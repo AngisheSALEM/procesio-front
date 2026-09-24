@@ -241,7 +241,7 @@ export const AuditComplianceModal: React.FC<AuditComplianceModalProps> = ({
                 Palette DGDA & Zéro couleur néon
               </div>
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                Surfaces Night Asphalt (`#2C2B2B`), fond clair Lin (`#f7f1e6`), accent Mustard Glow (`#E4B74A` / `#C58F18`), danger Retro Red (`#B71C1C`/`#D45A56`).
+                Surfaces Night Asphalt (`#222126`), fond clair Lin (`#f7f1e6`), accent Mustard Glow (`#E4B74A` / `#C58F18`), danger Retro Red (`#B71C1C`/`#D45A56`).
               </div>
             </div>
           </div>

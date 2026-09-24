@@ -56,7 +56,7 @@
 ---
 
 ## 3. Conformité aux Règles Strictes Demandées
-- [x] **Zéro box-shadow & Zéro bordure sur les cartes :** profondeur assurée exclusivement par les surfaces étagées (`#2C2B2B`, `#353333`, `#403D3D` en sombre, `#FFFFFF` sur `#f7f1e6` en clair).
+- [x] **Zéro box-shadow & Zéro bordure sur les cartes :** profondeur assurée exclusivement par les surfaces étagées (`#222126`, `#353333`, `#403D3D` en sombre, `#FFFFFF` sur `#f7f1e6` en clair).
 - [x] **Zéro couleur néon :** Palette 60–30–10 respectée (Night Asphalt, Lin Clair `#f7f1e6`, Mustard Glow, Retro Red, Denim Blue).
 - [x] **Zéro emoji :** Aucun emoji dans l'ensemble du code, interfaces et libellés.
 - [x] **Typographie SF Pro :** Déclarée en tête de pile de polices système Apple / standard.

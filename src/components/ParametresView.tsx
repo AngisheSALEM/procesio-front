@@ -70,8 +70,8 @@ export const ParametresView: React.FC<ParametresViewProps> = ({
                   width: '40px',
                   height: '40px',
                   borderRadius: '10px',
-                  backgroundColor: '#242323',
-                  border: '1px solid #514D4D',
+                  backgroundColor: '#1A191E',
+                  border: '1px solid #3D3C44',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -81,7 +81,7 @@ export const ParametresView: React.FC<ParametresViewProps> = ({
                 <Moon size={20} strokeWidth={2} />
               </div>
               <div>
-                <div style={{ fontSize: '14px', fontWeight: 600 }}>Thème Sombre (Night Asphalt)</div>
+                <div style={{ fontSize: '14px', fontWeight: 600 }}>Thème Sombre (Midnight Slate)</div>
                 <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
                   Recommandé pour un confort prolongé
                 </div>

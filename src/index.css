@@ -4,34 +4,34 @@
 */
 
 :root {
-  /* Default Dark Theme (Night Asphalt) */
-  --color-bg: #2C2B2B;
-  --color-bg-deep: #242323;
-  --color-surface: #353333;
-  --color-surface-elevated: #403D3D;
-  --color-surface-muted: #302F2F;
+  /* Default Dark Theme (Midnight Slate / Obsidian DGDA) */
+  --color-bg: #222126;
+  --color-bg-deep: #1A191E;
+  --color-surface: #2B2A30;
+  --color-surface-elevated: #35343B;
+  --color-surface-muted: #26252B;
 
-  --color-border: #4E4B4B;
-  --color-border-subtle: #3F3C3C;
+  --color-border: #3D3C44;
+  --color-border-subtle: #2E2D33;
 
   --color-text-primary: #f7f1e6;
   --color-text-secondary: #D8CEBD;
-  --color-text-muted: #A99F90;
-  --color-text-disabled: #766F66;
+  --color-text-muted: #9E968D;
+  --color-text-disabled: #6E6862;
 
   --color-accent: #E4B74A;
   --color-accent-hover: #F0C866;
   --color-accent-pressed: #C99D2F;
-  --color-on-accent: #2C2B2B;
+  --color-on-accent: #222126;
 
   --color-info: #7094B0;
-  --color-info-surface: #263845;
+  --color-info-surface: #1C2A36;
   --color-success: #6FA982;
-  --color-success-surface: #263A2C;
+  --color-success-surface: #1A2E22;
   --color-warning: #E4B74A;
-  --color-warning-surface: #44391F;
+  --color-warning-surface: #332814;
   --color-danger: #D45A56;
-  --color-danger-surface: #452525;
+  --color-danger-surface: #381D1D;
 
   /* Typography */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -48,10 +48,10 @@
   --transition-normal: 200ms ease;
 
   /* Frosted Glass Floating Styles (Liquid / iPadOS style) */
-  --glass-bg: rgba(36, 35, 35, 0.72);
-  --glass-surface: rgba(53, 51, 51, 0.65);
-  --glass-border: rgba(255, 255, 255, 0.09);
-  --glass-border-focus: rgba(228, 183, 74, 0.4);
+  --glass-bg: rgba(26, 25, 30, 0.78);
+  --glass-surface: rgba(43, 42, 48, 0.70);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-focus: rgba(228, 183, 74, 0.45);
   --glass-blur: blur(24px) saturate(160%);
 }
 

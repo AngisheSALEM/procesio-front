@@ -77,7 +77,7 @@ Procezo est conçu exclusivement pour les agents de la DGDA et structure l'instr
 3. **ZÉRO ÉMOJI :** Strictement aucun emoji dans le code, les labels, badges ou messages d'alerte. Utiliser le pack d'icônes vectorielles institutionnelles (Lucide / SF Symbols 1.5–2px).
 4. **ZÉRO NÉON, ZÉRO BOX-SHADOW & ZÉRO BORDURE SUR LES CARTES :** Aucune couleur fluorescente. Aucune ombre portée. Aucune bordure sur les cartes ; profondeur assurée exclusivement par le contraste des surfaces étagées.
 5. **Palette 60–30–10 officielle DGDA :**
-   - **Thème Sombre (défaut) :** Surface principale *Night Asphalt* (`#2C2B2B`), texte *Lin Clair* (`#f7f1e6`), accent *Mustard Glow* (`#E4B74A`).
+   - **Thème Sombre (défaut) :** Surface principale *Midnight Slate* (`#222126`), texte *Lin Clair* (`#f7f1e6`), accent *Mustard Glow* (`#E4B74A`).
    - **Thème Clair :** Surface *Lin Clair* (`#f7f1e6`), texte *Night Asphalt* (`#262525`), accent dérivé (`#C58F18`).
 6. **Typographie :**
    - Corps : Apple SF Pro (`-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display"`).
