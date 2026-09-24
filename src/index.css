@@ -1,0 +1,263 @@
+/* Procezo — Design System CSS
+   Conforme aux directives DGDA et procezo-design-system.md
+   Zéro néon, zéro box-shadow sur cartes/boutons, typographie SF Pro, palette 60-30-10
+*/
+
+:root {
+  /* Default Dark Theme (Night Asphalt) */
+  --color-bg: #2C2B2B;
+  --color-bg-deep: #242323;
+  --color-surface: #353333;
+  --color-surface-elevated: #403D3D;
+  --color-surface-muted: #302F2F;
+
+  --color-border: #4E4B4B;
+  --color-border-subtle: #3F3C3C;
+
+  --color-text-primary: #f7f1e6;
+  --color-text-secondary: #D8CEBD;
+  --color-text-muted: #A99F90;
+  --color-text-disabled: #766F66;
+
+  --color-accent: #E4B74A;
+  --color-accent-hover: #F0C866;
+  --color-accent-pressed: #C99D2F;
+  --color-on-accent: #2C2B2B;
+
+  --color-info: #7094B0;
+  --color-info-surface: #263845;
+  --color-success: #6FA982;
+  --color-success-surface: #263A2C;
+  --color-warning: #E4B74A;
+  --color-warning-surface: #44391F;
+  --color-danger: #D45A56;
+  --color-danger-surface: #452525;
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, Monaco, monospace;
+
+  /* Border radius strictly following design system */
+  --radius-sm: 4px;
+  --radius-btn: 6px;
+  --radius-card: 8px;
+  --radius-badge: 999px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+
+  /* Frosted Glass Floating Styles (Liquid / iPadOS style) */
+  --glass-bg: rgba(36, 35, 35, 0.72);
+  --glass-surface: rgba(53, 51, 51, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-border-focus: rgba(228, 183, 74, 0.4);
+  --glass-blur: blur(24px) saturate(160%);
+}
+
+[data-theme="light"] {
+  --color-bg: #f7f1e6;
+  --color-bg-deep: #EBE2D3;
+  --color-surface: #FFFFFF;
+  --color-surface-elevated: #FFFFFF;
+  --color-surface-muted: #F2EADA;
+
+  --color-border: #DFD5C3;
+  --color-border-subtle: #EAE2D3;
+
+  --color-text-primary: #262525;
+  --color-text-secondary: #446B8D;
+  --color-text-muted: #6C757D;
+  --color-text-disabled: #9E9990;
+
+  --color-accent: #C58F18;
+  --color-accent-hover: #AA790F;
+  --color-accent-pressed: #8A610A;
+  --color-on-accent: #262525;
+
+  --color-info: #446B8D;
+  --color-info-surface: #E3ECF3;
+  --color-success: #2C6E44;
+  --color-success-surface: #E2EFE5;
+  --color-warning: #946911;
+  --color-warning-surface: #F9EED4;
+  --color-danger: #9E1717;
+  --color-danger-surface: #F8DFDC;
+
+  --glass-bg: rgba(247, 241, 230, 0.85);
+  --glass-surface: rgba(255, 255, 255, 0.80);
+  --glass-border: rgba(68, 107, 141, 0.16);
+  --glass-border-focus: rgba(197, 143, 24, 0.5);
+  --glass-blur: blur(24px) saturate(160%);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+/* Zero box-shadow constraint strictly applied */
+button, .card, .panel, .modal, .badge, input, select, textarea {
+  box-shadow: none !important;
+}
+
+/* Zero border on cards — Depth is achieved strictly through surface contrast */
+.card, .panel, [data-card] {
+  border: none !important;
+}
+
+/* Monospace references */
+.font-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" on, "lnum" on;
+}
+
+/* Custom scrollbars matching theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-deep);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* Accessibility Focus Rings (WCAG 2.1 AA) */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--color-accent) !important;
+  outline-offset: 2px !important;
+}
+
+/* Interactive Clickable Cards — Smooth Micro-interactions */
+.card-interactive {
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  cursor: pointer;
+}
+.card-interactive:hover {
+  background-color: var(--color-surface-elevated) !important;
+  transform: translateY(-1px);
+}
+.card-interactive:active {
+  transform: scale(0.995);
+}
+
+/* Standard Ergonomic Button Hierarchy */
+.btn-primary {
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  font-weight: 600;
+  border-radius: var(--radius-btn);
+  padding: 8px 16px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+.btn-primary:hover {
+  background-color: var(--color-accent-hover);
+}
+.btn-primary:active {
+  background-color: var(--color-accent-pressed);
+  transform: scale(0.98);
+}
+
+.btn-secondary {
+  background-color: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  border: none;
+  font-weight: 500;
+  border-radius: var(--radius-btn);
+  padding: 8px 16px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+.btn-secondary:hover {
+  background-color: var(--color-surface-muted);
+}
+.btn-secondary:active {
+  transform: scale(0.98);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: none;
+  font-weight: 500;
+  border-radius: var(--radius-btn);
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+.btn-ghost:hover {
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-muted);
+}
+
+/* Tinted Status Capsules (Color Theory 10% & Low-Saturation Surfaces) */
+.badge-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-badge);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.2px;
+}
+
+.badge-status-warning {
+  background-color: var(--color-warning-surface);
+  color: var(--color-warning);
+}
+
+.badge-status-success {
+  background-color: var(--color-success-surface);
+  color: var(--color-success);
+}
+
+.badge-status-danger {
+  background-color: var(--color-danger-surface);
+  color: var(--color-danger);
+}
+
+.badge-status-info {
+  background-color: var(--color-info-surface);
+  color: var(--color-info);
+}
+
+.badge-status-neutral {
+  background-color: var(--color-surface-elevated);
+  color: var(--color-text-secondary);
+}
