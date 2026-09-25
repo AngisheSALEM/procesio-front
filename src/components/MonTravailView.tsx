@@ -233,7 +233,7 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
             <tr
               style={{
                 borderBottom: '1px solid var(--color-border)',
-                backgroundColor: 'var(--color-surface-elevated)',
+                backgroundColor: 'var(--color-surface)',
                 color: 'var(--color-text-muted)',
                 fontSize: '11px',
                 fontWeight: 700,

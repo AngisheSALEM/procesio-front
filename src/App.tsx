@@ -4,8 +4,6 @@ import { Sidebar } from './components/Sidebar';
 import { DossierHeader, type DossierTabId } from './components/DossierHeader';
 import { VueEnsembleTab } from './components/VueEnsembleTab';
 import { DossierTachesTab } from './components/DossierTachesTab';
-import { DossierAlertesTab } from './components/DossierAlertesTab';
-import { DossierEcheancesTab } from './components/DossierEcheancesTab';
 import { DemandeCommunicationView } from './components/DemandeCommunicationView';
 import { FeuilleObservationView } from './components/FeuilleObservationView';
 import { DocumentsTab } from './components/DocumentsTab';
@@ -19,7 +17,7 @@ import type {
   UserRole,
   DossierEnquete,
   TacheDossier,
-  AlerteDossier
+  TypeActionSysteme
 } from './types';
 import {
   mockUsers,
@@ -103,8 +101,6 @@ export function App() {
     const validTabs: DossierTabId[] = [
       'vue-ensemble',
       'taches',
-      'alertes',
-      'echeances',
       'actions-echanges',
       'constats-defense',
       'documents',
@@ -256,6 +252,9 @@ export function App() {
     description: string;
     priorite: 'URGENTE' | 'NORMALE';
     dateEcheance: string;
+    actionSysteme?: TypeActionSysteme;
+    cibleTab?: DossierTabId;
+    declencheur?: string;
   }) => {
     const now = new Date();
     const timestamp = `${now.toISOString().split('T')[0]} ${now.toTimeString().split(' ')[0]}`;
@@ -272,6 +271,9 @@ export function App() {
             dateEcheance: newTask.dateEcheance,
             horodatageCreation: timestamp,
             auteur: `${currentUser.grade} ${currentUser.nom}`,
+            actionSysteme: newTask.actionSysteme,
+            cibleTab: newTask.cibleTab,
+            declencheur: newTask.declencheur,
           };
           return {
             ...d,
@@ -309,37 +311,7 @@ export function App() {
     );
   };
 
-  // Handle adding alert to the selected dossier with timestamp
-  const handleAddAlerteToDossier = (newAlert: {
-    titre: string;
-    message: string;
-    niveau: 'CRITIQUE' | 'AVERTISSEMENT' | 'INFO';
-    actionRequise: string;
-  }) => {
-    const now = new Date();
-    const timestamp = `${now.toISOString().split('T')[0]} ${now.toTimeString().split(' ')[0]}`;
 
-    setDossiers((prev) =>
-      prev.map((d) => {
-        if (d.id === selectedDossierId) {
-          const item: AlerteDossier = {
-            id: `ALT-${Date.now().toString().slice(-4)}`,
-            titre: newAlert.titre,
-            message: newAlert.message,
-            niveau: newAlert.niveau,
-            actionRequise: newAlert.actionRequise,
-            horodatage: timestamp,
-            auteur: `${currentUser.grade} ${currentUser.nom}`,
-          };
-          return {
-            ...d,
-            alertes: [item, ...(d.alertes || [])],
-          };
-        }
-        return d;
-      })
-    );
-  };
 
   // If not authenticated, render Login Page
   if (!isAuthenticated) {
@@ -381,12 +353,12 @@ export function App() {
         }}
       >
         {/* Top Header: Search and theme toggle without bottom border */}
-        <Header
+        {/* <Header
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           theme={theme}
           onToggleTheme={toggleTheme}
-        />
+        /> */}
 
         {/* Central Workspace: Scrollable view area */}
         <main
@@ -398,10 +370,10 @@ export function App() {
             minWidth: 0,
             padding: '4px 24px 24px 24px',
           }}
-        >
+        > 
           {/* Route: Dossier Detail (Page de détail d'un dossier accédée depuis le tableau) */}
           {(activeNav === 'dossier-detail' || activeNav === 'dossiers-enquete') && (
-            <div>
+            <div> <br /><br />
               <DossierHeader
                 dossier={currentDossier}
                 activeTab={activeDossierTab}
@@ -425,32 +397,27 @@ export function App() {
                     taches={currentDossier.taches || []}
                     onToggleTask={handleToggleTaskInDossier}
                     onAddTask={handleAddTaskToDossier}
+                    onNavigateTab={(tab) => setActiveDossierTab(tab)}
                     user={currentUser}
-                  />
-                )}
-
-                {activeDossierTab === 'alertes' && (
-                  <DossierAlertesTab
-                    key={currentDossier.id}
-                    alertes={currentDossier.alertes || []}
-                    onAddAlerte={handleAddAlerteToDossier}
-                    user={currentUser}
-                  />
-                )}
-
-                {activeDossierTab === 'echeances' && (
-                  <DossierEcheancesTab
-                    key={currentDossier.id}
-                    echeances={currentDossier.echeances || []}
                   />
                 )}
 
                 {activeDossierTab === 'actions-echanges' && (
-                  <DemandeCommunicationView key={currentDossier.id} initialDemande={currentDemande} />
+                  <DemandeCommunicationView
+                    key={currentDossier.id}
+                    initialDemande={currentDemande}
+                    currentUser={currentUser}
+                    onGoToFeuilleObservation={() => setActiveDossierTab('constats-defense')}
+                  />
                 )}
 
                 {activeDossierTab === 'constats-defense' && (
-                  <FeuilleObservationView key={currentDossier.id} initialFeuille={currentFeuille} />
+                  <FeuilleObservationView
+                    key={currentDossier.id}
+                    initialFeuille={currentFeuille}
+                    currentUser={currentUser}
+                    onNavigateTab={(tab) => setActiveDossierTab(tab)}
+                  />
                 )}
 
                 {activeDossierTab === 'documents' && (

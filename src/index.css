@@ -136,10 +136,10 @@
   --color-surface: #EDF1F1;
 
   /* Surface surélevée (inputs, cartes interactives, survol de lignes) : Blanc givré (#EDF1F1) */
-  --color-surface-elevated: #EDF1F1;
+  --color-surface-elevated: ;
 
   /* Surface atténuée (en-têtes thead, badges neutres) : Glacier pâle (#EFFFFF) */
-  --color-surface-muted: #F6F8F8;
+  --color-surface-muted: #EDF1F1;
 
 
   /* --- BORDURES ET SÉPARATEURS --- */

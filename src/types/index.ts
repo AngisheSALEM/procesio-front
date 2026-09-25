@@ -41,6 +41,15 @@ export interface OperationDouaniere {
   valeurDeclareeUSD: number;
 }
 
+export type TypeActionSysteme =
+  | 'DEMANDE_COMMUNICATION'
+  | 'EVALUATION_REPONSE'
+  | 'FEUILLE_OBSERVATION'
+  | 'PV_CONSTAT'
+  | 'PV_INFRACTION'
+  | 'CLOTURE_SANS_SUITE'
+  | 'TRANSMISSION_HIERARCHIE';
+
 export interface TacheDossier {
   id: string;
   titre: string;
@@ -50,6 +59,9 @@ export interface TacheDossier {
   dateEcheance: string;
   horodatageCreation: string;
   auteur: string;
+  actionSysteme?: TypeActionSysteme;
+  cibleTab?: 'actions-echanges' | 'constats-defense' | 'documents' | 'vue-ensemble' | 'taches';
+  declencheur?: string;
 }
 
 export interface AlerteDossier {
@@ -128,6 +140,9 @@ export interface DemandeCommunication {
   reference: string;
   dossierId: string;
   redacteur: string;
+  auteur?: string;
+  horodatage?: string;
+  objet?: string;
   signataireHabilite: string;
   gradeSignataire: string;
   destinataire: {
@@ -144,6 +159,25 @@ export interface DemandeCommunication {
   reponsesRecues: ReponseRecue[];
   modaliteRemise: string;
   commentairesInternes: string;
+  pdfSourceNom?: string;
+  pdfSourceTaille?: string;
+  pdfSourceDateUpload?: string;
+  evaluationReponse?: 'SATISFAISANTE' | 'NON_SATISFAISANTE';
+  pvConstatGenere?: {
+    reference: string;
+    date: string;
+    motif: string;
+    inspecteurs: string[];
+    amendeLegaleUSD: number;
+  };
+  missionControleLancee?: {
+    reference: string;
+    dateDebut: string;
+    dateFin: string;
+    lieu: string;
+    equipe: string[];
+    objet: string;
+  };
 }
 
 export type AppreciationObservation =
@@ -188,11 +222,24 @@ export interface FeuilleObservation {
   observations: ObservationItem[];
   statutFeuille: 'BROUILLON' | 'NOTIFIEE' | 'DEFENSE_RECUE' | 'REUNION_CONTRADICTOIRE' | 'CLOTUREE';
   dateReunionCloturePrevue?: string;
+  pdfSourceNom?: string;
+  pdfSourceDateUpload?: string;
+  decisionFinale?: 'CLASSE_SANS_SUITE' | 'PV_INFRACTION_GLEC';
   decisionRelais?: {
     relaisGelec: boolean;
     referencePvInfraction?: string;
     motif: string;
     dateTransmission?: string;
+  };
+  pvInfractionGlec?: {
+    reference: string;
+    date: string;
+    infractions: string[];
+    droitsEludesUSD: number;
+    droitsEludesCDF: number;
+    amendeUSD: number;
+    inspecteurs: string[];
+    statutTransmission: 'TRANSMIS_GLEC' | 'EN_ATTENTE_SIGNATURE';
   };
 }
 

@@ -7,16 +7,13 @@ import {
   FolderOpen,
   Clock,
   ArrowLeft,
-  CheckCircle2,
-  AlertTriangle
+  CheckCircle2
 } from 'lucide-react';
 import type { DossierEnquete } from '../types';
 
 export type DossierTabId =
   | 'vue-ensemble'
   | 'taches'
-  | 'alertes'
-  | 'echeances'
   | 'actions-echanges'
   | 'constats-defense'
   | 'documents';
@@ -42,27 +39,17 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
     },
     {
       id: 'taches' as DossierTabId,
-      label: `Tâches (${dossier.taches?.length || 0})`,
+      label: `Tâches (${dossier.taches?.filter((t) => t.statut !== 'TERMINEE').length ?? dossier.taches?.length ?? 0})`,
       icon: <CheckCircle2 size={14} strokeWidth={1.8} />,
     },
     {
-      id: 'alertes' as DossierTabId,
-      label: `Alertes (${dossier.alertes?.length || 0})`,
-      icon: <AlertTriangle size={14} strokeWidth={1.8} />,
-    },
-    {
-      id: 'echeances' as DossierTabId,
-      label: `Échéances (${dossier.echeances?.length || 0})`,
-      icon: <Calendar size={14} strokeWidth={1.8} />,
-    },
-    {
       id: 'actions-echanges' as DossierTabId,
-      label: 'Demandes ',
+      label: 'Demande de communication',
       icon: <Send size={14} strokeWidth={1.8} />,
     },
     {
       id: 'constats-defense' as DossierTabId,
-      label: 'Constats d’observation',
+      label: 'Feuille d’observation',
       icon: <Scale size={14} strokeWidth={1.8} />,
     },
     {
@@ -76,109 +63,83 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
     <div
       style={{
         backgroundColor: 'var(--color-surface)',
-        borderBottom: '1px solid var(--color-border)',
+        border: '1px solid var(--color-border)',
         paddingTop: '16px',
         paddingLeft: '24px',
         paddingRight: '24px',
         borderRadius: '16px 16px 0 0',
       }}
     >
-      {/* Top Metadata Row: Reference, Priority, Status, Date */}
+      {/* Top Row: Back button, Title, Open Date and Due Date */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '16px',
-          marginBottom: '8px',
+          marginBottom: '14px',
           flexWrap: 'wrap',
         }}
       >
-
-        {/* Main Dossier Title */}
-          <h1
-          style={{
-          fontSize: '18px',
-          fontWeight: 700,
-          color: 'var(--color-text-primary)',
-          lineHeight: 1.35,
-          marginBottom: '8px',
-        }}
-          >
-        {dossier.objet}
-          </h1>         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '280px' }}>
           {onBack && (
             <button
               onClick={onBack}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '4px 10px',
-                fontSize: '12px',
-                fontWeight: 600,
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
                 color: 'var(--color-text-secondary)',
                 backgroundColor: 'var(--color-surface-elevated)',
                 border: 'none',
                 borderRadius: '8px',
                 cursor: 'pointer',
-                marginRight: '4px',
+                flexShrink: 0,
                 transition: 'all var(--transition-fast)',
               }}
-              title="Retourner à l’espace de travail"
+              title="Retour aux dossiers"
             >
-              <ArrowLeft size={13} strokeWidth={2} />
-              
+              <ArrowLeft size={16} strokeWidth={2} />
             </button>
           )}
 
-
-      
-          <span
-            className="  "
+          <h1
             style={{
-              fontSize: '10px',
+              fontSize: '18px',
               fontWeight: 700,
-              color: 'var(--color-accent)',
-              letterSpacing: '0.4px',
+              color: 'var(--color-text-primary)',
+              lineHeight: 1.35,
+              margin: 0,
             }}
           >
-            {dossier.reference}
-          </span>
-          <span style={{ color: 'var(--color-border-subtle)' }}>•</span>
-          <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
-            {dossier.unite}
-          </span>
-          <span style={{ color: 'var(--color-border-subtle)' }}>•</span>
-          <span style={{ fontSize: '10px', color: 'var(--color-warning)', fontWeight: 600 }}>
-            Priorité {dossier.priorite}
-          </span>
+            {dossier.objet}
+          </h1>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--color-text-muted)' }}>
-            <Clock size={12} color="var(--color-accent)" />
-            <span>Ouvert le : <strong className="" style={{ color: 'var(--color-text-secondary)' }}>{dossier.horodatageCreation || dossier.dateCreation}</strong></span>
+        {/* Date d'ouverture et date d'échéance */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--color-text-muted)' }}>
+            <Clock size={13} color="var(--color-accent)" />
+            <span>Ouvert le : <strong style={{ color: 'var(--color-text-secondary)' }}>{dossier.horodatageCreation || dossier.dateCreation}</strong></span>
           </div>
-          <span style={{ color: 'var(--color-border-subtle)' }}>•</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--color-text-muted)' }}>
-            <Calendar size={12} />
-            <span>Échéance : <strong className="" style={{ color: 'var(--color-text-secondary)' }}>{dossier.echeance}</strong></span>
+          <span style={{ color: 'var(--color-border)' }}>•</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--color-text-muted)' }}>
+            <Calendar size={13} color="var(--color-danger)" />
+            <span>Échéance : <strong style={{ color: 'var(--color-text-secondary)' }}>{dossier.echeance}</strong></span>
           </div>
         </div>
       </div>
-
-
-
-      {/* Sleek Subtitle Strip (Target entity, Responsible, Next action) */}
-     <br />
 
       {/* Ergonomic Navigation Tabs */}
       <div
         style={{
           display: 'flex',
           gap: '4px',
+          overflowX: 'auto',
+          maxWidth: '100%',
+          scrollbarWidth: 'none',
         }}
       >
         {tabs.map((tab) => {
@@ -207,7 +168,7 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
                 transition: 'all var(--transition-fast)',
               }}
             >
-              <span
+              {/* <span
                 style={{
                   color: isActive ? 'var(--color-accent)' : 'var(--color-text-muted)',
                   display: 'flex',
@@ -215,7 +176,7 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
                 }}
               >
                 {tab.icon}
-              </span>
+              </span> */}
               <span>{tab.label}</span>
             </button>
           );
