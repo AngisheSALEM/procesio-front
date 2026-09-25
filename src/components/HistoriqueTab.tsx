@@ -1,18 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { History } from 'lucide-react';
+import type { AuditLogEntry } from '../types';
 
-interface AuditLogEntry {
-  id: string;
-  date: string;
-  heure: string;
-  auteur: string;
-  action: string;
-  details: string;
-  categorie: 'PROCEDURE' | 'DOCUMENT' | 'DECISION' | 'SECURITE';
+interface HistoriqueTabProps {
+  logs?: AuditLogEntry[];
 }
 
-export const HistoriqueTab: React.FC = () => {
-  const logs: AuditLogEntry[] = [
+export const HistoriqueTab: React.FC<HistoriqueTabProps> = ({ logs: propLogs }) => {
+  const defaultLogs: AuditLogEntry[] = [
     {
       id: 'LOG-006',
       date: '2026-09-18',
@@ -69,6 +64,8 @@ export const HistoriqueTab: React.FC = () => {
     },
   ];
 
+  const [logs] = useState<AuditLogEntry[]>(propLogs || defaultLogs);
+
   return (
     <div
       style={{
@@ -87,7 +84,7 @@ export const HistoriqueTab: React.FC = () => {
             Enregistrement inaltérable des actions, consultations et décisions selon les normes DGDA
           </div>
         </div>
-        <span className="font-mono" style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+        <span className="  " style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
           {logs.length} événements consignés
         </span>
       </div>
@@ -128,7 +125,7 @@ export const HistoriqueTab: React.FC = () => {
                 <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                   {log.action}
                 </div>
-                <div className="font-mono" style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                <div className="  " style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
                   {log.date} à {log.heure}
                 </div>
               </div>

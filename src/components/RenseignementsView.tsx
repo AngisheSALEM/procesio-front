@@ -101,10 +101,10 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({ onOpenDo
           <tbody>
             {renseignements.map((ren) => (
               <tr key={ren.id} style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
-                <td style={{ padding: '12px 16px', fontWeight: 700 }} className="font-mono">
+                <td style={{ padding: '12px 16px', fontWeight: 700 }} className="  ">
                   {ren.reference}
                 </td>
-                <td style={{ padding: '12px 16px', color: 'var(--color-text-secondary)' }} className="font-mono">
+                <td style={{ padding: '12px 16px', color: 'var(--color-text-secondary)' }} className="  ">
                   {ren.dateReception}
                 </td>
                 <td style={{ padding: '12px 16px' }}>

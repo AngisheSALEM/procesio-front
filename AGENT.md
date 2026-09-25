@@ -60,7 +60,7 @@ Procezo est conçu exclusivement pour les agents de la DGDA et structure l'instr
 - Chaque constat possède ses faits, ses justificatifs, ses questions, les arguments de défense reçus, et l’appréciation motivée de l’enquêteur (*Point expliqué*, *Complément requis*, *Analyse requise*, *Constat confirmé pour contentieux*).
 - La résolution de O1 ne ferme jamais automatiquement O2 ni O3.
 
-### F. Traitement des Demandes de Communication (Art. 46)
+### F. Traitement des Demandes de Communication  
 - Liste détaillée des pièces demandées avec statut unitaire (*Fourni*, *Manquant*, *Incomplet*, *En attente*).
 - Distinction claire entre la réception d'un courrier et son appréciation au fond.
 - Gestion du cycle de réponse : *Brouillon*, *À valider*, *Émise*, *Réponse partielle*, *Réponse complète*, *Terminée*.

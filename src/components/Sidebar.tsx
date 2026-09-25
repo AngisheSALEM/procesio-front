@@ -75,11 +75,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <Briefcase size={18} strokeWidth={1.8} />,
     },
     {
-      id: 'dossiers-enquete',
-      label: 'Dossiers d’enquête',
-      icon: <FolderLock size={18} strokeWidth={1.8} />,
-    },
-    {
       id: 'renseignements',
       label: 'Renseignements',
       icon: <Radio size={18} strokeWidth={1.8} />,
@@ -101,52 +96,70 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       style={{
-        width: isCollapsed ? '64px' : '240px',
-        margin: '16px 0 16px 16px',
-        height: 'calc(100% - 32px)',
-        maxHeight: 'calc(100vh - 92px)',
-        position: 'sticky',
-        top: '16px',
+        width: isCollapsed ? '68px' : '250px',
+        margin: 0,
+        height: '100vh',
+        maxHeight: '100vh',
+        position: 'relative',
+        top: 0,
+        left: 0,
         flexShrink: 0,
-        backgroundColor: 'var(--glass-bg)',
-        backdropFilter: 'var(--glass-blur)',
-        WebkitBackdropFilter: 'var(--glass-blur)',
-        border: '1px solid var(--glass-border)',
-        borderRadius: '20px',
+        backgroundColor: 'var(--color-bg-deep)',
+        borderRight: '1px solid var(--color-border-subtle)',
+        borderTop: 'none',
+        borderBottom: 'none',
+        borderLeft: 'none',
+        borderRadius: 0,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        padding: isCollapsed ? '16px 8px' : '16px 12px',
+        padding: isCollapsed ? '16px 8px' : '16px 14px',
         userSelect: 'none',
         transition: 'width var(--transition-normal), padding var(--transition-normal)',
         zIndex: 20,
       }}
     >
       <div>
-        {/* Top Header of the floating nav bar */}
+        {/* Top Header of the sidebar with Logo & PROCEZO */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: isCollapsed ? 'center' : 'space-between',
-            padding: isCollapsed ? '0 0 14px 0' : '2px 8px 14px 8px',
-            borderBottom: '1px solid var(--glass-border)',
-            marginBottom: '10px',
+            padding: isCollapsed ? '0 0 16px 0' : '0 4px 18px 4px',
+            borderBottom: '1px solid var(--color-border-subtle)',
+            marginBottom: '16px',
+            gap: '8px',
           }}
         >
-          {!isCollapsed && (
-            <span
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img
+              src="/Logo-dgda.png"
+              alt="Logo DGDA"
               style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.8px',
-                color: 'var(--color-text-muted)',
+                width: '34px',
+                height: '34px',
+                objectFit: 'contain',
+                borderRadius: '6px',
+                flexShrink: 0,
               }}
-            >
-              {user.role === 'admin' ? 'Espace Direction' : 'Espace Enquêteur'}
-            </span>
-          )}
+              onError={(e) => {
+                (e.currentTarget as HTMLElement).style.display = 'none';
+              }}
+            />
+            {!isCollapsed && (
+              <span
+                style={{
+                  fontSize: '17px',
+                  fontWeight: 800,
+                  letterSpacing: '0.8px',
+                  color: 'var(--color-text-primary)',
+                }}
+              >
+                PROCEZO
+              </span>
+            )}
+          </div>
 
           <button
             onClick={onToggleCollapse}
@@ -159,7 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '4px',
+              padding: '6px',
               borderRadius: 'var(--radius-btn)',
               outline: 'none',
             }}
@@ -253,7 +266,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 width: '32px',
                 height: '32px',
                 borderRadius: '9999px',
-                backgroundColor: 'var(--color-surface-elevated)',
+                backgroundColor: 'var(--color-surface)',
                 border: '1px solid var(--color-border)',
                 display: 'flex',
                 alignItems: 'center',

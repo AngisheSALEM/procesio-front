@@ -96,7 +96,7 @@ export const DocumentsModelesView: React.FC = () => {
           <tbody>
             {modeles.map((m) => (
               <tr key={m.id} style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
-                <td style={{ padding: '12px 16px', fontWeight: 700 }} className="font-mono">
+                <td style={{ padding: '12px 16px', fontWeight: 700 }} className="  ">
                   {m.code}
                 </td>
                 <td style={{ padding: '12px 16px' }}>
@@ -105,7 +105,7 @@ export const DocumentsModelesView: React.FC = () => {
                     {m.description}
                   </div>
                 </td>
-                <td style={{ padding: '12px 16px' }} className="font-mono">
+                <td style={{ padding: '12px 16px' }} className="  ">
                   {m.version}
                 </td>
                 <td style={{ padding: '12px 16px' }}>
@@ -131,7 +131,7 @@ export const DocumentsModelesView: React.FC = () => {
                     </span>
                   )}
                 </td>
-                <td style={{ padding: '12px 16px', color: 'var(--color-text-secondary)' }} className="font-mono">
+                <td style={{ padding: '12px 16px', color: 'var(--color-text-secondary)' }} className="  ">
                   {m.dateApplication}
                 </td>
                 <td style={{ padding: '12px 16px', textAlign: 'right' }}>

@@ -6,6 +6,7 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import type { DossierEnquete } from '../types';
+import { mockDemandesParDossier, mockFeuillesParDossier } from '../data/mockData';
 
 interface VueEnsembleTabProps {
   dossier: DossierEnquete;
@@ -55,13 +56,13 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '12px' }}>
             <div>
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Identifiant NIF</div>
-              <div className="font-mono" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-accent)' }}>
+              <div className="  " style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-accent)' }}>
                 {dossier.entiteControlee.nif}
               </div>
             </div>
             <div>
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Registre de Commerce (RCCM)</div>
-              <div className="font-mono" style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>
+              <div className="  " style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>
                 {dossier.entiteControlee.rccm}
               </div>
             </div>
@@ -139,19 +140,19 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
                     borderBottom: '1px solid var(--color-border-subtle)',
                   }}
                 >
-                  <td style={{ padding: '8px', fontWeight: 600 }} className="font-mono">
+                  <td style={{ padding: '8px', fontWeight: 600 }} className="  ">
                     {op.referenceSydonia}
                   </td>
                   <td style={{ padding: '8px' }}>
                     <div style={{ color: 'var(--color-text-primary)' }}>{op.bureau}</div>
-                    <div className="font-mono" style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                    <div className="  " style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
                       {op.dateDeclaration}
                     </div>
                   </td>
                   <td style={{ padding: '8px', color: 'var(--color-text-secondary)' }}>
                     {op.regime}
                   </td>
-                  <td style={{ padding: '8px', textAlign: 'right', fontWeight: 600 }} className="font-mono">
+                  <td style={{ padding: '8px', textAlign: 'right', fontWeight: 600 }} className="  ">
                     {op.valeurDeclareeUSD.toLocaleString()} $
                   </td>
                 </tr>
@@ -233,7 +234,7 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Shield size={14} color="var(--color-accent)" />
-                  <span className="font-mono" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                  <span className="  " style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                     {rId}
                   </span>
                 </div>
@@ -247,55 +248,71 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
       </div>
 
       {/* Quick Action Navigation Shortcuts */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '16px',
-        }}
-      >
-        <div
-          onClick={onGoToDemandes}
-          className="card-interactive"
-          style={{
-            backgroundColor: 'var(--color-surface)',
-            border: 'none',
-            borderRadius: 'var(--radius-card)',
-            padding: '16px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-accent)' }}>
-              Demandes de communication en cours
-            </div>
-            <ExternalLink size={15} color="var(--color-accent)" />
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-            1 demande émise auprès de la TMB • Réponse partielle reçue • 2 pièces manquantes à relancer
-          </div>
-        </div>
+      {(() => {
+        const demande = mockDemandesParDossier[dossier.id];
+        const feuille = mockFeuillesParDossier[dossier.id];
+        const piecesCount = demande ? demande.elementsDemandes.length : 0;
+        const manquantesCount = demande
+          ? demande.elementsDemandes.filter((e) => e.statutRemise === 'MANQUANT' || e.statutRemise === 'EN_ATTENTE').length
+          : 0;
+        const constatsCount = feuille ? feuille.observations.length : 0;
 
-        <div
-          onClick={onGoToObservations}
-          className="card-interactive"
-          style={{
-            backgroundColor: 'var(--color-surface)',
-            border: 'none',
-            borderRadius: 'var(--radius-card)',
-            padding: '16px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-accent)' }}>
-              Feuille d'observation contradictoire (O1, O2, O3)
+        return (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '16px',
+            }}
+          >
+            <div
+              onClick={onGoToDemandes}
+              className="card-interactive"
+              style={{
+                backgroundColor: 'var(--color-surface)',
+                border: 'none',
+                borderRadius: 'var(--radius-card)',
+                padding: '16px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-accent)' }}>
+                  Demandes de communication  
+                </div>
+                <ExternalLink size={15} color="var(--color-accent)" />
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                {demande
+                  ? `${demande.reference} • Destinataire : ${demande.destinataire.nom} • ${piecesCount} pièces requises (${manquantesCount} en attente)`
+                  : 'Aucune demande active émise'}
+              </div>
             </div>
-            <ExternalLink size={15} color="var(--color-accent)" />
+
+            <div
+              onClick={onGoToObservations}
+              className="card-interactive"
+              style={{
+                backgroundColor: 'var(--color-surface)',
+                border: 'none',
+                borderRadius: 'var(--radius-card)',
+                padding: '16px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-accent)' }}>
+                  Feuille d’observation contradictoire
+                </div>
+                <ExternalLink size={15} color="var(--color-accent)" />
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                {feuille
+                  ? `${feuille.reference} • ${constatsCount} constat${constatsCount > 1 ? 's' : ''} formulé${constatsCount > 1 ? 's' : ''} (${feuille.observations.map(o => o.code).join(', ')}) • Statut : ${feuille.statutFeuille}`
+                  : 'Aucune feuille d’observation rédigée'}
+              </div>
+            </div>
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-            3 constats formulés • 1 point expliqué • 1 complément requis • 1 constat maintenu pour contentieux
-          </div>
-        </div>
-      </div>
+        );
+      })()}
     </div>
   );
 };

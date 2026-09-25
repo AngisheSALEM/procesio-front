@@ -41,6 +41,36 @@ export interface OperationDouaniere {
   valeurDeclareeUSD: number;
 }
 
+export interface TacheDossier {
+  id: string;
+  titre: string;
+  description: string;
+  statut: 'A_FAIRE' | 'EN_COURS' | 'TERMINEE';
+  priorite: 'URGENTE' | 'NORMALE';
+  dateEcheance: string;
+  horodatageCreation: string;
+  auteur: string;
+}
+
+export interface AlerteDossier {
+  id: string;
+  titre: string;
+  message: string;
+  niveau: 'CRITIQUE' | 'AVERTISSEMENT' | 'INFO';
+  actionRequise: string;
+  horodatage: string;
+  auteur: string;
+}
+
+export interface EcheanceDossier {
+  id: string;
+  libelle: string;
+  dateButoir: string;
+  typeEcheance: string;
+  horodatageFixe: string;
+  statut: 'DANS_LES_DELAIS' | 'IMMINENT' | 'DEPASSE';
+}
+
 export interface DossierEnquete {
   id: string;
   reference: string;
@@ -54,10 +84,14 @@ export interface DossierEnquete {
   echeance: string;
   prochaineAction: string;
   dateCreation: string;
+  horodatageCreation: string;
   entiteControlee: EntiteControlee;
   equipe: string[];
   operationsDouanieres: OperationDouaniere[];
   renseignementsLiesIds: string[];
+  taches: TacheDossier[];
+  alertes: AlerteDossier[];
+  echeances: EcheanceDossier[];
 }
 
 export type StatutDemandeCommunication =
@@ -161,3 +195,71 @@ export interface FeuilleObservation {
     dateTransmission?: string;
   };
 }
+
+export type StatutTache = 'A_FAIRE' | 'EN_COURS' | 'TERMINEE';
+export type PrioriteTache = 'URGENTE' | 'NORMALE' | 'FAIBLE';
+
+export interface TacheAgent {
+  id: string;
+  titre: string;
+  description: string;
+  dossierId: string;
+  dossierRef: string;
+  entrepriseNom: string;
+  echeance: string;
+  statut: StatutTache;
+  priorite: PrioriteTache;
+  assigneA: string;
+  categorie: 'VERIFICATION' | 'COMMUNICATION' | 'OBSERVATION' | 'AUDIT' | 'REDIGE_PV';
+}
+
+export type TypeAlerte = 'RETARD_REPONSE' | 'ECHEANCE_PROCHE' | 'INCOHERENCE_SYDONIA' | 'REUNION_CONTRADICTOIRE' | 'SIGNALEMENT';
+
+export interface AlerteOperationnelle {
+  id: string;
+  titre: string;
+  message: string;
+  date: string;
+  type: TypeAlerte;
+  niveau: 'CRITIQUE' | 'AVERTISSEMENT' | 'INFO';
+  dossierId: string;
+  dossierRef: string;
+  actionRequise: string;
+  resolue?: boolean;
+}
+
+export interface EcheanceItem {
+  id: string;
+  titre: string;
+  dateButoir: string;
+  joursRestants: number;
+  dossierId: string;
+  dossierRef: string;
+  entrepriseNom: string;
+  typeEcheance: 'REPONSE_ART_46' | 'MOYENS_DEFENSE' | 'REUNION_CLOTURE' | 'RAPPORT_FINAL';
+  statut: 'DANS_LES_DELAIS' | 'IMMINENT' | 'EN_RETARD';
+}
+
+export interface DocumentItem {
+  id: string;
+  reference: string;
+  titre: string;
+  type: 'PV_OPERATIONS' | 'PV_INFRACTION' | 'DEMANDE_COMMUNICATION' | 'FEUILLE_OBSERVATION' | 'BORDEREAU_GELEC';
+  format: 'PDF' | 'DOCX' | 'SCAN_SIGNE' | 'XLSX';
+  statutValidation: 'BROUILLON' | 'VALIDE_INTERNE' | 'SIGNE_OFFICIEL' | 'TRANSMIS';
+  dateCreation: string;
+  auteur: string;
+  signataire?: string;
+  relaisGelec: boolean;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  date: string;
+  heure: string;
+  auteur: string;
+  action: string;
+  details: string;
+  categorie: 'PROCEDURE' | 'DOCUMENT' | 'DECISION' | 'SECURITE';
+}
+

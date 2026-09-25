@@ -8,8 +8,8 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
-  const [selectedRole, setSelectedRole] = useState<UserRole>('admin');
-  const [email, setEmail] = useState('admin@dgda.cd');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('enqueteur');
+  const [email, setEmail] = useState('enqueteur@dgda.cd');
   const [password, setPassword] = useState('••••••••••••');
   const [rememberMe, setRememberMe] = useState(true);
 

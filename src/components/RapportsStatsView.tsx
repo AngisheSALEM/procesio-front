@@ -109,7 +109,7 @@ export const RapportsStatsView: React.FC<RapportsStatsViewProps> = ({ onOpenDoss
               )}
             </div>
 
-            <div className="font-mono" style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)', marginTop: '6px' }}>
+            <div className="  " style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)', marginTop: '6px' }}>
               {kpi.valeur}
             </div>
 

@@ -16,7 +16,7 @@
 - **`DemandeCommunication` :** Adossée à l’Article 46 du Code des douanes. Exige un signataire ayant un grade de commandement. Découpe chaque pièce requise avec un état unitaire (*Fourni*, *Manquant*, *Incomplet*). Enregistre les courriers reçus avec examen motivé de l’enquêteur et décision de relance.
 - **`FeuilleObservation` :** Adossée aux Articles 44 à 49 de la Décision DG/DGDA/DG/2011/296. Articulée autour de constats individuels numérotés (**O1, O2, O3...**). Chaque constat intègre les faits, justifications, questions, éléments de défense reçus et l’appréciation motivée de l'enquêteur (*Point expliqué*, *Complément requis*, *Constat confirmé pour contentieux*).
 - **`Renseignement` :** Objet distinct du dossier, pouvant faire l’objet d'une alerte multi-bureaux sans créer d'entreprise artificielle.
-- **`Documents & Relais GELEC` :** Séparation formelle entre PV d’opérations (Art. 44) et PV d’infraction (Art. 356-357). Bordereau de transmission vers GELEC avec filtrage automatique des sources confidentielles.
+- **`Documents & Relais GELEC` :** Séparation formelle entre PV d’opérations   et PV d’infraction  . Bordereau de transmission vers GELEC avec filtrage automatique des sources confidentielles.
 
 ### B. Architecture Bipersonna & Authentification (DGDA)
 - **Les 2 personas officiels :**
@@ -53,6 +53,19 @@
 - Vérifie l'absence totale de couleurs fluorescentes ou néon non autorisées.
 - Comptabilise les icônes vectorielles conformes (traits Lucide / SF Symbols).
 
+### D. Refonte de l’Espace Enquêteur (Tableau de Bord Agent & Multi-Dossiers)
+- **Nettoyage de la barre de navigation :** Suppression de l’entrée « Dossiers d’enquête » de la barre latérale de l’agent. Le dossier est désormais une vue de détail contextuelle à laquelle on accède depuis le tableau de bord de l’agent (`Mon travail`).
+- **Nouveau Dashboard Enquêteur (`MonTravailView.tsx`) :**
+  1. *Indicateurs (KPIs)* : Dossiers actifs sous charge (4), Tâches opérationnelles (5), Échéances & Réunions (3), Alertes opérationnelles (1).
+  2. *Alertes & Signalements* : Alertes critiques (délai dépassé  , réunion contradictoire imminente, minoration de fret SYDONIA) avec boutons d'accès direct au dossier.
+  3. *Dossiers récents* : Cartes de dossiers récents enrichis (CONGO MINING, KATANGA COBALT, GRANDS LACS PETROLEUM, SAIC) avec bouton d'accès direct « Ouvrir l'affaire ».
+  4. *Tâches d'instruction* : Liste interactive avec filtrage (Toutes, Urgentes, À faire, En cours, Terminées), bascule d'état en un clic, et lien vers l'affaire concernée.
+  5. *Échéances procédurales* : Délais légaux calendaires ( , réunions contradictoires, rapports finals).
+- **Routage et Isolation des données par dossier (`App.tsx` & `mockData.ts`) :**
+  - Chaque dossier possède ses propres entités, numéros NIF/RCCM, déclarations SYDONIA, demandes  , feuilles d’observation O1/O2/O3, pièces et historique d'audit.
+  - Bouton retour fluide « ← Tableau de bord » intégré au [DossierHeader.tsx](file:///C:/Users/Salem/Documents/projet/procesio%20front/src/components/DossierHeader.tsx).
+  - Remontage propre des composants via `key={currentDossier.id}` sans cascading renders.
+
 ---
 
 ## 3. Conformité aux Règles Strictes Demandées
@@ -62,4 +75,5 @@
 - [x] **Typographie SF Pro :** Déclarée en tête de pile de polices système Apple / standard.
 - [x] **Interfaces Demande de communication & Feuille d'observation :** Développées avec tous leurs détails réglementaires et interactions complètes.
 - [x] **Ergonomie & théorie des couleurs appliquée :** Hiérarchie stricte des boutons (1 seul CTA primaire `.btn-primary` par zone), capsules de statut à surfaces teintées douces (`.badge-status`), et micro-interactions tactiles fluides (`.card-interactive`).
+- [x] **Dashboard Enquêteur & Données distinctes par dossier :** Implémenté et validé par capture visuelle.
 - [x] **Fichiers AGENT.md et MEMORY.md :** Rédigés et versionnés à la racine du projet.

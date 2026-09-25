@@ -118,7 +118,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span
-              className="font-mono"
+              className="  "
               style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-accent)' }}
             >
               {demande.reference}
@@ -197,7 +197,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           }}
         >
           <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Total demandé</span>
-          <span className="font-mono" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+          <span className="  " style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
             {totalElements}
           </span>
         </div>
@@ -213,7 +213,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           }}
         >
           <span style={{ fontSize: '12px', color: 'var(--color-success)' }}>Pièces obtenues</span>
-          <span className="font-mono" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-success)' }}>
+          <span className="  " style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-success)' }}>
             {fournisCount}
           </span>
         </div>
@@ -229,7 +229,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           }}
         >
           <span style={{ fontSize: '12px', color: 'var(--color-warning)' }}>Pièces manquantes</span>
-          <span className="font-mono" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-warning)' }}>
+          <span className="  " style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-warning)' }}>
             {manquantsCount}
           </span>
         </div>
@@ -245,7 +245,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           }}
         >
           <span style={{ fontSize: '12px', color: 'var(--color-info)' }}>À compléter</span>
-          <span className="font-mono" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-info)' }}>
+          <span className="  " style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-info)' }}>
             {incompletsCount}
           </span>
         </div>
@@ -273,7 +273,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             Inventaire des pièces et justifications requises
           </h2>
           <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-            Échéance de réponse initiale : <span className="font-mono">{demande.echeanceReponse}</span>
+            Échéance de réponse initiale : <span className="  ">{demande.echeanceReponse}</span>
           </span>
         </div>
 
@@ -310,7 +310,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                     backgroundColor: 'var(--color-surface)',
                   }}
                 >
-                  <td style={{ padding: '12px 16px', fontWeight: 700 }} className="font-mono">
+                  <td style={{ padding: '12px 16px', fontWeight: 700 }} className="  ">
                     {element.id}
                   </td>
                   <td style={{ padding: '12px 16px', fontWeight: 500, color: 'var(--color-text-primary)' }}>
@@ -364,7 +364,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
               Distinction entre la réception matérielle et l'appréciation d'enquête
             </div>
           </div>
-          <span className="font-mono" style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+          <span className="  " style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
             {demande.reponsesRecues.length} réponse(s) enregistrée(s)
           </span>
         </div>
@@ -405,11 +405,11 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span className="font-mono" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-accent)' }}>
+                    <span className="  " style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-accent)' }}>
                       Courrier réf. {rep.referenceCourrier}
                     </span>
                     <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                      Reçu le <strong className="font-mono">{rep.dateReception}</strong>
+                      Reçu le <strong className="  ">{rep.dateReception}</strong>
                     </span>
                     <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
                       Par {rep.auteur}
@@ -476,7 +476,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Paperclip size={12} strokeWidth={2} color="var(--color-accent)" />
-                            <span className="font-mono">{pj}</span>
+                            <span className="  ">{pj}</span>
                           </div>
                           <Download size={12} strokeWidth={2} style={{ cursor: 'pointer', color: 'var(--color-text-muted)' }} />
                         </div>
@@ -638,7 +638,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                           onChange={() => handleTogglePiece(el.id)}
                           style={{ accentColor: 'var(--color-accent)' }}
                         />
-                        <span className="font-mono" style={{ fontWeight: 700, color: 'var(--color-accent)' }}>
+                        <span className="  " style={{ fontWeight: 700, color: 'var(--color-accent)' }}>
                           {el.id}
                         </span>
                         <span style={{ color: 'var(--color-text-primary)' }}>{el.libelle}</span>

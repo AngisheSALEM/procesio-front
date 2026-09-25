@@ -1,95 +1,217 @@
-/* Procezo — Design System CSS
-   Conforme aux directives DGDA et procezo-design-system.md
-   Zéro néon, zéro box-shadow sur cartes/boutons, typographie SF Pro, palette 60-30-10
-*/
+/* ==========================================================================
+   PROCEZO — SYSTÈME DE DESIGN & CHARTE GRAPHIQUE OFFICIELLE (DGDA)
+   ==========================================================================
+   Règles fondamentales :
+   - Règle 60-30-10 : 60% Fond/Surfaces sombres, 30% Typographie/Structure, 10% Accents
+   - Zéro ombre portée (box-shadow: none) : La hiérarchie repose sur le contraste des surfaces
+   - Zéro bordure artificielle sur les cartes : Épure et lisibilité opérationnelle
+   - Contraste WCAG 2.1 AA garanti pour le travail des inspecteurs et vérificateurs
+   ========================================================================== */
 
 :root {
-  /* Default Dark Theme (Midnight Slate / Obsidian DGDA) */
-  --color-bg: #222126;
-  --color-bg-deep: #1A191E;
-  --color-surface: #2B2A30;
-  --color-surface-elevated: #35343B;
-  --color-surface-muted: #26252B;
+  /* ========================================================================
+     1. THÈME SOMBRE PAR DÉFAUT (Midnight Slate / Noir Obsidienne DGDA)
+     ======================================================================== */
 
+  /* --- FONDS ET SURFACES (Structure d'arrière-plan de l'application) --- */
+
+  /* Fond principal de toute l'application (body, arrière-plan global de l'écran) */
+  --color-bg: #13191E;
+
+  /* Fond en retrait plus profond : barre latérale (sidebar), rail de navigation, piste de défilement */
+  --color-bg-deep: #1C2A36;
+
+  /* Surface standard : fond des panneaux principaux, conteneurs, modales de dialogue, tableau de données */
+  --color-surface:#1C2A36;
+
+  /* Surface surélevée : fond des champs de formulaire (inputs), cartes interactives, survol de lignes de tableau */
+  --color-surface-elevated: #4B5966;
+
+  /* Surface atténuée : arrière-plan des en-têtes de tableau (thead), badges neutres, zones désactivées */
+  --color-surface-muted: #1C2A36;
+
+
+  /* --- BORDURES ET SÉPARATEURS --- */
+
+  /* Bordure principale : délimitation des inputs, bordure inférieure des lignes de tableau, séparateurs de panneaux */
   --color-border: #3D3C44;
+
+  /* Bordure discrète : séparateurs internes légers entre sections secondaires */
   --color-border-subtle: #2E2D33;
 
-  --color-text-primary: #f7f1e6;
-  --color-text-secondary: #D8CEBD;
-  --color-text-muted: #9E968D;
-  --color-text-disabled: #6E6862;
 
-  --color-accent: #E4B74A;
-  --color-accent-hover: #F0C866;
-  --color-accent-pressed: #C99D2F;
+  /* --- TYPOGRAPHIE ET NIVEAUX DE TEXTE --- */
+
+  /* Texte primaire : niveau de contraste maximal pour les titres majeurs, références officielles et valeurs clés */
+  --color-text-primary: #F6F8F8;
+
+  /* Texte secondaire : libellés des champs (labels), sous-titres, texte de corps, noms de colonnes */
+  --color-text-secondary: #EDF1F1;
+
+  /* Texte atténué : horodatages certifiés, identifiants secondaires, métadonnées, textes d'aide */
+  --color-text-muted:#B5C4CC;
+
+  /* Texte désactivé : éléments non modifiables ou actions temporairement indisponibles */
+  --color-text-disabled: #736f6b;
+
+
+  /* --- COULEUR D'ACCENTUATION ET D'ACTION (Identité Procezo / DGDA) --- */
+
+  /* Accent principal : bouton d'action principale ("Nouveau dossier", "+ Nouvelle tâche"), onglet actif, focus */
+  --color-accent: #4aa9e4;
+
+  /* Accent au survol (hover) : retour visuel lors du passage de la souris sur un bouton ou lien d'action */
+  --color-accent-hover: #4aa9e4;
+
+  /* Accent à l'enfoncement (active/pressed) : retour visuel lors du clic sur le bouton */
+  --color-accent-pressed: #4aa9e4;
+
+  /* Couleur du texte/icône SUR le fond d'accentuation (garantit la lisibilité sur fond bleu d'accent) */
   --color-on-accent: #222126;
 
+
+  /* --- COULEURS SÉMANTIQUES MÉTIER (Statuts, Alertes et Échéances) --- */
+
+  /* Information / Instruction douanière : texte et icônes d'information neutre */
   --color-info: #7094B0;
+  /* Fond teinté du badge d'information */
   --color-info-surface: #1C2A36;
+
+  /* Succès / Validation : dossier clôturé conforme, tâche terminée (case cochée), délai respecté */
   --color-success: #6FA982;
+  /* Fond teinté du badge de succès */
   --color-success-surface: #1A2E22;
+
+  /* Avertissement / Attention : échéance proche, dossier "En attente", tâche urgente, signalement moyen */
   --color-warning: #E4B74A;
+  /* Fond teinté du badge d'avertissement */
   --color-warning-surface: #332814;
+
+  /* Danger / Alerte critique : délai légal dépassé, anomalie grave, discordance majeure SYDONIA, blocage */
   --color-danger: #D45A56;
+  /* Fond teinté du badge d'alerte critique */
   --color-danger-surface: #381D1D;
 
-  /* Typography */
+
+  /* --- TYPOGRAPHIE SYSTÈME --- */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, Monaco, monospace;
+  --font-sf: "SF Mono", "JetBrains Mono", Menlo, Consolas, Monaco, monospace;
 
-  /* Border radius strictly following design system */
-  --radius-sm: 4px;
-  --radius-btn: 6px;
-  --radius-card: 8px;
-  --radius-badge: 999px;
 
-  /* Transitions */
+  /* --- RAYONS DE COURBURE (Arrondis) --- */
+  --radius-sm: 4px;       /* Petits indicateurs, pouces de barre de défilement */
+  --radius-btn: 6px;      /* Boutons d'action */
+  --radius-card: 8px;     /* Cartes et panneaux */
+  --radius-badge: 999px;  /* Badges et pilules de statut */
+
+
+  /* --- MICRO-INTERACTIONS (Transitions fluides) --- */
   --transition-fast: 150ms ease;
   --transition-normal: 200ms ease;
 
-  /* Frosted Glass Floating Styles (Liquid / iPadOS style) */
-  --glass-bg: rgba(26, 25, 30, 0.78);
-  --glass-surface: rgba(43, 42, 48, 0.70);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-border-focus: rgba(228, 183, 74, 0.45);
+
+  /* --- EFFETS TRANSLUCIDES (Verre givré / Liquid glass pour en-têtes flottants) --- */
+  --glass-bg:#1C2A36;
+  --glass-surface: #4B5966;
+  --glass-border: #0d0d0d01;
+  --glass-border-focus: rgba(40, 84, 121, 0.45);
   --glass-blur: blur(24px) saturate(160%);
 }
+
+
+/* ==========================================================================
+   2. THÈME CLAIR MONOCHROMATIQUE (Palette : #839292, #B8C7C7, #EFFFFF, #EDF1F1, #FFFFFF)
+   ========================================================================== */
 
 [data-theme="light"] {
-  --color-bg: #f7f1e6;
-  --color-bg-deep: #EBE2D3;
-  --color-surface: #FFFFFF;
-  --color-surface-elevated: #FFFFFF;
-  --color-surface-muted: #F2EADA;
+  /* --- FONDS ET SURFACES DE LA PALETTE MONOCHROMATIQUE --- */
 
-  --color-border: #DFD5C3;
-  --color-border-subtle: #EAE2D3;
+  /* Fond principal de l'application : Cyan glacier très clair (#EFFFFF) */
+  --color-bg: #F6F8F8;
 
-  --color-text-primary: #262525;
-  --color-text-secondary: #446B8D;
-  --color-text-muted: #6C757D;
-  --color-text-disabled: #9E9990;
+  /* Fond en retrait (sidebar / rails / barre latérale) : Blanc givré doux (#EDF1F1) */
+  --color-bg-deep: #EDF1F1;
 
-  --color-accent: #C58F18;
-  --color-accent-hover: #AA790F;
-  --color-accent-pressed: #8A610A;
-  --color-on-accent: #262525;
+  /* Surface standard (panneaux, tableaux, conteneurs, modales) : Blanc pur (#FFFFFF) */
+  --color-surface: #EDF1F1;
 
-  --color-info: #446B8D;
-  --color-info-surface: #E3ECF3;
-  --color-success: #2C6E44;
-  --color-success-surface: #E2EFE5;
-  --color-warning: #946911;
-  --color-warning-surface: #F9EED4;
-  --color-danger: #9E1717;
-  --color-danger-surface: #F8DFDC;
+  /* Surface surélevée (inputs, cartes interactives, survol de lignes) : Blanc givré (#EDF1F1) */
+  --color-surface-elevated: #EDF1F1;
 
-  --glass-bg: rgba(247, 241, 230, 0.85);
-  --glass-surface: rgba(255, 255, 255, 0.80);
-  --glass-border: rgba(68, 107, 141, 0.16);
-  --glass-border-focus: rgba(197, 143, 24, 0.5);
-  --glass-blur: blur(24px) saturate(160%);
+  /* Surface atténuée (en-têtes thead, badges neutres) : Glacier pâle (#EFFFFF) */
+  --color-surface-muted: #F6F8F8;
+
+
+  /* --- BORDURES ET SÉPARATEURS --- */
+
+  /* Bordure principale : Ardoise cyan douce (#B8C7C7) */
+  --color-border: #B8C7C7;
+
+  /* Bordure subtile : Ardoise cyan translucide (#B8C7C7 à 45%) */
+  --color-border-subtle: rgba(184, 199, 199, 0.45);
+
+
+  /* --- TYPOGRAPHIE HAUTE LISIBILITÉ (Conservée intacte sans modification) --- */
+
+  /* Texte primaire : Noir absolu pour contraste maximal */
+  --color-text-primary: #000000;
+
+  /* Texte secondaire : Charbon très sombre pour sous-titres, libellés et headers */
+  --color-text-secondary: #171E1E;
+
+  /* Texte atténué : Ardoise chaude pour horodatages, NIF, métadonnées */
+  --color-text-muted: #434B4B;
+
+  /* Texte désactivé : Ardoise claire pour éléments inactifs */
+  --color-text-disabled: #757E7E;
+
+
+  /* --- ACCENTUATION MONOCHROME ÉLÉGANTE --- */
+
+  /* Accent principal : Ardoise minérale sauge (#839292) pour boutons et sélecteurs */
+  --color-accent: #2976AD;
+
+  /* Accent au survol (hover) : Ardoise minérale foncée (#718080) */
+  --color-accent-hover: #2976AD;
+
+  /* Accent enfoncé (active) : Ardoise minérale dense (#5E6C6C) */
+  --color-accent-pressed: #2976AD;
+
+  /* Texte sur bouton accentué : Blanc pur (#FFFFFF) garantissant le contraste */
+  --color-on-accent: #FFFFFF;
+
+
+  /* --- COULEURS SÉMANTIQUES (Harmonisées aux tons minéraux et glacier) --- */
+
+  /* Information / Instruction douanière */
+  --color-info: #5B7285;
+  --color-info-surface: #EBF1F5;
+
+  /* Succès / Validation (Vert sauge minéral) */
+  --color-success: #4E7B5C;
+  --color-success-surface: #ECF4EF;
+
+  /* Avertissement / Attention (Ocre minéral) */
+  --color-warning: #947124;
+  --color-warning-surface: #FAF4E8;
+
+  /* Danger / Alerte critique (Brique minérale) */
+  --color-danger: #A83E3A;
+  --color-danger-surface: #FAEBEB;
+
+
+  /* --- EFFETS TRANSLUCIDES (Verre givré clair minéral) --- */
+  --glass-bg: #EDF1F1;
+  --glass-surface: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(184, 199, 199, 0.50);
+  --glass-border-focus: rgba(131, 146, 146, 0.55);
+  --glass-blur: blur(24px) saturate(140%);
 }
+
+
+/* ==========================================================================
+   3. RÈGLES STRUCTURELLES GLOBALES ET NORMALISATION
+   ========================================================================== */
 
 * {
   box-sizing: border-box;
@@ -107,23 +229,24 @@ body {
   min-height: 100vh;
 }
 
-/* Zero box-shadow constraint strictly applied */
+/* Règle DGDA : Zéro ombre portée pour une interface épurée et sans distraction */
 button, .card, .panel, .modal, .badge, input, select, textarea {
   box-shadow: none !important;
 }
 
-/* Zero border on cards — Depth is achieved strictly through surface contrast */
+/* Règle DGDA : Zéro bordure sur les cartes — la profondeur est donnée par le contraste de surface */
 .card, .panel, [data-card] {
   border: none !important;
 }
 
-/* Monospace references */
-.font-mono {
-  font-family: var(--font-mono);
+/* Police à chasse fixe (Monospace) pour références DGDA, numéros de déclaration et horodatages */
+.font-sf {
+  font-family: var(--font-sf);
   font-feature-settings: "tnum" on, "lnum" on;
+  
 }
 
-/* Custom scrollbars matching theme */
+/* Barres de défilement discrètes et intégrées au thème */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -142,13 +265,13 @@ button, .card, .panel, .modal, .badge, input, select, textarea {
   background: var(--color-text-muted);
 }
 
-/* Accessibility Focus Rings (WCAG 2.1 AA) */
+/* Anneaux de focus pour l'accessibilité au clavier (Norme WCAG 2.1 AA) */
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 2px solid var(--color-accent) !important;
   outline-offset: 2px !important;
 }
 
-/* Interactive Clickable Cards — Smooth Micro-interactions */
+/* Cartes et lignes interactives avec micro-interaction au survol */
 .card-interactive {
   transition: background-color var(--transition-fast), transform var(--transition-fast);
   cursor: pointer;
@@ -161,7 +284,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   transform: scale(0.995);
 }
 
-/* Standard Ergonomic Button Hierarchy */
+/* ==========================================================================
+   4. HIÉRARCHIE DES BOUTONS
+   ========================================================================== */
+
+/* Bouton principal : Action clé (ex: "Nouveau dossier", "Enregistrer") */
 .btn-primary {
   background-color: var(--color-accent);
   color: var(--color-on-accent);
@@ -184,6 +311,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   transform: scale(0.98);
 }
 
+/* Bouton secondaire : Action de support (ex: "Annuler", "Filtres") */
 .btn-secondary {
   background-color: var(--color-surface-elevated);
   color: var(--color-text-primary);
@@ -205,6 +333,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   transform: scale(0.98);
 }
 
+/* Bouton fantôme / transparent : Actions discrètes ou de navigation */
 .btn-ghost {
   background: transparent;
   color: var(--color-text-secondary);
@@ -224,7 +353,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   background-color: var(--color-surface-muted);
 }
 
-/* Tinted Status Capsules (Color Theory 10% & Low-Saturation Surfaces) */
+/* ==========================================================================
+   5. PILULES ET BADGES DE STATUT (Théorie des couleurs douanières)
+   ========================================================================== */
+
 .badge-status {
   display: inline-flex;
   align-items: center;
@@ -237,26 +369,31 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   letter-spacing: 0.2px;
 }
 
+/* Badge Avertissement (Jaune / Ocre) : Échéances imminentes, dossiers en attente */
 .badge-status-warning {
   background-color: var(--color-warning-surface);
   color: var(--color-warning);
 }
 
+/* Badge Succès (Vert) : Tâches terminées, dossiers conformes */
 .badge-status-success {
   background-color: var(--color-success-surface);
   color: var(--color-success);
 }
 
+/* Badge Danger (Rouge) : Alertes graves, retards critiques, fraudes suspectées */
 .badge-status-danger {
   background-color: var(--color-danger-surface);
   color: var(--color-danger);
 }
 
+/* Badge Information (Bleu-gris) : Dossiers sous instruction, traçabilité */
 .badge-status-info {
   background-color: var(--color-info-surface);
   color: var(--color-info);
 }
 
+/* Badge Neutre : Métadonnées secondaires, rôles, filtres inactifs */
 .badge-status-neutral {
   background-color: var(--color-surface-elevated);
   color: var(--color-text-secondary);

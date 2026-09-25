@@ -19,7 +19,9 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
   initialFeuille,
 }) => {
   const [feuille, setFeuille] = useState<FeuilleObservation>(initialFeuille);
-  const [expandedObs, setExpandedObs] = useState<string>('O2'); // O2 opened by default
+  const [expandedObs, setExpandedObs] = useState<string>(
+    () => initialFeuille.observations[0]?.code || 'O1'
+  );
   const [showAddDefenseModal, setShowAddDefenseModal] = useState<string | null>(null);
   const [showNewObsModal, setShowNewObsModal] = useState(false);
 
@@ -100,7 +102,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className="font-mono" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-accent)' }}>
+            <span className="  " style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-accent)' }}>
               {feuille.reference}
             </span>
             <span style={{ color: 'var(--color-border)' }}>•</span>
@@ -146,7 +148,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
               >
                 <Calendar size={13} color="var(--color-accent)" strokeWidth={2} />
                 <span>
-                  Réunion de clôture : <strong className="font-mono">{feuille.dateReunionCloturePrevue}</strong>
+                  Réunion de clôture : <strong className="  ">{feuille.dateReunionCloturePrevue}</strong>
                 </span>
               </div>
             </>
@@ -182,7 +184,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
           }}
         >
           <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Constats émis</div>
-          <div className="font-mono" style={{ fontSize: '20px', fontWeight: 700, marginTop: '4px' }}>
+          <div className="  " style={{ fontSize: '20px', fontWeight: 700, marginTop: '4px' }}>
             {totalObs}
           </div>
         </div>
@@ -195,7 +197,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
           }}
         >
           <div style={{ fontSize: '11px', color: 'var(--color-success)' }}>Points expliqués / régularisés</div>
-          <div className="font-mono" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-success)', marginTop: '4px' }}>
+          <div className="  " style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-success)', marginTop: '4px' }}>
             {closCount}
           </div>
         </div>
@@ -208,7 +210,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
           }}
         >
           <div style={{ fontSize: '11px', color: 'var(--color-warning)' }}>Compléments demandés</div>
-          <div className="font-mono" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-warning)', marginTop: '4px' }}>
+          <div className="  " style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-warning)', marginTop: '4px' }}>
             {attenteCount}
           </div>
         </div>
@@ -221,7 +223,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
           }}
         >
           <div style={{ fontSize: '11px', color: 'var(--color-danger)' }}>Maintenus (relais contentieux)</div>
-          <div className="font-mono" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-danger)', marginTop: '4px' }}>
+          <div className="  " style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-danger)', marginTop: '4px' }}>
             {contentieuxCount}
           </div>
         </div>
@@ -260,7 +262,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1 }}>
                   <div
-                    className="font-mono"
+                    className="  "
                     style={{
                       width: '36px',
                       height: '36px',
@@ -357,7 +359,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                         <ul style={{ paddingLeft: '16px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
                           {obs.justificatifsAssocies.map((j, idx) => (
                             <li key={idx} style={{ marginBottom: '2px' }}>
-                              <span className="font-mono">{j}</span>
+                              <span className="  ">{j}</span>
                             </li>
                           ))}
                         </ul>
@@ -397,7 +399,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                       >
                         <span>2. Éléments de défense reçus</span>
                         {obs.defenseRecue && (
-                          <span className="font-mono" style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
+                          <span className="  " style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
                             Reçu le {obs.defenseRecue.dateReception}
                           </span>
                         )}
@@ -427,7 +429,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                                       color: 'var(--color-text-secondary)',
                                     }}
                                   >
-                                    <span className="font-mono">{pj}</span>
+                                    <span className="  ">{pj}</span>
                                   </div>
                                 ))}
                               </div>

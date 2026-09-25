@@ -116,20 +116,20 @@ export const ParametresView: React.FC<ParametresViewProps> = ({
                   width: '40px',
                   height: '40px',
                   borderRadius: '10px',
-                  backgroundColor: '#E6D5B8',
-                  border: '1px solid #CDBFA9',
+                  backgroundColor: '#F7FFFF',
+                  border: '1px solid #B8C7C7',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#B88922',
+                  color: '#839292',
                 }}
               >
                 <Sun size={20} strokeWidth={2} />
               </div>
               <div>
-                <div style={{ fontSize: '14px', fontWeight: 600 }}>Thème Clair (Cream Beige)</div>
+                <div style={{ fontSize: '14px', fontWeight: 600 }}>Thème Clair (Monochrome Glacier)</div>
                 <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                  Contraste élevé pour impression ou forte luminosité
+                  Palette : #839292, #B8C7C7, #EFFFFF, #F7FFFF, #FFFFFF
                 </div>
               </div>
             </div>
@@ -168,7 +168,7 @@ export const ParametresView: React.FC<ParametresViewProps> = ({
             <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'block' }}>
               Matricule DGDA
             </label>
-            <div className="font-mono" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-accent)', marginTop: '4px' }}>
+            <div className="font-sf" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-accent)', marginTop: '4px' }}>
               {user.matricule}
             </div>
           </div>
@@ -205,8 +205,12 @@ export const ParametresView: React.FC<ParametresViewProps> = ({
               Rôle attribué
             </label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-              {user.role === 'admin' ? <Shield size={14} color="var(--color-accent)" /> : <Briefcase size={14} color="var(--color-accent)" />}
-              <span>{user.role === 'admin' ? 'Administrateur / Responsable d’unité' : 'Enquêteur / Vérificateur'}</span>
+              {user.role === 'admin' ? (
+                <Shield size={14} color="var(--color-accent)" />
+              ) : (
+                <Briefcase size={14} color="var(--color-accent)" />
+              )}
+              <span>{user.role === 'admin' ? "Administrateur / Responsable d'unité" : 'Enquêteur / Vérificateur'}</span>
             </div>
           </div>
         </div>

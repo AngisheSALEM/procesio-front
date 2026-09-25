@@ -128,7 +128,7 @@ export const AuditComplianceModal: React.FC<AuditComplianceModalProps> = ({
           </div>
 
           <div
-            className="font-mono"
+            className="  "
             style={{
               fontSize: '26px',
               fontWeight: 800,
@@ -330,7 +330,7 @@ export const AuditComplianceModal: React.FC<AuditComplianceModalProps> = ({
 
         {/* Footer */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--color-border)', paddingTop: '16px' }}>
-          <div className="font-mono" style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+          <div className="  " style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
             Dernière vérification : {report.lastChecked.toLocaleTimeString()}
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>

@@ -1,64 +1,33 @@
 import React from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X, Sun, Moon } from 'lucide-react';
 
 interface HeaderProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
+  theme?: 'dark' | 'light';
+  onToggleTheme?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   searchQuery,
   onSearchChange,
+  theme,
+  onToggleTheme,
 }) => {
   return (
     <header
       style={{
-        backgroundColor: 'var(--color-bg-deep)',
-        borderBottom: '1px solid var(--color-border-subtle)',
-        padding: '10px 24px',
+        backgroundColor: 'transparent',
+        borderBottom: 'none',
+        padding: '12px 24px',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '20px',
+        justifyContent: 'flex-end',
         userSelect: 'none',
       }}
     >
-      {/* Brand & Logo DGDA */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-        <img
-          src="/Logo-dgda.png"
-          alt="Logo DGDA"
-          style={{
-            width: '38px',
-            height: '38px',
-            objectFit: 'contain',
-            borderRadius: '6px',
-          }}
-          onError={(e) => {
-            (e.currentTarget as HTMLElement).style.display = 'none';
-          }}
-        />
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span
-              style={{
-                fontSize: '17px',
-                fontWeight: 800,
-                letterSpacing: '0.8px',
-                color: 'var(--color-text-primary)',
-              }}
-            >
-              PROCEZO
-            </span>
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.2 }}>
-            Direction Générale des Douanes et Accises — RDC
-          </div>
-        </div>
-      </div>
-
-      {/* Right: Floating Pill Search Bar (Style from reference image) */}
-      <div style={{ display: 'flex', alignItems: 'center' }}>
+      {/* Right: Floating Pill Search Bar + Quick Theme Switch */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <div
           style={{
             display: 'flex',
@@ -107,6 +76,8 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
         </div>
+
+       
       </div>
     </header>
   );

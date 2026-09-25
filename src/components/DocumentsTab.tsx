@@ -5,7 +5,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 
-interface DocumentItem {
+export interface DocumentItem {
   id: string;
   reference: string;
   titre: string;
@@ -18,8 +18,12 @@ interface DocumentItem {
   relaisGelec: boolean;
 }
 
-export const DocumentsTab: React.FC = () => {
-  const [documents] = useState<DocumentItem[]>([
+interface DocumentsTabProps {
+  documents?: DocumentItem[];
+}
+
+export const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents: propDocuments }) => {
+  const defaultDocs: DocumentItem[] = [
     {
       id: 'DOC-01',
       reference: 'DGDA/DRK/FO/2026/018',
@@ -78,7 +82,9 @@ export const DocumentsTab: React.FC = () => {
       auteur: 'Contrôleur Éric Tshimanga',
       relaisGelec: true,
     },
-  ]);
+  ];
+
+  const [documents] = useState<DocumentItem[]>(propDocuments || defaultDocs);
 
   const [relaisStatut, setRelaisStatut] = useState<'NON_TRANSMIS' | 'PROPOSE' | 'TRANSMIS' | 'RECEPTIONNE'>('PROPOSE');
 
@@ -195,15 +201,15 @@ export const DocumentsTab: React.FC = () => {
                 <td style={{ padding: '12px 16px' }}>
                   <div style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{doc.titre}</div>
                   <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                    Créé par {doc.auteur} • le <span className="font-mono">{doc.dateCreation}</span>
+                    Créé par {doc.auteur} • le <span className="  ">{doc.dateCreation}</span>
                   </div>
                 </td>
-                <td style={{ padding: '12px 16px', fontWeight: 600 }} className="font-mono">
+                <td style={{ padding: '12px 16px', fontWeight: 600 }} className="  ">
                   {doc.reference}
                 </td>
                 <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                   <span
-                    className="font-mono"
+                    className="  "
                     style={{
                       fontSize: '11px',
                       padding: '2px 6px',
