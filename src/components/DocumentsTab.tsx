@@ -158,11 +158,12 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents: propDocum
 
       {/* Documents Table */}
       <div
+        className="responsive-table-container"
         style={{
           backgroundColor: 'var(--color-surface)',
           border: 'none',
           borderRadius: 'var(--radius-card)',
-          overflow: 'hidden',
+          overflowX: 'auto',
         }}
       >
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--color-border)' }}>
@@ -171,7 +172,7 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents: propDocum
           </h3>
         </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+        <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
           <thead>
             <tr
               style={{

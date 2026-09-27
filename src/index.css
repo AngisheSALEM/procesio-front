@@ -375,3 +375,256 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   background-color: var(--color-surface-elevated);
   color: var(--color-text-secondary);
 }
+
+/* ==========================================================================
+   6. RESPONSIVE DESIGN — TABLETTE (<=1024px) & MOBILE (<=768px / <=480px)
+   ========================================================================== */
+
+/* Conteneur principal de l'application */
+.app-layout {
+  display: flex;
+  flex-direction: row;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  position: relative;
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+.app-scroll-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  min-width: 0;
+  padding: 4px 24px 24px 24px;
+}
+
+/* Conteneur de tableau responsive avec défilement horizontal fluide */
+.responsive-table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-card);
+}
+
+.responsive-table-container table {
+  min-width: 600px;
+  width: 100%;
+}
+
+/* Grilles KPI adaptatives */
+.kpi-grid-6 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.kpi-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.kpi-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.kpi-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.form-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.cards-grid-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.view-container {
+  padding: 20px;
+}
+
+/* Modales adaptatives */
+.modal-backdrop-responsive {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-card-responsive {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-border);
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Barre mobile (uniquement visible sur mobile <= 768px) */
+.mobile-topbar {
+  display: none;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+/* Breakpoint 1 : Tablette (<= 1024px) */
+@media (max-width: 1024px) {
+  .app-scroll-area {
+    padding: 4px 16px 20px 16px;
+  }
+
+  .kpi-grid-6 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+
+  .kpi-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+
+  .kpi-grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+}
+
+/* Breakpoint 2 : Tablette portrait & Mobile (<= 768px) */
+@media (max-width: 768px) {
+  .app-scroll-area {
+    padding: 4px 12px 16px 12px;
+  }
+
+  .view-container {
+    padding: 12px 4px;
+  }
+
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    justifyContent: space-between;
+    padding: 10px 14px;
+    background-color: var(--color-bg-deep);
+    border-bottom: 1px solid var(--color-border-subtle);
+    flex-shrink: 0;
+    z-index: 30;
+  }
+
+  /* Sidebar en mode tiroir (drawer) sur mobile */
+  .app-sidebar-drawer {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    border-radius: 0 16px 16px 0 !important;
+    z-index: 1001 !important;
+    transition: transform var(--transition-normal) !important;
+  }
+
+  .app-sidebar-drawer.sidebar-collapsed-mobile {
+    transform: translateX(-105%) !important;
+    pointer-events: none;
+  }
+
+  .app-sidebar-drawer.sidebar-open-mobile {
+    transform: translateX(0) !important;
+    width: 260px !important;
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    z-index: 1000;
+  }
+
+  .kpi-grid-6 {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .kpi-grid-4 {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .kpi-grid-3 {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .kpi-grid-2 {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .form-grid-2col {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .cards-grid-auto {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+/* Breakpoint 3 : Petit mobile (<= 480px) */
+@media (max-width: 480px) {
+  .app-scroll-area {
+    padding: 4px 8px 12px 8px;
+  }
+
+  .view-container {
+    padding: 8px 0;
+  }
+
+  .modal-backdrop-responsive {
+    padding: 10px;
+  }
+
+  .modal-card-responsive {
+    max-height: 94vh;
+    border-radius: 12px;
+  }
+}
+

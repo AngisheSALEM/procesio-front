@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Menu } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { DossierHeader, type DossierTabId } from './components/DossierHeader';
 import { VueEnsembleTab } from './components/VueEnsembleTab';
@@ -19,14 +20,17 @@ import type {
   DemandeCommunication,
   FeuilleObservation,
   DocumentItem,
-  PvDetail
+  PvDetail,
+  RenseignementItem
 } from './types';
 import {
   mockUsers,
   mockDossiers,
   mockDemandesParDossier,
   mockFeuillesParDossier,
-  mockDocumentsParDossier
+  mockDocumentsParDossier,
+  mockPvsParDossier,
+  mockRenseignements
 } from './data/mockData';
 
 // Storage keys for persistent state on refresh
@@ -58,6 +62,9 @@ export function App() {
 
   // 4. Dossiers state (with creation support)
   const [dossiers, setDossiers] = useState<DossierEnquete[]>(mockDossiers);
+
+  // Renseignements state
+  const [renseignements, setRenseignements] = useState<RenseignementItem[]>(mockRenseignements);
 
   // Demandes de communication (par dossier) : Tableau de demandes
   const [demandesParDossier, setDemandesParDossier] = useState<Record<string, DemandeCommunication[]>>({
@@ -113,40 +120,25 @@ export function App() {
       },
     ],
     'dossier-0843': [mockDemandesParDossier['dossier-0843']],
+    'dossier-0844': [mockDemandesParDossier['dossier-0844']],
+    'dossier-0845': [mockDemandesParDossier['dossier-0845']],
+    'dossier-0846': [mockDemandesParDossier['dossier-0846']],
+    'dossier-0847': [mockDemandesParDossier['dossier-0847']],
   });
 
   // Feuilles d'observation (par dossier) : Tableau de feuilles
   const [feuillesParDossier, setFeuillesParDossier] = useState<Record<string, FeuilleObservation[]>>({
     'dossier-0842': [mockFeuillesParDossier['dossier-0842']],
+    'dossier-0843': [mockFeuillesParDossier['dossier-0843']],
+    'dossier-0844': [mockFeuillesParDossier['dossier-0844']],
+    'dossier-0845': [mockFeuillesParDossier['dossier-0845']],
+    'dossier-0846': [mockFeuillesParDossier['dossier-0846']],
+    'dossier-0847': [mockFeuillesParDossier['dossier-0847']],
   });
 
   // Procès-Verbaux dressés (par dossier) : Tableau de PVs
-  const [pvsParDossier, setPvsParDossier] = useState<Record<string, PvDetail[]>>({
-    'dossier-0842': [
-      {
-        id: 'pv-0842-1',
-        reference: 'DGDA/DRK/PV-INF/2026/089',
-        dossierId: 'dossier-0842',
-        datePv: '2026-10-24',
-        inspecteurs: ['Inspecteur Marc Kabamba', 'Inspecteur Jean-Paul Kasongo'],
-        destinataire: 'CONGO MINING & CHEMICAL LOGISTICS SAS',
-        objet: 'Minoration de la valeur transactionnelle et déduction indue de charges de transport',
-        cadreLegal: 'Articles 356, 357, 398 et 402 du Code des douanes (Loi n° 10/002)',
-        infractions: [
-          'Minoration de la valeur en douane taxable et carence de justificatifs probants (Articles 356 et 357 du Code des douanes)',
-          'Défaut de communication d’actes comptables et manifestes requis après mise en demeure (Article 46 et Article 49)',
-        ],
-        droitsEludesUSD: 45000,
-        droitsEludesCDF: 125000000,
-        amendeUSD: 90000,
-        auditionDate: '2026-10-20',
-        destinationContentieuse: 'Transmission à la Division Contentieuse DRK Lubumbashi & Parquet près le Tribunal de Grande Instance',
-        statutPv: 'TRANSMIS_CONTENTIEUX',
-        pdfNom: 'PV_Infraction_Douaniere_Officiel.pdf',
-        pdfTaille: '1.2 Mo',
-      },
-    ],
-  });
+  const [pvsParDossier, setPvsParDossier] = useState<Record<string, PvDetail[]>>(mockPvsParDossier);
+
 
   // Documents et PV du dossier
   const [documentsParDossier, setDocumentsParDossier] = useState<Record<string, DocumentItem[]>>(mockDocumentsParDossier);
@@ -185,7 +177,7 @@ export function App() {
     if (savedNav && validRoutes.includes(savedNav)) {
       return savedNav === 'dossiers-enquete' ? 'dossier-detail' : savedNav;
     }
-    return role === 'enqueteur' ? 'mon-travail' : 'mon-travail';
+    return role === 'admin' ? 'rapports-stats' : 'mon-travail';
   }, []);
 
   const [activeNav, setActiveNav] = useState<string>(() => getNavFromHash(userRole));
@@ -202,7 +194,9 @@ export function App() {
     return validTabs.includes(savedTab) ? savedTab : 'vue-ensemble';
   });
 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    return typeof window !== 'undefined' ? window.innerWidth <= 768 : false;
+  });
 
   // Sync theme with HTML attribute and localStorage
   useEffect(() => {
@@ -252,7 +246,7 @@ export function App() {
     localStorage.setItem(STORAGE_AUTH, 'true');
     localStorage.setItem(STORAGE_ROLE, role);
 
-    const defaultRoute = 'mon-travail';
+    const defaultRoute = role === 'admin' ? 'rapports-stats' : 'mon-travail';
     setActiveNav(defaultRoute);
     window.location.hash = `#/${defaultRoute}`;
   };
@@ -267,9 +261,13 @@ export function App() {
     setActiveNav(id);
   };
 
-  const handleOpenDossier = (dossierId: string) => {
+  const handleOpenDossier = (dossierId: string, initialTab?: DossierTabId) => {
     setSelectedDossierId(dossierId);
     localStorage.setItem(STORAGE_SELECTED_DOSSIER, dossierId);
+    if (initialTab) {
+      setActiveDossierTab(initialTab);
+      localStorage.setItem(STORAGE_TAB, initialTab);
+    }
     setActiveNav('dossier-detail');
     window.location.hash = `#/dossier/${dossierId}`;
   };
@@ -300,6 +298,47 @@ export function App() {
     }));
   };
 
+  // Handle classifying without further action (Clôture sans suite)
+  const handleCloturerSansSuite = (motif: string, dId?: string) => {
+    const targetId = dId || currentDossier.id;
+    const today = new Date().toISOString().split('T')[0];
+    setDossiers((prev) =>
+      prev.map((d) => {
+        if (d.id === targetId) {
+          return {
+            ...d,
+            statut: 'CLOTURE',
+            decisionCloture: 'CLASSE_SANS_SUITE',
+            motifClassement: motif,
+            dateCloture: today,
+            prochaineAction: `Dossier classé sans suite — ${motif}`,
+          };
+        }
+        return d;
+      })
+    );
+  };
+
+  // Handle reversing a judgment upon new justification / revirement
+  const handleRevirementJugement = (motif: string, docNom?: string, dId?: string) => {
+    const targetId = dId || currentDossier.id;
+    setDossiers((prev) =>
+      prev.map((d) => {
+        if (d.id === targetId) {
+          return {
+            ...d,
+            statut: 'EN_COURS',
+            decisionCloture: undefined,
+            motifClassement: undefined,
+            dateCloture: undefined,
+            prochaineAction: `Jugement révisé suite à revirement (${docNom || 'Nouvelle pièce'}) — ${motif}`,
+          };
+        }
+        return d;
+      })
+    );
+  };
+
   // Handle saving/updating a Demande de communication
   const handleSaveDemande = (updatedDemande: DemandeCommunication) => {
     const dId = updatedDemande.dossierId || currentDossier.id;
@@ -313,6 +352,10 @@ export function App() {
           : [...list, updatedDemande],
       };
     });
+
+    if (updatedDemande.evaluationReponse === 'SATISFAISANTE' && updatedDemande.motifSatisfaction) {
+      handleCloturerSansSuite(updatedDemande.motifSatisfaction, dId);
+    }
   };
 
   // Handle cancelling a Demande de communication
@@ -361,6 +404,10 @@ export function App() {
           : [...list, updatedFeuille],
       };
     });
+
+    if (updatedFeuille.decisionFinale === 'CLASSE_SANS_SUITE' && updatedFeuille.motifSatisfaction) {
+      handleCloturerSansSuite(updatedFeuille.motifSatisfaction, dId);
+    }
   };
 
   // Handle creating Feuille d'observation when user completes the creation form in Demande
@@ -499,8 +546,8 @@ export function App() {
     }
   };
 
-  // Handle creating a new dossier with precise timestamp
-  const handleCreateDossier = (data: any) => {
+  // Handle creating a new dossier with precise timestamp (and optional intelligence link)
+  const handleCreateDossier = (data: any, renseignementId?: string) => {
     const now = new Date();
     const timestamp = `${now.toISOString().split('T')[0]} ${now.toTimeString().split(' ')[0]}`;
     const newId = `dossier-${Date.now().toString().slice(-4)}`;
@@ -509,9 +556,9 @@ export function App() {
       ...data,
       id: newId,
       horodatageCreation: timestamp,
-      equipe: [`${currentUser.grade} ${currentUser.prenom} ${currentUser.nom} (Chef de mission)`],
+      equipe: data.equipe && data.equipe.length > 0 ? data.equipe : [`${currentUser.grade} ${currentUser.prenom} ${currentUser.nom} (Chef de mission)`],
       operationsDouanieres: [],
-      renseignementsLiesIds: [],
+      renseignementsLiesIds: renseignementId ? [renseignementId] : [],
       taches: [],
       alertes: [
         {
@@ -537,7 +584,33 @@ export function App() {
     };
 
     setDossiers((prev) => [newDossier, ...prev]);
-    handleOpenDossier(newId);
+
+    if (renseignementId) {
+      setRenseignements((prev) =>
+        prev.map((r) =>
+          r.id === renseignementId
+            ? {
+                ...r,
+                statut: 'Dossier d’enquête ouvert',
+                effetProduit: 'ENQUETE_EN_COURS',
+                dossiersLies: [...(r.dossiersLies || []), newId],
+              }
+            : r
+        )
+      );
+    }
+
+    if (currentUser.role !== 'admin') {
+      handleOpenDossier(newId);
+    }
+  };
+
+  const handleAddRenseignement = (newR: RenseignementItem) => {
+    setRenseignements((prev) => [newR, ...prev]);
+  };
+
+  const handleUpdateRenseignement = (updatedR: RenseignementItem) => {
+    setRenseignements((prev) => prev.map((r) => (r.id === updatedR.id ? updatedR : r)));
   };
 
 
@@ -549,6 +622,7 @@ export function App() {
 
   return (
     <div
+      className="app-layout"
       style={{
         display: 'flex',
         flexDirection: 'row',
@@ -571,6 +645,7 @@ export function App() {
 
       {/* Main Workspace Column (Header at top, then scrolling view area) */}
       <div
+        className="app-main"
         style={{
           display: 'flex',
           flexDirection: 'column',
@@ -581,23 +656,47 @@ export function App() {
           overflow: 'hidden',
         }}
       >
-        {/* Top Header: Search and theme toggle without bottom border */}
-        {/* <Header
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-        /> */}
+        {/* Mobile topbar: only visible on screens <= 768px */}
+        <header className="mobile-topbar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--color-text-primary)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '4px',
+              }}
+              title="Menu de navigation"
+              aria-label="Menu de navigation"
+            >
+              <Menu size={20} />
+            </button>
+            <img
+              src="/Logo-dgda.png"
+              alt="Logo DGDA"
+              style={{ width: '24px', height: '24px', objectFit: 'contain' }}
+              onError={(e) => {
+                (e.currentTarget as HTMLElement).style.display = 'none';
+              }}
+            />
+            <span style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '0.6px' }}>PROCEZO</span>
+          </div>
+        </header>
 
         {/* Central Workspace: Scrollable view area */}
         <main
+          className="app-scroll-area"
           style={{
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
             overflowY: 'auto',
             minWidth: 0,
-            padding: '4px 24px 24px 24px',
           }}
         > 
           {/* Route: Dossier Detail (Page de détail d'un dossier accédée depuis le tableau) */}
@@ -618,7 +717,7 @@ export function App() {
                 onBack={handleBackToDashboard}
               />
 
-              <div style={{ padding: '24px 20px' }}>
+              <div className="view-container">
                 {activeDossierTab === 'vue-ensemble' && (
                   <VueEnsembleTab
                     key={currentDossier.id}
@@ -631,6 +730,7 @@ export function App() {
                     onGoToPvs={() => setActiveDossierTab('documents')}
                     onSaveDemande={handleSaveDemande}
                     onSaveFeuille={handleSaveFeuille}
+                    onCloturerSansSuite={handleCloturerSansSuite}
                     currentUser={currentUser}
                   />
                 )}
@@ -648,7 +748,10 @@ export function App() {
                     onAddDemande={handleAddDemande}
                     onCancelDemande={handleCancelDemande}
                     onCreateFeuille={handleCreateFeuilleFromDemande}
+                    onCloturerSansSuite={handleCloturerSansSuite}
+                    onRevirementJugement={handleRevirementJugement}
                     hasFeuille={hasFeuille}
+                    hasPv={hasPv}
                   />
                 )}
 
@@ -663,6 +766,8 @@ export function App() {
                     onSaveFeuille={handleSaveFeuille}
                     onAddFeuille={handleAddFeuille}
                     onLancerPv={handleLancerPv}
+                    onCloturerSansSuite={handleCloturerSansSuite}
+                    onRevirementJugement={handleRevirementJugement}
                     hasPv={hasPv}
                   />
                 )}
@@ -687,7 +792,7 @@ export function App() {
 
           {/* Route: Mon travail (Tableau minimaliste des dossiers de l'agent) */}
           {activeNav === 'mon-travail' && (
-            <div style={{ padding: '20px' }}>
+            <div className="view-container">
               <MonTravailView
                 dossiers={dossiers}
                 onOpenDossier={handleOpenDossier}
@@ -699,35 +804,53 @@ export function App() {
 
           {/* Route: Renseignements */}
           {activeNav === 'renseignements' && (
-            <div style={{ padding: '20px' }}>
-              <RenseignementsView onOpenDossier={() => handleOpenDossier('dossier-0842')} />
+            <div className="view-container">
+              <RenseignementsView
+                renseignements={renseignements}
+                currentUser={currentUser}
+                onOpenDossier={handleOpenDossier}
+                onCreateDossier={handleCreateDossier}
+                onAddRenseignement={handleAddRenseignement}
+                onUpdateRenseignement={handleUpdateRenseignement}
+                dossiers={dossiers}
+                demandesParDossier={demandesParDossier}
+                feuillesParDossier={feuillesParDossier}
+                pvsParDossier={pvsParDossier}
+              />
             </div>
           )}
 
           {/* Route: Documents et modèles */}
           {activeNav === 'documents-modeles' && (
-            <div style={{ padding: '20px' }}>
+            <div className="view-container">
               <DocumentsModelesView />
             </div>
           )}
 
           {/* Route: Rapports et statistiques (Admin) */}
           {activeNav === 'rapports-stats' && (
-            <div style={{ padding: '20px' }}>
-              <RapportsStatsView onOpenDossier={() => handleOpenDossier('dossier-0842')} />
+            <div className="view-container">
+              <RapportsStatsView
+                onOpenDossier={(dId, tab) => handleOpenDossier(dId || 'dossier-0842', tab)}
+                dossiers={dossiers}
+                renseignements={renseignements}
+                demandesParDossier={demandesParDossier}
+                feuillesParDossier={feuillesParDossier}
+                pvsParDossier={pvsParDossier}
+              />
             </div>
           )}
 
           {/* Route: Lab Tableaux UX / Components */}
           {activeNav === 'components' && (
-            <div style={{ padding: '20px' }}>
+            <div className="view-container">
               <ComponentsView onOpenDossier={handleOpenDossier} />
             </div>
           )}
 
           {/* Route: Paramètres (Theme switch and profile) */}
           {activeNav === 'parametres' && (
-            <div style={{ padding: '20px' }}>
+            <div className="view-container">
               <ParametresView
                 user={currentUser}
                 theme={theme}

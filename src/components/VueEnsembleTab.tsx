@@ -3,7 +3,8 @@ import {
   Plus,
   Upload,
   X,
-  ExternalLink
+  ExternalLink,
+  CheckCircle
 } from 'lucide-react';
 import type { DossierEnquete, DemandeCommunication, FeuilleObservation, UserAccount, PvDetail } from '../types';
 import { formatDate } from '../utils/dateUtils';
@@ -20,6 +21,7 @@ interface VueEnsembleTabProps {
   onGoToPvs?: () => void;
   onSaveDemande?: (demande: DemandeCommunication) => void;
   onSaveFeuille?: (feuille: FeuilleObservation) => void;
+  onCloturerSansSuite?: (motif: string) => void;
   currentUser?: UserAccount;
 }
 
@@ -35,6 +37,7 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
   onGoToPvs,
   onSaveDemande,
   onSaveFeuille,
+  onCloturerSansSuite: _onCloturerSansSuite,
   currentUser,
 }) => {
   const demandesList = (demandes && demandes.length > 0)
@@ -204,16 +207,71 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
           }}
         >
           {dossier.entiteControlee.nom}
-        </span> <br /> 
+        </span>
           
-        {/* Adresse & Contact sans icônes parasites */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-         <br /><br /> <div>{dossier.entiteControlee.adresse}</div>
-          <div style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
-            {dossier.entiteControlee.contact}
+        {/* Type de cible & Pour le compte de : SANS BORDER, SANS BG, SANS ICÔNE */}
+        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+          <span style={{ color: 'var(--color-text-muted)' }}>Type de cible : </span>
+          <span style={{ color: 'var(--color-text-primary)' }}>
+            {dossier.entiteControlee.typeCible || dossier.entiteControlee.typeEntite || 'Entreprise commerciale'}
+          </span>
+          {dossier.entiteControlee.pourLeCompteDe && (
+            <span style={{ marginLeft: '6px', color: 'var(--color-text-muted)' }}>
+              (Agissant pour le compte de : <span style={{ color: 'var(--color-text-primary)' }}>{dossier.entiteControlee.pourLeCompteDe}</span>)
+            </span>
+          )}
+        </div>
+
+        {/* Adresse & Contact sans icônes ni bordures */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '6px' }}>
+          <div>
+            <span style={{ color: 'var(--color-text-muted)' }}>Adresse : </span>
+            <span style={{ color: 'var(--color-text-primary)' }}>{dossier.entiteControlee.adresse}</span>
           </div>
+          {dossier.entiteControlee.contact && (
+            <div style={{ color: 'var(--color-text-muted)', fontSize: '11px' }}>
+              Contact : {dossier.entiteControlee.contact}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* =========================================================================
+          STATUT DE CLASSEMENT SANS SUITE (SI LE DOSSIER EST SATISFAIT / CLÔTURÉ)
+          ========================================================================= */}
+      {dossier.decisionCloture === 'CLASSE_SANS_SUITE' && (
+        <div
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            borderRadius: 'var(--radius-card)',
+            border: '1px solid var(--color-border)',
+            padding: '20px 24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle size={16} color="var(--color-text-primary)" />
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                Dossier classé sans suite — Conformité validée
+              </span>
+            </div>
+            {dossier.dateCloture && (
+              <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                Clôturé le {formatDate(dossier.dateCloture)}
+              </span>
+            )}
+          </div>
+          {dossier.motifClassement && (
+            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: 1.5, marginTop: '2px' }}>
+              <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>Motif de satisfaction : </span>
+              {dossier.motifClassement}
+            </div>
+          )}
+        </div>
+      )}
 
       {/*================================ BLOC D'OBJET DE L ENQUETE ================*/}
 
@@ -280,7 +338,7 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
             </button>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
+              {/* <button
                 type="button"
                 className="btn-secondary"
                 onClick={() => {
@@ -296,7 +354,7 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
                 style={{ fontSize: '12px', padding: '6px 12px' }}
               >
                 <span>Mettre à jour</span>
-              </button>
+              </button> */}
               <button
                 type="button"
                 className="btn-ghost"
@@ -382,7 +440,7 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
 
             {/* Bouton en haut à droite : Mettre à jour */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
+              {/* <button
                 type="button"
                 className="btn-secondary"
                 onClick={() => {
@@ -398,7 +456,7 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
                 style={{ fontSize: '12px', padding: '6px 12px' }}
               >
                 <span>Mettre à jour</span>
-              </button>
+              </button> */}
               <button
                 type="button"
                 className="btn-ghost"
@@ -520,6 +578,7 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
           ========================================================================= */}
       {showDemandeModal && (
         <div
+          className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -533,13 +592,15 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
           }}
         >
           <div
+            className="modal-card-responsive"
             style={{
               backgroundColor: 'var(--color-surface)',
               borderRadius: 'var(--radius-card)',
               border: '1px solid var(--color-border)',
               width: '100%',
               maxWidth: '560px',
-              overflow: 'hidden',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
             }}
@@ -726,6 +787,7 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
           ========================================================================= */}
       {showFeuilleModal && (
         <div
+          className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -739,13 +801,15 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
           }}
         >
           <div
+            className="modal-card-responsive"
             style={{
               backgroundColor: 'var(--color-surface)',
               borderRadius: 'var(--radius-card)',
               border: '1px solid var(--color-border)',
               width: '100%',
               maxWidth: '560px',
-              overflow: 'hidden',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
             }}

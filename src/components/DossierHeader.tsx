@@ -228,7 +228,7 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
           flexWrap: 'wrap',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '280px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 'min(100%, 260px)', flexWrap: 'wrap' }}>
           {onBack && (
             <button
               onClick={onBack}
@@ -277,7 +277,9 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
               whiteSpace: 'nowrap',
             }}
           >
-            {dossier.statut === 'EN_COURS'
+            {dossier.decisionCloture === 'CLASSE_SANS_SUITE'
+              ? 'Classé sans suite'
+              : dossier.statut === 'EN_COURS'
               ? 'En cours'
               : dossier.statut === 'A_VALIDER'
               ? 'À valider'
@@ -295,6 +297,8 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
               position: 'relative',
               display: 'flex',
               alignItems: 'center',
+              width: '100%',
+              maxWidth: '360px',
             }}
           >
             <div
@@ -306,7 +310,7 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
                 borderRadius: '9999px',
                 padding: '7px 16px',
                 gap: '10px',
-                width: '360px',
+                width: '100%',
                 transition: 'all var(--transition-fast)',
               }}
             >
@@ -354,7 +358,7 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
                   position: 'absolute',
                   top: 'calc(100% + 8px)',
                   left: 0,
-                  width: '480px',
+                  width: 'min(480px, calc(100vw - 32px))',
                   maxHeight: '440px',
                   overflowY: 'auto',
                   backgroundColor: 'var(--color-surface)',
@@ -816,19 +820,15 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
         </div>
       </div>
       {/* Date d'ouverture et date d'échéance */}
-      
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-          <span></span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--color-text-muted)' }}>
-            {/* <Clock size={13} color="var(--color-accent)" /> */}
-            <span>Ouvert le : <strong style={{ color: 'var(--color-text-secondary)' }}>{formatDate(dossier.horodatageCreation || dossier.dateCreation, true)}</strong></span>
-          </div>
-          <span style={{ color: 'var(--color-border)' }}>•</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--color-text-muted)' }}>
-            {/* <Calendar size={13} color="var(--color-danger)" /> */}
-            <span>Échéance : <strong style={{ color: 'var(--color-text-secondary)' }}>{formatDate(dossier.echeance)}</strong></span>
-          </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, flexWrap: 'wrap', margin: '8px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--color-text-muted)' }}>
+          <span>Ouvert le : <strong style={{ color: 'var(--color-text-secondary)' }}>{formatDate(dossier.horodatageCreation || dossier.dateCreation, true)}</strong></span>
         </div>
+        <span style={{ color: 'var(--color-border)' }}>•</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--color-text-muted)' }}>
+          <span>Échéance : <strong style={{ color: 'var(--color-text-secondary)' }}>{formatDate(dossier.echeance)}</strong></span>
+        </div>
+      </div>
       {/* Ergonomic Navigation Tabs */}
       <div
         style={{
@@ -837,6 +837,8 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
           overflowX: 'auto',
           maxWidth: '100%',
           scrollbarWidth: 'none',
+          WebkitOverflowScrolling: 'touch',
+          whiteSpace: 'nowrap',
         }}
       >
         {tabs.map((tab) => {
@@ -865,6 +867,7 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
                 fontWeight: isActive ? 600 : 400,
                 fontSize: '10px',
                 cursor: 'pointer',
+                flexShrink: 0,
                 transition: 'all var(--transition-fast)',
               }}
             >

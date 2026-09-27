@@ -43,7 +43,7 @@ export const ParametresView: React.FC<ParametresViewProps> = ({
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+        <div className="kpi-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
           {/* Dark Theme Option */}
           <button
             type="button"
@@ -128,9 +128,7 @@ export const ParametresView: React.FC<ParametresViewProps> = ({
               </div>
               <div>
                 <div style={{ fontSize: '14px', fontWeight: 600 }}>Thème Clair (Monochrome Glacier)</div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                  Palette : #839292, #B8C7C7, #EFFFFF, #F7FFFF, #FFFFFF
-                </div>
+                
               </div>
             </div>
             {theme === 'light' && <Check size={18} color="var(--color-accent)" strokeWidth={2.5} />}
@@ -154,7 +152,7 @@ export const ParametresView: React.FC<ParametresViewProps> = ({
           </h2>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+        <div className="kpi-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
           <div>
             <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'block' }}>
               Nom & Prénom

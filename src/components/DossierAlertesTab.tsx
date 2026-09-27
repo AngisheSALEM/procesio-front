@@ -47,7 +47,7 @@ export const DossierAlertesTab: React.FC<DossierAlertesTabProps> = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
             Alertes et signalements d’irrégularité du dossier
@@ -172,6 +172,7 @@ export const DossierAlertesTab: React.FC<DossierAlertesTabProps> = ({
       {/* Creation Modal */}
       {showModal && (
         <div
+          className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -181,15 +182,19 @@ export const DossierAlertesTab: React.FC<DossierAlertesTabProps> = ({
             justifyContent: 'center',
             zIndex: 100,
             backdropFilter: 'blur(4px)',
+            padding: '20px',
           }}
         >
           <div
+            className="modal-card-responsive"
             style={{
               backgroundColor: 'var(--color-surface)',
               borderRadius: '16px',
               padding: '24px',
               width: '100%',
               maxWidth: '520px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
               gap: '16px',
@@ -260,7 +265,7 @@ export const DossierAlertesTab: React.FC<DossierAlertesTabProps> = ({
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '6px' }}>
                     Niveau de gravité

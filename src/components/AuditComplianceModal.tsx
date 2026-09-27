@@ -24,6 +24,7 @@ export const AuditComplianceModal: React.FC<AuditComplianceModalProps> = ({
 
   return (
     <div
+      className="modal-backdrop-responsive"
       style={{
         position: 'fixed',
         inset: 0,
@@ -36,6 +37,7 @@ export const AuditComplianceModal: React.FC<AuditComplianceModalProps> = ({
       }}
     >
       <div
+        className="modal-card-responsive"
         style={{
           backgroundColor: 'var(--color-surface)',
           border: 'none',

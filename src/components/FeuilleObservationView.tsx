@@ -7,7 +7,8 @@ import {
   CheckCircle,
   Scale,
   FolderOpen,
-  ArrowLeft
+  ArrowLeft,
+  RotateCcw
 } from 'lucide-react';
 import type { FeuilleObservation, UserAccount } from '../types';
 import type { DossierTabId } from './DossierHeader';
@@ -22,6 +23,8 @@ interface FeuilleObservationViewProps {
   onSaveFeuille?: (feuille: FeuilleObservation) => void;
   onAddFeuille?: (feuille: FeuilleObservation) => void;
   onLancerPv?: (pvData: { reference: string; date: string; motif: string; infractions: string[] }) => void;
+  onCloturerSansSuite?: (motif: string) => void;
+  onRevirementJugement?: (motif: string, docNom?: string) => void;
   hasPv?: boolean;
 }
 
@@ -34,6 +37,8 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
   onSaveFeuille,
   onAddFeuille,
   onLancerPv,
+  onCloturerSansSuite,
+  onRevirementJugement,
   hasPv = false,
 }) => {
   const feuillesList = (feuilles && feuilles.length > 0)
@@ -57,10 +62,82 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
   // Modale pour dresser un PV d'infraction
   const [showPvModal, setShowPvModal] = useState(false);
 
-  // État du formulaire épuré : STRICTEMENT 5 champs
+  // Modale de satisfaction & clôture sans suite
+  const [showSatisfactionModal, setShowSatisfactionModal] = useState(false);
+  const [satisfactionForm, setSatisfactionForm] = useState({
+    inspecteur: defaultAuteur,
+    dateDecision: new Date().toISOString().split('T')[0],
+    motif: 'Les justifications complémentaires et quittances authentiques présentées lors de l’audition contradictoire dissipent les présomptions d’infraction. Déclarations reconnues conformes.',
+    decision: 'CLASSE_SANS_SUITE' as const,
+    recommandations: 'Rapport contradictoire de clôture sans suite validé. Clôture définitive et archivage sans poursuite.',
+  });
+
+  const handleSatisfactionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!satisfactionForm.motif.trim()) {
+      alert('Veuillez renseigner le motif de satisfaction.');
+      return;
+    }
+    if (feuille) {
+      const updated: FeuilleObservation = {
+        ...feuille,
+        statutFeuille: 'CLOTUREE',
+        decisionFinale: 'CLASSE_SANS_SUITE',
+        motifSatisfaction: satisfactionForm.motif,
+        dateCloture: satisfactionForm.dateDecision,
+      };
+      onSaveFeuille?.(updated);
+    }
+    onCloturerSansSuite?.(satisfactionForm.motif);
+    setShowSatisfactionModal(false);
+    showToast('Observations satisfaites — Feuille clôturée et dossier classé sans suite.');
+  };
+
+  // Modale de revirement sur le jugement (Feuille d'observation)
+  const [showRevirementModal, setShowRevirementModal] = useState(false);
+  const [revirementForm, setRevirementForm] = useState({
+    inspecteur: defaultAuteur,
+    dateRevirement: new Date().toISOString().split('T')[0],
+    motif: '',
+    documentNom: '',
+    pdfFile: null as { name: string; size: string } | null,
+  });
+
+  const handleRevirementSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!revirementForm.motif.trim()) {
+      alert('Veuillez renseigner le motif du revirement de situation.');
+      return;
+    }
+    const docName = revirementForm.pdfFile?.name || revirementForm.documentNom || 'Nouvelle pièce probante';
+    if (feuille) {
+      const updated: FeuilleObservation = {
+        ...feuille,
+        statutFeuille: 'REUNION_CONTRADICTOIRE',
+        decisionFinale: undefined,
+        motifSatisfaction: undefined,
+        revirementJugement: {
+          date: revirementForm.dateRevirement,
+          motif: revirementForm.motif,
+          documentNom: docName,
+          documentTaille: revirementForm.pdfFile?.size || '620 Ko',
+          inspecteur: revirementForm.inspecteur,
+        },
+      };
+      onSaveFeuille?.(updated);
+    }
+    onRevirementJugement?.(revirementForm.motif, docName);
+    setShowRevirementModal(false);
+    showToast('Revirement de situation acté. Vous pouvez réévaluer la feuille d’observation.');
+  };
+
+  // État du formulaire épuré : avec type de cible, agissant pour le compte de et adresse
   const [createForm, setCreateForm] = useState({
     inspecteur: defaultAuteur,
     destinataire: feuille?.destinataire || dossierNom || 'CONGO MINING & CHEMICAL LOGISTICS SAS',
+    typeCible: 'Entreprise commerciale',
+    pourLeCompteDe: '',
+    adresse: feuille?.adresse || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
     objet: feuille?.objetControle || 'Vérification de la valeur transactionnelle et assiette taxable du fret CIF',
     auditionPrevue: feuille?.dateReunionCloturePrevue || '2026-10-20',
     pdfFile: null as { name: string; size: string } | null,
@@ -98,6 +175,9 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
       reference: `DGDA/DRK/FO/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
       inspecteurs: [createForm.inspecteur],
       destinataire: createForm.destinataire,
+      typeCible: createForm.typeCible,
+      pourLeCompteDe: createForm.pourLeCompteDe.trim() || undefined,
+      adresse: createForm.adresse.trim(),
       objetControle: createForm.objet,
       cadreLegal: feuille?.cadreLegal || 'Code des douanes - Contrôle différé et a posteriori',
       observations: [],
@@ -166,6 +246,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
 
   const renderCreateModal = () => (
     <div
+      className="modal-backdrop-responsive"
       style={{
         position: 'fixed',
         inset: 0,
@@ -179,13 +260,15 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
       }}
     >
       <div
+        className="modal-card-responsive"
         style={{
           backgroundColor: 'var(--color-surface)',
           borderRadius: 'var(--radius-card)',
           border: '1px solid var(--color-border)',
           width: '100%',
           maxWidth: '560px',
-          overflow: 'hidden',
+          maxHeight: '90vh',
+          overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
         }}
@@ -245,6 +328,79 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
               placeholder="Ex : CONGO MINING & CHEMICAL LOGISTICS SAS"
               value={createForm.destinataire}
               onChange={(e) => setCreateForm({ ...createForm, destinataire: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                fontSize: '12px',
+                backgroundColor: 'var(--color-bg)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-btn)',
+                color: 'var(--color-text-primary)',
+                outline: 'none',
+              }}
+            />
+          </div>
+
+          {/* Type de cible & Pour le compte de */}
+          <div className="form-grid-2col" style={{ gap: '12px' }}>
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                Type de cible
+              </label>
+              <select
+                value={createForm.typeCible}
+                onChange={(e) => setCreateForm({ ...createForm, typeCible: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  fontSize: '12px',
+                  backgroundColor: 'var(--color-bg)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-btn)',
+                  color: 'var(--color-text-primary)',
+                  outline: 'none',
+                }}
+              >
+                <option value="Entreprise commerciale">Entreprise commerciale</option>
+                <option value="Commissionnaire en douane">Commissionnaire en douane</option>
+                <option value="Organisation non gouvernementale">Organisation non gouvernementale</option>
+                <option value="Autre catégorie validée">Autre catégorie validée</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                Pour le compte de (optionnel)
+              </label>
+              <input
+                type="text"
+                placeholder="Si commissionnaire ou déclarant..."
+                value={createForm.pourLeCompteDe}
+                onChange={(e) => setCreateForm({ ...createForm, pourLeCompteDe: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  fontSize: '12px',
+                  backgroundColor: 'var(--color-bg)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-btn)',
+                  color: 'var(--color-text-primary)',
+                  outline: 'none',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Adresse de l'entité */}
+          <div>
+            <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              Adresse géographique de l'entité
+            </label>
+            <input
+              type="text"
+              placeholder="Ex : 04 Avenue des Métaux, Quartier Industriel, Lubumbashi"
+              value={createForm.adresse}
+              onChange={(e) => setCreateForm({ ...createForm, adresse: e.target.value })}
               style={{
                 width: '100%',
                 padding: '8px 12px',
@@ -424,6 +580,9 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
               setCreateForm({
                 inspecteur: defaultAuteur,
                 destinataire: dossierNom || 'CONGO MINING & CHEMICAL LOGISTICS SAS',
+                typeCible: 'Entreprise commerciale',
+                pourLeCompteDe: '',
+                adresse: '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
                 objet: '',
                 auditionPrevue: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
                 pdfFile: null,
@@ -458,7 +617,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             <p style={{ fontSize: '13px', margin: 0 }}>Aucune feuille d'observation enregistrée pour ce dossier.</p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+          <div className="cards-grid-auto">
             {feuillesList.map((item) => {
               const hasPvAttached = Boolean(item.pvInfractionGlec || item.decisionFinale === 'PV_INFRACTION_GLEC');
 
@@ -664,6 +823,29 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
               </span>
             </p>
 
+            {/* Type de cible & Pour le compte de : SANS BORDER, SANS BACKGROUND COLOR, SANS ICÔNE */}
+            <div style={{ fontSize: '12px', marginTop: '4px', color: 'var(--color-text-secondary)' }}>
+              <span style={{ color: 'var(--color-text-muted)' }}>Type de cible : </span>
+              <span style={{ color: 'var(--color-text-primary)' }}>
+                {feuille.typeCible || 'Entreprise commerciale'}
+              </span>
+              {feuille.pourLeCompteDe && (
+                <span style={{ marginLeft: '6px', color: 'var(--color-text-muted)' }}>
+                  (Agissant pour le compte de : <span style={{ color: 'var(--color-text-primary)' }}>{feuille.pourLeCompteDe}</span>)
+                </span>
+              )}
+            </div>
+
+            {/* Adresse : SANS BORDER, SANS BACKGROUND COLOR, SANS ICÔNE */}
+            {(feuille.adresse || dossierNom) && (
+              <div style={{ fontSize: '12px', marginTop: '4px', color: 'var(--color-text-secondary)' }}>
+                <span style={{ color: 'var(--color-text-muted)' }}>Adresse : </span>
+                <span style={{ color: 'var(--color-text-primary)' }}>
+                  {feuille.adresse || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi'}
+                </span>
+              </div>
+            )}
+
             {/* Inspecteur vérificateur : SANS ICÔNE */}
             <div style={{ fontSize: '12px', marginTop: '4px' }}>
               <span style={{ color: 'var(--color-text-muted)' }}>Inspecteur vérificateur : </span>
@@ -782,18 +964,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                     <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                       Constat {obs.code} : {obs.titre}
                     </span>
-                    <span
-                      style={{
-                        fontSize: '11px',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        backgroundColor: 'var(--color-bg)',
-                        border: '1px solid var(--color-border)',
-                        color: 'var(--color-text-secondary)',
-                      }}
-                    >
-                      {obs.statutConstat === 'MAINTENU_CONTENTIEUX' ? 'Maintenu contentieux' : 'En examen'}
-                    </span>
+                  
                   </div>
                   <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '6px', lineHeight: 1.5 }}>
                     {obs.faitsConstates}
@@ -802,6 +973,28 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
               ))}
             </div>
           </div>
+
+          {feuille?.decisionFinale === 'CLASSE_SANS_SUITE' && (
+              <div
+                style={{
+                  width: '100%',
+                  marginTop: '8px',
+                  padding: '12px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: 'var(--color-surface-muted)',
+                  border: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                  <CheckCircle size={14} color="var(--color-text-primary)" />
+                  <span>Observations satisfaites — Feuille clôturée sans suite</span>
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px', lineHeight: 1.4 }}>
+                  <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>Motif de satisfaction : </span>
+                  {feuille.motifSatisfaction || 'Justificatifs probants acceptés lors de la phase contradictoire. Absence d’infraction constatée.'}
+                </div>
+              </div>
+            )}
 
           {/* 5. Actions d'instruction simples */}
           <div
@@ -813,64 +1006,123 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
               borderTop: '1px solid var(--color-border-subtle)',
             }}
           >
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => {
-                if (feuille) {
-                  const updated: FeuilleObservation = { ...feuille, statutFeuille: 'CLOTUREE' };
-                  onSaveFeuille?.(updated);
-                }
-                showToast('Observations clôturées après contradictoire.');
-              }}
-              style={{ fontSize: '12px' }}
-            >
-              <CheckCircle size={14} />
-              <span>Valider la clôture du contradictoire</span>
-            </button>
+            {!hasPv && !feuille?.decisionFinale && !feuille?.pvInfractionGlec ? (
+              /* ÉTAT INITIAL SANS JUGEMENT : BOUTONS DE JUGEMENT DISPONIBLES */
+              <>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => {
+                    setSatisfactionForm((prev) => ({
+                      ...prev,
+                      inspecteur: feuille?.inspecteurs?.[0] || defaultAuteur,
+                      motif: feuille?.motifSatisfaction || prev.motif,
+                    }));
+                    setShowSatisfactionModal(true);
+                  }}
+                  style={{ fontSize: '12px' }}
+                >
+                  <CheckCircle size={14} />
+                  <span>Valider la satisfaction & Clôturer sans suite</span>
+                </button>
 
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => {
-                setPvForm({
-                  reference: `DGDA/DRK/PV-INF/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
-                  date: new Date().toISOString().split('T')[0],
-                  inspecteurs: feuille?.inspecteurs?.join(', ') || defaultAuteur,
-                  infractions: 'Minoration de la valeur en douane taxable et carence de justificatifs probants (Articles 356 et 357 du Code des douanes)',
-                  destination: 'Transmission à la Division Contentieuse et Parquet près le Tribunal de Grande Instance',
-                });
-                setShowPvModal(true);
-              }}
-              style={{
-                fontSize: '12px',
-                backgroundColor: hasPv ? 'var(--color-surface-elevated)' : undefined,
-                color: hasPv ? 'var(--color-accent)' : undefined,
-              }}
-            >
-              <Scale size={13} />
-              <span>{hasPv ? 'Mettre à jour le procès-verbal' : 'Dresser un procès-verbal d’infraction (PV)'}</span>
-            </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    setPvForm({
+                      reference: `DGDA/DRK/PV-INF/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
+                      date: new Date().toISOString().split('T')[0],
+                      inspecteurs: feuille?.inspecteurs?.join(', ') || defaultAuteur,
+                      infractions: 'Minoration de la valeur en douane taxable et carence de justificatifs probants (Articles 356 et 357 du Code des douanes)',
+                      destination: 'Transmission à la Division Contentieuse et Parquet près le Tribunal de Grande Instance',
+                    });
+                    setShowPvModal(true);
+                  }}
+                  style={{ fontSize: '12px' }}
+                >
+                  <Scale size={13} />
+                  <span>Dresser un procès-verbal d’infraction (PV)</span>
+                </button>
+              </>
+            ) : (
+              /* DÈS QU'UN JUGEMENT EST RENDU (PV DRESSÉ OU CLASSÉ SANS SUITE) : LES BOUTONS DE JUGEMENT DISPARAISSENT */
+              <>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    setCreateForm({
+                      inspecteur: defaultAuteur,
+                      destinataire: feuille?.destinataire || dossierNom || 'CONGO MINING & CHEMICAL LOGISTICS SAS',
+                      typeCible: feuille?.typeCible || 'Entreprise commerciale',
+                      pourLeCompteDe: feuille?.pourLeCompteDe || '',
+                      adresse: feuille?.adresse || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
+                      objet: '',
+                      auditionPrevue: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+                      pdfFile: null,
+                    });
+                    setShowCreateModal(true);
+                  }}
+                  style={{ fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Plus size={13} />
+                  <span>Nouvelle feuille d’observation</span>
+                </button>
 
-            {hasPv && (
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => onNavigateTab?.('documents')}
-                style={{
-                  fontSize: '12px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  color: 'var(--color-accent)',
-                  border: '1px solid var(--color-border)',
-                }}
-              >
-                <FolderOpen size={13} />
-                <span>Consulter le PV</span>
-              </button>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => {
+                    setRevirementForm({
+                      inspecteur: defaultAuteur,
+                      dateRevirement: new Date().toISOString().split('T')[0],
+                      motif: '',
+                      documentNom: '',
+                      pdfFile: null,
+                    });
+                    setShowRevirementModal(true);
+                  }}
+                  title="Revenir sur le jugement suite à de nouveaux éléments ou une régularisation"
+                  style={{
+                    fontSize: '11px',
+                    padding: '6px 12px',
+                    color: 'var(--color-text-muted)',
+                    border: '1px solid var(--color-border-subtle)',
+                    borderRadius: 'var(--radius-btn)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <RotateCcw size={12} />
+                  <span>Revenir sur votre jugement</span>
+                </button>
+
+                {(hasPv || feuille?.decisionFinale === 'PV_INFRACTION_GLEC' || feuille?.pvInfractionGlec) && (
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => onNavigateTab?.('documents')}
+                    style={{
+                      fontSize: '12px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      color: 'var(--color-accent)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  >
+                    <FolderOpen size={13} />
+                    <span>Consulter le PV</span>
+                  </button>
+                )}
+              </>
             )}
+
+            
           </div>
+          
         </div>
       </div>
 
@@ -884,6 +1136,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
           ========================================================================= */}
       {showCreateModal && (
         <div
+          className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -897,13 +1150,15 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
           }}
         >
           <div
+            className="modal-card-responsive"
             style={{
               backgroundColor: 'var(--color-surface)',
               borderRadius: 'var(--radius-card)',
               border: '1px solid var(--color-border)',
               width: '100%',
               maxWidth: '560px',
-              overflow: 'hidden',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
             }}
@@ -1084,6 +1339,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
           ========================================================================= */}
       {showPvModal && (
         <div
+          className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1097,13 +1353,15 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
           }}
         >
           <div
+            className="modal-card-responsive"
             style={{
               backgroundColor: 'var(--color-surface)',
               borderRadius: 'var(--radius-card)',
               border: '1px solid var(--color-border)',
               width: '100%',
               maxWidth: '560px',
-              overflow: 'hidden',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
             }}
@@ -1261,6 +1519,436 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                 </button>
                 <button type="submit" className="btn-primary">
                   Dresser le procès-verbal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* =========================================================================
+          MODALE DE SATISFACTION & CLÔTURE SANS SUITE (FEUILLE D'OBSERVATION)
+          Permet de motiver pourquoi les observations sont satisfaites
+          et d'enregistrer ce motif pour classer le dossier sans suite.
+          ========================================================================= */}
+      {showSatisfactionModal && (
+        <div
+          className="modal-backdrop-responsive"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px',
+          }}
+        >
+          <div
+            className="modal-card-responsive"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              borderRadius: 'var(--radius-card)',
+              border: '1px solid var(--color-border)',
+              width: '100%',
+              maxWidth: '560px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.45)',
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid var(--color-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
+                  Satisfaction des Observations & Clôture sans Suite
+                </h2>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                  Définir le motif qui justifie que les explications contradictoires sont satisfaites
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setShowSatisfactionModal(false)}
+                style={{ padding: '4px' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSatisfactionSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Champ 1 : Motif de satisfaction */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                  Motif de satisfaction & Justification de la clôture sans suite *
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={satisfactionForm.motif}
+                  onChange={(e) => setSatisfactionForm((prev) => ({ ...prev, motif: e.target.value }))}
+                  placeholder="Détailler pourquoi les explications de l'opérateur et les pièces justificatives sont retenues comme satisfaisantes..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    fontSize: '13px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '6px',
+                    color: 'var(--color-text-primary)',
+                    resize: 'vertical',
+                    lineHeight: 1.4,
+                  }}
+                />
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                  Ce motif clôt le contradictoire et sera reporté dans le suivi des dossiers classés sans suite.
+                </div>
+              </div>
+
+              {/* Champ 2 : Décision de clôture */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                  Issue du contradictoire
+                </label>
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: 'var(--color-surface-muted)',
+                    border: '1px solid var(--color-border-subtle)',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: 'var(--color-text-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <CheckCircle size={14} color="var(--color-text-primary)" />
+                  <span>Classement sans suite — Aucune infraction retenue (Pas de PV)</span>
+                </div>
+              </div>
+
+              {/* Champ 3 : Inspecteur & Date */}
+              <div className="form-grid-2col" style={{ gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                    Inspecteur vérificateur
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={satisfactionForm.inspecteur}
+                    onChange={(e) => setSatisfactionForm((prev) => ({ ...prev, inspecteur: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '6px',
+                      color: 'var(--color-text-primary)',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                    Date de clôture
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={satisfactionForm.dateDecision}
+                    onChange={(e) => setSatisfactionForm((prev) => ({ ...prev, dateDecision: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '6px',
+                      color: 'var(--color-text-primary)',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Champ 4 : Recommandations ou visa d'archivage */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                  Recommandations finales ou visa de clôture
+                </label>
+                <input
+                  type="text"
+                  value={satisfactionForm.recommandations}
+                  onChange={(e) => setSatisfactionForm((prev) => ({ ...prev, recommandations: e.target.value }))}
+                  placeholder="Ex : Visa de clôture définitive de la Division..."
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '13px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '6px',
+                    color: 'var(--color-text-primary)',
+                  }}
+                />
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid var(--color-border-subtle)', paddingTop: '14px' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowSatisfactionModal(false)}
+                  style={{ fontSize: '12px' }}
+                >
+                  Annuler
+                </button>
+                <button type="submit" className="btn-primary" style={{ fontSize: '12px' }}>
+                  <CheckCircle size={14} />
+                  <span>Valider et classer sans suite</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL : Revirement sur le jugement (Feuille d'observation) */}
+      {showRevirementModal && (
+        <div
+          className="modal-backdrop-responsive"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px',
+          }}
+          onClick={() => setShowRevirementModal(false)}
+        >
+          <div
+            className="modal-card-responsive"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-card)',
+              width: '100%',
+              maxWidth: '560px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: 'var(--shadow-elevation)',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header modal */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid var(--color-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '6px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <RotateCcw size={16} color="var(--color-text-primary)" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>
+                    Revirement de situation sur le jugement
+                  </h3>
+                  <p style={{ fontSize: '12px', margin: 0, color: 'var(--color-text-muted)' }}>
+                    Réexamen des observations contradictoires suite à de nouveaux éléments
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRevirementModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  color: 'var(--color-text-muted)',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Formulaire de revirement */}
+            <form onSubmit={handleRevirementSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Champ 1 : Motif du revirement */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                  Motif associé à ce revirement de situation *
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={revirementForm.motif}
+                  onChange={(e) => setRevirementForm((prev) => ({ ...prev, motif: e.target.value }))}
+                  placeholder="Expliquez avec précision les faits nouveaux, incohérences ou justifications justifiant ce revirement de jugement..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    fontSize: '13px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '6px',
+                    color: 'var(--color-text-primary)',
+                    resize: 'vertical',
+                    lineHeight: 1.4,
+                  }}
+                />
+              </div>
+
+              {/* Champ 2 : Document / Justificatif associé */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                  Document associé au revirement de situation *
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <input
+                    type="text"
+                    required
+                    value={revirementForm.documentNom}
+                    onChange={(e) => setRevirementForm((prev) => ({ ...prev, documentNom: e.target.value }))}
+                    placeholder="Intitulé ou référence de la pièce (ex: Nouveau rapport d'expertise, Quittance contestée)..."
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '6px',
+                      color: 'var(--color-text-primary)',
+                    }}
+                  />
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 12px',
+                      border: '1px dashed var(--color-border)',
+                      borderRadius: '6px',
+                      backgroundColor: 'var(--color-bg)',
+                    }}
+                  >
+                    <Upload size={14} color="var(--color-text-muted)" />
+                    <input
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setRevirementForm((prev) => ({
+                            ...prev,
+                            documentNom: prev.documentNom || file.name,
+                            pdfFile: { name: file.name, size: `${Math.round(file.size / 1024)} Ko` },
+                          }));
+                        }
+                      }}
+                      style={{ fontSize: '12px', color: 'var(--color-text-secondary)', flex: 1 }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Champ 3 : Inspecteur & Date */}
+              <div className="form-grid-2col" style={{ gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                    Inspecteur rapporteur
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={revirementForm.inspecteur}
+                    onChange={(e) => setRevirementForm((prev) => ({ ...prev, inspecteur: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '6px',
+                      color: 'var(--color-text-primary)',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                    Date de revirement
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={revirementForm.dateRevirement}
+                    onChange={(e) => setRevirementForm((prev) => ({ ...prev, dateRevirement: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '6px',
+                      color: 'var(--color-text-primary)',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Boutons d'action */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid var(--color-border-subtle)', paddingTop: '14px' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowRevirementModal(false)}
+                  style={{ fontSize: '12px' }}
+                >
+                  Annuler
+                </button>
+                <button type="submit" className="btn-primary" style={{ fontSize: '12px' }}>
+                  <RotateCcw size={13} />
+                  <span>Acter le revirement</span>
                 </button>
               </div>
             </form>

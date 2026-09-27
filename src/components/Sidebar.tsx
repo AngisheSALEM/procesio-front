@@ -2,8 +2,6 @@ import React from 'react';
 import {
   Briefcase,
   Radio,
-  FolderLock,
-  FileCheck,
   BarChart3,
   Settings,
   PanelLeftClose,
@@ -37,13 +35,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const adminNavItems: NavItem[] = [
     {
-      id: 'dossiers-enquete',
-      label: 'Dossiers d’enquête',
-      icon: <FolderLock size={18} strokeWidth={1.8} />,
+      id: 'rapports-stats',
+      label: 'Supervision & Stats',
+      icon: <BarChart3 size={18} strokeWidth={1.8} />,
     },
     {
       id: 'mon-travail',
-      label: 'Supervision',
+      label: 'Tous les Dossiers',
       icon: <Briefcase size={18} strokeWidth={1.8} />,
     },
     {
@@ -51,21 +49,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Renseignements',
       icon: <Radio size={18} strokeWidth={1.8} />,
     },
-    {
-      id: 'documents-modeles',
-      label: 'Modèles d’actes',
-      icon: <FileCheck size={18} strokeWidth={1.8} />,
-    },
-    {
-      id: 'rapports-stats',
-      label: 'Rapports & Stats',
-      icon: <BarChart3 size={18} strokeWidth={1.8} />,
-    },
-    // {
-    //   id: 'components',
-    //   label: 'Lab Tableaux UX',
-    //   icon: <Table size={18} strokeWidth={1.8} />,
-    // },
     {
       id: 'parametres',
       label: 'Paramètres',
@@ -76,7 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const enqueteurNavItems: NavItem[] = [
     {
       id: 'mon-travail',
-      label: 'Mon travail',
+      label: "Dossiers d'enquetes",
       icon: <Briefcase size={18} strokeWidth={1.8} />,
     },
     // {
@@ -89,11 +72,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Renseignements',
       icon: <Radio size={18} strokeWidth={1.8} />,
     },
-    {
-      id: 'documents-modeles',
-      label: 'Modèles d’actes',
-      icon: <FileCheck size={18} strokeWidth={1.8} />,
-    },
+    // {
+    //   id: 'documents-modeles',
+    //   label: 'Modèles d’actes',
+    //   icon: <FileCheck size={18} strokeWidth={1.8} />,
+    // },
     {
       id: 'parametres',
       label: 'Paramètres',
@@ -103,33 +86,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const items = user.role === 'admin' ? adminNavItems : enqueteurNavItems;
 
+  const handleItemClick = (itemId: string) => {
+    onSelectNav(itemId);
+    // On mobile screens, auto-close sidebar drawer after selecting a view
+    if (window.innerWidth <= 768 && !isCollapsed) {
+      onToggleCollapse();
+    }
+  };
+
   return (
-    <aside
-      style={{
-        width: isCollapsed ? '68px' : '250px',
-        margin: 0,
-        height: '100vh',
-        maxHeight: '100vh',
-        position: 'relative',
-        top: 0,
-        left: 0,
-        flexShrink: 0,
-        backgroundColor: 'var(--color-bg-deep)',
-        borderRight: '1px solid var(--color-border-subtle)',
-        borderTop: 'none',
-        borderBottom: 'none',
-        borderLeft: 'none',
-        borderRadius: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        padding: isCollapsed ? '16px 8px' : '16px 14px',
-        userSelect: 'none',
-        transition: 'width var(--transition-normal), padding var(--transition-normal)',
-        zIndex: 20,
-      }}
-    >
-      <div>
+    <>
+      {/* Backdrop overlay for mobile drawer */}
+      {!isCollapsed && (
+        <div
+          className="sidebar-backdrop"
+          onClick={onToggleCollapse}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={`app-sidebar-drawer ${isCollapsed ? 'sidebar-collapsed-mobile' : 'sidebar-open-mobile'}`}
+        style={{
+          width: isCollapsed ? '68px' : '250px',
+          marginRight: '10px',
+          marginTop: '5px',
+          marginBottom: '10px',
+          height: '100vh',
+          maxHeight: '100vh',
+          position: 'relative',
+          top: 0,
+          left: 0,
+          flexShrink: 0,
+          backgroundColor: 'var(--color-bg-deep)',
+          border: '1px solid var(--color-border-subtle)',
+          borderTop: 'none',
+          borderBottom: 'none',
+          borderLeft: 'none',
+          borderRadius: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          padding: isCollapsed ? '16px 8px' : '16px 14px',
+          userSelect: 'none',
+          transition: 'width var(--transition-normal), padding var(--transition-normal)',
+          zIndex: 20,
+        }}
+      >
+        <div>
         {/* Top Header of the sidebar with Logo & PROCEZO */}
         <div
           style={{
@@ -137,7 +141,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             alignItems: 'center',
             justifyContent: isCollapsed ? 'center' : 'space-between',
             padding: isCollapsed ? '0 0 16px 0' : '0 4px 18px 4px',
-            borderBottom: '1px solid var(--color-border-subtle)',
+            borderBottom: 'none',
             marginBottom: '16px',
             gap: '8px',
           }}
@@ -202,7 +206,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             return (
               <button
                 key={item.id}
-                onClick={() => onSelectNav(item.id)}
+                onClick={() => handleItemClick(item.id)}
                 title={isCollapsed ? item.label : undefined}
                 style={{
                   display: 'flex',
@@ -211,7 +215,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   gap: '12px',
                   padding: isCollapsed ? '10px 0' : '10px 14px',
                   backgroundColor: isActive ? 'var(--glass-surface)' : 'transparent',
-                  border: isActive ? '1px solid var(--glass-border-focus)' : '1px solid transparent',
+                  border: 'none',
                   borderRadius: '12px',
                   color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                   cursor: 'pointer',
@@ -255,7 +259,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* User Identity in Navbar (as requested: name is in nav bar and not in header) */}
       <div
         style={{
-          borderTop: '1px solid var(--glass-border)',
+          borderTop: 'none',
           paddingTop: '12px',
         }}
       >
@@ -341,5 +345,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
     </aside>
+    </>
   );
 };

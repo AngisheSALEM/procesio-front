@@ -66,14 +66,15 @@ export const DocumentsModelesView: React.FC = () => {
       </div>
 
       <div
+        className="responsive-table-container"
         style={{
           backgroundColor: 'var(--color-surface)',
           border: 'none',
           borderRadius: 'var(--radius-card)',
-          overflow: 'hidden',
+          overflowX: 'auto',
         }}
       >
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+        <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
           <thead>
             <tr
               style={{

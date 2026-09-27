@@ -22,14 +22,22 @@ export type StatutDossier =
 
 export type Priorite = 'NORMALE' | 'URGENTE' | 'SIGNALEE';
 
+export type TypeCible =
+  | 'Commissionnaire en douane'
+  | 'Entreprise commerciale'
+  | 'Organisation non gouvernementale'
+  | 'Autre catégorie validée';
+
 export interface EntiteControlee {
   nom: string;
   rccm: string;
   nif: string;
-  typeEntite: 'Société commerciale' | 'Commissionnaire en douane' | 'Banque' | 'Particulier' | 'ONG';
+  typeEntite: 'Société commerciale' | 'Commissionnaire en douane' | 'Banque' | 'Particulier' | 'ONG' | string;
   roleDansDossier: 'Entreprise contrôlée' | 'Déclarant / Transitaire' | 'Détenteur de pièces' | 'Bénéficiaire';
   adresse: string;
   contact: string;
+  typeCible?: TypeCible | string;
+  pourLeCompteDe?: string;
 }
 
 export interface OperationDouaniere {
@@ -104,6 +112,14 @@ export interface DossierEnquete {
   taches: TacheDossier[];
   alertes: AlerteDossier[];
   echeances: EcheanceDossier[];
+  decisionCloture?: 'CLASSE_SANS_SUITE' | 'TRANSMIS_CONTENTIEUX' | 'REGULARISE';
+  motifClassement?: string;
+  dateCloture?: string;
+  hasPv?: boolean;
+  pvIds?: string[];
+  droitsEludesUSD?: number;
+  droitsEludesCDF?: number;
+  amendeUSD?: number;
 }
 
 export type StatutDemandeCommunication =
@@ -151,6 +167,8 @@ export interface DemandeCommunication {
     qualite: string;
     adresse: string;
     representant?: string;
+    typeCible?: TypeCible | string;
+    pourLeCompteDe?: string;
   };
   dateEmission?: string;
   echeanceReponse: string;
@@ -169,6 +187,14 @@ export interface DemandeCommunication {
   reponsePdfAuteur?: string;
   reponsePdfRef?: string;
   evaluationReponse?: 'SATISFAISANTE' | 'NON_SATISFAISANTE';
+  motifSatisfaction?: string;
+  revirementJugement?: {
+    date: string;
+    motif: string;
+    documentNom?: string;
+    documentTaille?: string;
+    inspecteur?: string;
+  };
   pvConstatGenere?: {
     reference: string;
     date: string;
@@ -214,6 +240,11 @@ export interface ObservationItem {
   appreciationEnqueteur?: AppreciationObservation;
   statutConstat: StatutConstat;
   analyseMotivee: string;
+  sourcePdfNom?: string;
+  sourcePdfPage?: string;
+  sourcePdfExtrait?: string;
+  montantLitigieuxUSD?: number;
+  tauxConfianceOcr?: number;
 }
 
 export interface FeuilleObservation {
@@ -223,6 +254,9 @@ export interface FeuilleObservation {
   dateRedaction: string;
   inspecteurs: string[];
   destinataire: string;
+  typeCible?: TypeCible | string;
+  pourLeCompteDe?: string;
+  adresse?: string;
   objetControle: string;
   cadreLegal: string; // ex: Décision DG/DGDA/DG/2011/296 Articles 44-49
   observations: ObservationItem[];
@@ -231,6 +265,15 @@ export interface FeuilleObservation {
   pdfSourceNom?: string;
   pdfSourceDateUpload?: string;
   decisionFinale?: 'CLASSE_SANS_SUITE' | 'PV_INFRACTION_GLEC';
+  motifSatisfaction?: string;
+  dateCloture?: string;
+  revirementJugement?: {
+    date: string;
+    motif: string;
+    documentNom?: string;
+    documentTaille?: string;
+    inspecteur?: string;
+  };
   decisionRelais?: {
     relaisGelec: boolean;
     referencePvInfraction?: string;
@@ -334,5 +377,44 @@ export interface AuditLogEntry {
   action: string;
   details: string;
   categorie: 'PROCEDURE' | 'DOCUMENT' | 'DECISION' | 'SECURITE';
+}
+
+export interface EtapeEvolutionRenseignement {
+  etape: string;
+  date: string;
+  acteur: string;
+  statut: 'TERMINE' | 'EN_COURS' | 'A_VENIR';
+  commentaire?: string;
+}
+
+export interface RenseignementItem {
+  id: string;
+  reference: string;
+  dateReception: string;
+  origine: string;
+  objet: string;
+  resume: string;
+  niveauAcces: string;
+  serviceDestinataire: string;
+  statut: string;
+  dossiersLies: string[];
+  piecesDisponibles?: string[];
+  // Cotation managériale (Savoir qui a été coté)
+  cotePar?: string;
+  coteA?: string;
+  dateCotation?: string;
+  degreFiabilite?: string;
+  priorite?: 'NORMALE' | 'URGENTE' | 'SIGNALEE';
+  instructionCotation?: string;
+  delaiPrescritJours?: number;
+  // Effets produits
+  effetProduit?: 'ENQUETE_OUVERTE_AVEC_PV' | 'ENQUETE_EN_COURS' | 'CLASSE_SANS_SUITE' | 'EN_EVALUATION';
+  effetDescription?: string;
+  dossierGenereRef?: string;
+  pvGenereRef?: string;
+  montantRecouvreUSD?: number;
+  montantRecouvreCDF?: number;
+  // Suivi de l'évolution (Comment les dossiers ont évolué)
+  cycleEvolution?: EtapeEvolutionRenseignement[];
 }
 

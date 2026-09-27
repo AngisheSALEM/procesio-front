@@ -6,7 +6,8 @@ import {
   X,
   CheckCircle,
   Scale,
-  ArrowLeft
+  ArrowLeft,
+  RotateCcw
 } from 'lucide-react';
 import type { DemandeCommunication, FeuilleObservation, UserAccount } from '../types';
 import { formatDate } from '../utils/dateUtils';
@@ -21,7 +22,10 @@ interface DemandeCommunicationViewProps {
   onAddDemande?: (demande: DemandeCommunication) => void;
   onCancelDemande?: (demandeId: string) => void;
   onCreateFeuille?: (feuille: FeuilleObservation) => void;
+  onCloturerSansSuite?: (motif: string) => void;
+  onRevirementJugement?: (motif: string, docNom?: string) => void;
   hasFeuille?: boolean;
+  hasPv?: boolean;
 }
 
 export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> = ({
@@ -34,7 +38,10 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
   onAddDemande,
   onCancelDemande,
   onCreateFeuille,
+  onCloturerSansSuite,
+  onRevirementJugement,
   hasFeuille = false,
+  hasPv = false,
 }) => {
   const demandesList = (demandes && demandes.length > 0)
     ? demandes
@@ -57,6 +64,73 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
   // Formulaire de création de la feuille d'observation
   const [showFeuilleModal, setShowFeuilleModal] = useState(false);
 
+  // Formulaire de satisfaction & classement sans suite
+  const [showSatisfactionModal, setShowSatisfactionModal] = useState(false);
+  const [satisfactionForm, setSatisfactionForm] = useState({
+    inspecteur: defaultAuteur,
+    dateDecision: new Date().toISOString().split('T')[0],
+    motif: 'Les pièces comptables et justificatifs transmis justifient la conformité intégrale des opérations. Absence d’irrégularité douanière ou fiscale constatée.',
+    decision: 'CLASSE_SANS_SUITE' as const,
+    recommandations: 'Archivage du dossier au rang des affaires régulières avec visa de conformité de la hiérarchie.',
+  });
+
+  const handleSatisfactionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!satisfactionForm.motif.trim()) {
+      alert('Veuillez renseigner le motif de satisfaction.');
+      return;
+    }
+    if (demande) {
+      const updated: DemandeCommunication = {
+        ...demande,
+        statut: 'REPONSE_COMPLETE',
+        evaluationReponse: 'SATISFAISANTE',
+        motifSatisfaction: satisfactionForm.motif,
+      };
+      onUpdateDemande?.(updated);
+    }
+    onCloturerSansSuite?.(satisfactionForm.motif);
+    setShowSatisfactionModal(false);
+    showToast('Demande marquée satisfaite — Dossier classé sans suite avec succès.');
+  };
+
+  // Modale de revirement sur le jugement
+  const [showRevirementModal, setShowRevirementModal] = useState(false);
+  const [revirementForm, setRevirementForm] = useState({
+    inspecteur: defaultAuteur,
+    dateRevirement: new Date().toISOString().split('T')[0],
+    motif: '',
+    documentNom: '',
+    pdfFile: null as { name: string; size: string } | null,
+  });
+
+  const handleRevirementSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!revirementForm.motif.trim()) {
+      alert('Veuillez renseigner le motif du revirement de situation.');
+      return;
+    }
+    const docName = revirementForm.pdfFile?.name || revirementForm.documentNom || 'Nouvelle pièce probante';
+    if (demande) {
+      const updated: DemandeCommunication = {
+        ...demande,
+        evaluationReponse: undefined,
+        motifSatisfaction: undefined,
+        revirementJugement: {
+          date: revirementForm.dateRevirement,
+          motif: revirementForm.motif,
+          documentNom: docName,
+          documentTaille: revirementForm.pdfFile?.size || '540 Ko',
+          inspecteur: revirementForm.inspecteur,
+        },
+      };
+      onUpdateDemande?.(updated);
+    }
+    onRevirementJugement?.(revirementForm.motif, docName);
+    setShowRevirementModal(false);
+    showToast('Revirement de situation acté. Vous pouvez réévaluer la demande.');
+  };
+
   // Formulaire d'enregistrement de la réponse de l'opérateur (STRICTEMENT 5 CHAMPS)
   const [showReponseModal, setShowReponseModal] = useState(false);
   const [reponseForm, setReponseForm] = useState({
@@ -67,19 +141,25 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
     pdfFile: null as { name: string; size: string } | null,
   });
 
-  // État du formulaire épuré : STRICTEMENT 5 champs
+  // État du formulaire épuré : champs avec qualification de cible et adresse
   const [createForm, setCreateForm] = useState({
     auteur: defaultAuteur,
     destinataire: demande?.destinataire?.nom || 'CONGO MINING & CHEMICAL LOGISTICS SAS',
+    typeCible: 'Entreprise commerciale',
+    pourLeCompteDe: '',
+    adresse: demande?.destinataire?.adresse || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
     echeance: demande?.echeanceReponse || '2026-10-15',
     objet: demande?.objet || 'Communication des manifestes de fret maritime et factures CIF Kasumbalesa',
     pdfFile: null as { name: string; size: string } | null,
   });
 
-  // Formulaire Feuille d'observation : STRICTEMENT 5 champs
+  // Formulaire Feuille d'observation
   const [feuilleForm, setFeuilleForm] = useState({
     inspecteur: defaultAuteur,
     destinataire: demande?.destinataire?.nom || 'CONGO MINING & CHEMICAL LOGISTICS SAS',
+    typeCible: 'Entreprise commerciale',
+    pourLeCompteDe: '',
+    adresse: demande?.destinataire?.adresse || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
     objet: `Constatations contradictoires suite au défaut de communication : ${demande?.objet || ''}`,
     auditionPrevue: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
     pdfFile: null as { name: string; size: string } | null,
@@ -111,8 +191,10 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
       objet: createForm.objet,
       destinataire: {
         nom: createForm.destinataire,
-        qualite: 'Entreprise contrôlée',
-        adresse: '',
+        qualite: createForm.typeCible,
+        typeCible: createForm.typeCible,
+        pourLeCompteDe: createForm.pourLeCompteDe.trim() || undefined,
+        adresse: createForm.adresse.trim(),
       },
       statut: 'EMISE',
       signataireHabilite: 'Salem Mukendi (Directeur Provincial)',
@@ -186,6 +268,9 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
       dateRedaction: dateStr,
       inspecteurs: [feuilleForm.inspecteur],
       destinataire: feuilleForm.destinataire,
+      typeCible: feuilleForm.typeCible,
+      pourLeCompteDe: feuilleForm.pourLeCompteDe.trim() || undefined,
+      adresse: feuilleForm.adresse.trim(),
       objetControle: feuilleForm.objet,
       cadreLegal: 'Décision DG/DGDA/DG/2011/296 (Articles 44 à 49) portant réglementation des contrôles a posteriori en RDC',
       statutFeuille: 'NOTIFIEE',
@@ -278,6 +363,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
 
   const renderCreateModal = () => (
     <div
+      className="modal-backdrop-responsive"
       style={{
         position: 'fixed',
         inset: 0,
@@ -291,13 +377,15 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
       }}
     >
       <div
+        className="modal-card-responsive"
         style={{
           backgroundColor: 'var(--color-surface)',
           borderRadius: 'var(--radius-card)',
           border: '1px solid var(--color-border)',
           width: '100%',
           maxWidth: '560px',
-          overflow: 'hidden',
+          maxHeight: '90vh',
+          overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
         }}
@@ -534,6 +622,9 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
               setCreateForm({
                 auteur: defaultAuteur,
                 destinataire: dossierNom || 'CONGO MINING & CHEMICAL LOGISTICS SAS',
+                typeCible: 'Entreprise commerciale',
+                pourLeCompteDe: '',
+                adresse: '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
                 echeance: new Date(Date.now() + 21 * 86400000).toISOString().split('T')[0],
                 objet: '',
                 pdfFile: null,
@@ -568,7 +659,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             <p style={{ fontSize: '13px', margin: 0 }}>Aucune demande de communication enregistrée pour ce dossier.</p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+          <div className="cards-grid-auto">
             {demandesList.map((item) => {
               const hasRep = Boolean(
                 item.reponsePdfNom ||
@@ -810,11 +901,26 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 fontWeight: 700,}}>{demande.destinataire.nom}</span>
             </p>
 
-            {/* Description établissement : SANS ICÔNE */}
-            {/* <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-              {demande.destinataire.qualite || 'Entreprise contrôlée'}
-              {demande.destinataire.adresse ? ` — ${demande.destinataire.adresse}` : ''}
-            </div> */}
+            {/* Type de cible & Pour le compte de : SANS BORDER, SANS BACKGROUND COLOR, SANS ICÔNE */}
+            <div style={{ fontSize: '12px', marginTop: '4px', color: 'var(--color-text-secondary)' }}>
+              <span style={{ color: 'var(--color-text-muted)' }}>Type de cible : </span>
+              <span style={{ color: 'var(--color-text-primary)' }}>
+                {demande.destinataire.typeCible || demande.destinataire.qualite || 'Entreprise commerciale'}
+              </span>
+              {demande.destinataire.pourLeCompteDe && (
+                <span style={{ marginLeft: '6px', color: 'var(--color-text-muted)' }}>
+                  (Agissant pour le compte de : <span style={{ color: 'var(--color-text-primary)' }}>{demande.destinataire.pourLeCompteDe}</span>)
+                </span>
+              )}
+            </div>
+
+            {/* Adresse : SANS BORDER, SANS BACKGROUND COLOR, SANS ICÔNE */}
+            {demande.destinataire.adresse && (
+              <div style={{ fontSize: '12px', marginTop: '4px', color: 'var(--color-text-secondary)' }}>
+                <span style={{ color: 'var(--color-text-muted)' }}>Adresse : </span>
+                <span style={{ color: 'var(--color-text-primary)' }}>{demande.destinataire.adresse}</span>
+              </div>
+            )}
 
             {/* Enquêteur rédacteur : SANS ICÔNE */}
             <div style={{ fontSize: '12px',  marginTop: '4px' }}>
@@ -1027,47 +1133,55 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             ) : (
               /* DÈS QU'IL Y A UNE RÉPONSE UPLOADÉE */
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={() => {
-                    const updated: DemandeCommunication = {
-                      ...demande,
-                      statut: 'REPONSE_COMPLETE',
-                      evaluationReponse: 'SATISFAISANTE',
-                    };
-                    onUpdateDemande?.(updated);
-                    showToast('Demande marquée comme satisfaite.');
-                  }}
-                  style={{ fontSize: '12px' }}
-                >
-                  <CheckCircle size={14} />
-                  <span>Marquer comme satisfait</span>
-                </button>
+                {!demande.evaluationReponse && (
+                  <>
+                    {!hasPv && (
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={() => {
+                          setSatisfactionForm((prev) => ({
+                            ...prev,
+                            inspecteur: defaultAuteur,
+                            motif: demande.motifSatisfaction || prev.motif,
+                          }));
+                          setShowSatisfactionModal(true);
+                        }}
+                        style={{ fontSize: '12px' }}
+                      >
+                        <CheckCircle size={14} />
+                        <span>Marquer comme satisfait</span>
+                      </button>
+                    )}
 
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => {
-                    const updated: DemandeCommunication = {
-                      ...demande,
-                      statut: 'TERMINEE',
-                      evaluationReponse: 'NON_SATISFAISANTE',
-                    };
-                    onUpdateDemande?.(updated);
-                    setFeuilleForm({
-                      inspecteur: defaultAuteur,
-                      destinataire: demande.destinataire?.nom || 'Entreprise contrôlée',
-                      objet: `Constatations contradictoires suite au défaut de communication : ${demande.objet}`,
-                      auditionPrevue: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
-                      pdfFile: null,
-                    });
-                    setShowFeuilleModal(true);
-                  }}
-                  style={{ fontSize: '12px' }}
-                >
-                  <span>Non satisfait</span>
-                </button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => {
+                        const updated: DemandeCommunication = {
+                          ...demande,
+                          statut: 'TERMINEE',
+                          evaluationReponse: 'NON_SATISFAISANTE',
+                        };
+                        onUpdateDemande?.(updated);
+                        setFeuilleForm({
+                          inspecteur: defaultAuteur,
+                          destinataire: demande.destinataire?.nom || 'Entreprise contrôlée',
+                          typeCible: demande.destinataire?.typeCible || demande.destinataire?.qualite || 'Entreprise commerciale',
+                          pourLeCompteDe: demande.destinataire?.pourLeCompteDe || '',
+                          adresse: demande.destinataire?.adresse || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
+                          objet: `Constatations contradictoires suite au défaut de communication : ${demande.objet}`,
+                          auditionPrevue: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+                          pdfFile: null,
+                        });
+                        setShowFeuilleModal(true);
+                      }}
+                      style={{ fontSize: '12px' }}
+                    >
+                      <span>Non satisfait</span>
+                    </button>
+                  </>
+                )}
 
                 {demande.evaluationReponse === 'NON_SATISFAISANTE' && !hasFeuille && (
                   <button
@@ -1077,6 +1191,9 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                       setFeuilleForm({
                         inspecteur: defaultAuteur,
                         destinataire: demande.destinataire?.nom || 'Entreprise contrôlée',
+                        typeCible: demande.destinataire?.typeCible || demande.destinataire?.qualite || 'Entreprise commerciale',
+                        pourLeCompteDe: demande.destinataire?.pourLeCompteDe || '',
+                        adresse: demande.destinataire?.adresse || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
                         objet: `Constatations contradictoires suite au défaut de communication : ${demande.objet}`,
                         auditionPrevue: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
                         pdfFile: null,
@@ -1113,6 +1230,60 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                     <span>Consulter la feuille d’observation</span>
                   </button>
                 )}
+                  {demande.evaluationReponse && (
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => {
+                      setRevirementForm({
+                        inspecteur: defaultAuteur,
+                        dateRevirement: new Date().toISOString().split('T')[0],
+                        motif: '',
+                        documentNom: '',
+                        pdfFile: null,
+                      });
+                      setShowRevirementModal(true);
+                    }}
+                    title="Revenir sur l'évaluation initiale suite à de nouveaux éléments"
+                    style={{
+                      fontSize: '11px',
+                      padding: '5px 10px',
+                      color: 'var(--color-text-muted)',
+                      border: 'none',
+                      borderRadius: 'var(--radius-btn)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                    }}
+                  >
+                    <RotateCcw size={12} />
+                    <span>Revenir sur le jugement</span>
+                  </button>
+                )}
+
+              
+
+                {demande.evaluationReponse === 'SATISFAISANTE' && (
+                  <div
+                    style={{
+                      width: '100%',
+                      marginTop: '8px',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      backgroundColor: 'var(--color-surface-muted)',
+                      border: '1px solid var(--color-border-subtle)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                      <CheckCircle size={14} color="var(--color-text-primary)" />
+                      <span>Demande satisfaite — Dossier classé sans suite</span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px', lineHeight: 1.4 }}>
+                      <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>Motif de satisfaction : </span>
+                      {demande.motifSatisfaction || 'Les pièces transmises justifient la conformité douanière des opérations contrôlées.'}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1137,6 +1308,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           ========================================================================= */}
       {showCreateModal && (
         <div
+          className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1150,13 +1322,15 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           }}
         >
           <div
+            className="modal-card-responsive"
             style={{
               backgroundColor: 'var(--color-surface)',
               borderRadius: 'var(--radius-card)',
               border: '1px solid var(--color-border)',
               width: '100%',
               maxWidth: '560px',
-              overflow: 'hidden',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
             }}
@@ -1220,6 +1394,79 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                   placeholder="Ex : CONGO MINING & CHEMICAL LOGISTICS SAS"
                   value={createForm.destinataire}
                   onChange={(e) => setCreateForm({ ...createForm, destinataire: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-btn)',
+                    color: 'var(--color-text-primary)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Champ 2b : Type de cible */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                    Type de cible
+                  </label>
+                  <select
+                    value={createForm.typeCible}
+                    onChange={(e) => setCreateForm({ ...createForm, typeCible: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-btn)',
+                      color: 'var(--color-text-primary)',
+                      outline: 'none',
+                    }}
+                  >
+                    <option value="Entreprise commerciale">Entreprise commerciale</option>
+                    <option value="Commissionnaire en douane">Commissionnaire en douane</option>
+                    <option value="Organisation non gouvernementale">Organisation non gouvernementale</option>
+                    <option value="Autre catégorie validée">Autre catégorie validée</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                    Pour le compte de (optionnel)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Si commissionnaire ou déclarant..."
+                    value={createForm.pourLeCompteDe}
+                    onChange={(e) => setCreateForm({ ...createForm, pourLeCompteDe: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-btn)',
+                      color: 'var(--color-text-primary)',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Champ 2c : Adresse de l'opérateur */}
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Adresse géographique de l'entité
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex : 04 Avenue des Métaux, Quartier Industriel, Lubumbashi"
+                  value={createForm.adresse}
+                  onChange={(e) => setCreateForm({ ...createForm, adresse: e.target.value })}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -1341,6 +1588,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           ========================================================================= */}
       {showFeuilleModal && (
         <div
+          className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1354,13 +1602,15 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           }}
         >
           <div
+            className="modal-card-responsive"
             style={{
               backgroundColor: 'var(--color-surface)',
               borderRadius: 'var(--radius-card)',
               border: '1px solid var(--color-border)',
               width: '100%',
               maxWidth: '560px',
-              overflow: 'hidden',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
             }}
@@ -1423,6 +1673,79 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                   required
                   value={feuilleForm.destinataire}
                   onChange={(e) => setFeuilleForm({ ...feuilleForm, destinataire: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-btn)',
+                    color: 'var(--color-text-primary)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Champ 2b : Type de cible */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                    Type de cible
+                  </label>
+                  <select
+                    value={feuilleForm.typeCible}
+                    onChange={(e) => setFeuilleForm({ ...feuilleForm, typeCible: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-btn)',
+                      color: 'var(--color-text-primary)',
+                      outline: 'none',
+                    }}
+                  >
+                    <option value="Entreprise commerciale">Entreprise commerciale</option>
+                    <option value="Commissionnaire en douane">Commissionnaire en douane</option>
+                    <option value="Organisation non gouvernementale">Organisation non gouvernementale</option>
+                    <option value="Autre catégorie validée">Autre catégorie validée</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                    Pour le compte de (optionnel)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Si commissionnaire ou déclarant..."
+                    value={feuilleForm.pourLeCompteDe}
+                    onChange={(e) => setFeuilleForm({ ...feuilleForm, pourLeCompteDe: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-btn)',
+                      color: 'var(--color-text-primary)',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Champ 2c : Adresse de l'entité */}
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Adresse de l'entité
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex : 04 Avenue des Métaux, Quartier Industriel, Lubumbashi"
+                  value={feuilleForm.adresse}
+                  onChange={(e) => setFeuilleForm({ ...feuilleForm, adresse: e.target.value })}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -1543,6 +1866,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           ========================================================================= */}
       {showReponseModal && (
         <div
+          className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1556,13 +1880,15 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           }}
         >
           <div
+            className="modal-card-responsive"
             style={{
               backgroundColor: 'var(--color-surface)',
               borderRadius: 'var(--radius-card)',
               border: '1px solid var(--color-border)',
               width: '100%',
               maxWidth: '560px',
-              overflow: 'hidden',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
               boxShadow: 'var(--shadow-modal)',
@@ -1736,6 +2062,418 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 <button type="submit" className="btn-primary" style={{ fontSize: '12px' }}>
                   <Upload size={13} />
                   <span>Enregistrer la réponse</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODALE DE SATISFACTION & CLASSEMENT SANS SUITE DU DOSSIER
+          Permet de motiver pourquoi les pièces reçues sont satisfaisantes
+          et d'enregistrer ce motif pour classer le dossier sans suite.
+          ========================================================================= */}
+      {showSatisfactionModal && (
+        <div
+          className="modal-backdrop-responsive"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px',
+          }}
+        >
+          <div
+            className="modal-card-responsive"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              borderRadius: 'var(--radius-card)',
+              border: '1px solid var(--color-border)',
+              width: '100%',
+              maxWidth: '560px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.45)',
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid var(--color-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
+                  Satisfaction de la Demande & Classement sans Suite
+                </h2>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                  Définir le motif de conformité qui justifie le classement sans suite de l’enquête
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setShowSatisfactionModal(false)}
+                style={{ padding: '4px' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSatisfactionSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Champ 1 : Motif de satisfaction & Classement sans suite */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                  Motif de satisfaction & Justification du classement sans suite *
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={satisfactionForm.motif}
+                  onChange={(e) => setSatisfactionForm((prev) => ({ ...prev, motif: e.target.value }))}
+                  placeholder="Détailler précisément les motifs de conformité (ex: pièces probantes, quittances régularisées, absence d'infraction)..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    fontSize: '13px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '6px',
+                    color: 'var(--color-text-primary)',
+                    resize: 'vertical',
+                    lineHeight: 1.4,
+                  }}
+                />
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                  Ce motif figurera officiellement dans le registre des dossiers classés sans suite.
+                </div>
+              </div>
+
+              {/* Champ 2 : Décision de clôture */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                  Décision d’instruction retenue
+                </label>
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: 'var(--color-surface-muted)',
+                    border: '1px solid var(--color-border-subtle)',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: 'var(--color-text-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <CheckCircle size={14} color="var(--color-text-primary)" />
+                  <span>Classement sans suite immédiat (Dossier régulier)</span>
+                </div>
+              </div>
+
+              {/* Champ 3 : Inspecteur & Date */}
+              <div className="form-grid-2col" style={{ gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                    Inspecteur vérificateur
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={satisfactionForm.inspecteur}
+                    onChange={(e) => setSatisfactionForm((prev) => ({ ...prev, inspecteur: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '6px',
+                      color: 'var(--color-text-primary)',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                    Date de décision
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={satisfactionForm.dateDecision}
+                    onChange={(e) => setSatisfactionForm((prev) => ({ ...prev, dateDecision: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '6px',
+                      color: 'var(--color-text-primary)',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Champ 4 : Recommandations ou visa d'archivage */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                  Recommandations finales ou visa d’archivage
+                </label>
+                <input
+                  type="text"
+                  value={satisfactionForm.recommandations}
+                  onChange={(e) => setSatisfactionForm((prev) => ({ ...prev, recommandations: e.target.value }))}
+                  placeholder="Ex : Visa du Directeur provincial pour archivage..."
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '13px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '6px',
+                    color: 'var(--color-text-primary)',
+                  }}
+                />
+              </div>
+
+              {/* Boutons d'action */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid var(--color-border-subtle)', paddingTop: '14px' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowSatisfactionModal(false)}
+                  style={{ fontSize: '12px' }}
+                >
+                  Annuler
+                </button>
+                <button type="submit" className="btn-primary" style={{ fontSize: '12px' }}>
+                  <CheckCircle size={14} />
+                  <span>Valider et classer sans suite</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODALE DE REVIREMENT SUR LE JUGEMENT (DEMANDE DE COMMUNICATION)
+          Permet de motiver pourquoi l'évaluation initiale est révisée
+          et de joindre la pièce justificative associée à ce revirement.
+          ========================================================================= */}
+      {showRevirementModal && (
+        <div
+          className="modal-backdrop-responsive"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px',
+          }}
+        >
+          <div
+            className="modal-card-responsive"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              borderRadius: 'var(--radius-card)',
+              border: '1px solid var(--color-border)',
+              width: '100%',
+              maxWidth: '560px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.45)',
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid var(--color-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
+                  Revenir sur le Jugement de la Demande
+                </h2>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                  Enregistrer le motif et le document officiel justifiant ce revirement de situation
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setShowRevirementModal(false)}
+                style={{ padding: '4px' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleRevirementSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Champ 1 : Motif du revirement */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                  Motif associé à ce revirement de situation *
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={revirementForm.motif}
+                  onChange={(e) => setRevirementForm((prev) => ({ ...prev, motif: e.target.value }))}
+                  placeholder="Détailler les nouveaux éléments, la régularisation spontanée ou la contestation juridique qui motive ce revirement..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    fontSize: '13px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '6px',
+                    color: 'var(--color-text-primary)',
+                    resize: 'vertical',
+                    lineHeight: 1.4,
+                  }}
+                />
+              </div>
+
+              {/* Champ 2 : Document / Justificatif associé */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                  Document associé au revirement de situation *
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <input
+                    type="text"
+                    required
+                    value={revirementForm.documentNom}
+                    onChange={(e) => setRevirementForm((prev) => ({ ...prev, documentNom: e.target.value }))}
+                    placeholder="Intitulé ou référence de la pièce (ex: Attestation bancaire complémentaire, Arrêté DGDA)..."
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '6px',
+                      color: 'var(--color-text-primary)',
+                    }}
+                  />
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 12px',
+                      border: '1px dashed var(--color-border)',
+                      borderRadius: '6px',
+                      backgroundColor: 'var(--color-bg)',
+                    }}
+                  >
+                    <Upload size={14} color="var(--color-text-muted)" />
+                    <input
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setRevirementForm((prev) => ({
+                            ...prev,
+                            documentNom: prev.documentNom || file.name,
+                            pdfFile: { name: file.name, size: `${Math.round(file.size / 1024)} Ko` },
+                          }));
+                        }
+                      }}
+                      style={{ fontSize: '12px', color: 'var(--color-text-secondary)', flex: 1 }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Champ 3 : Inspecteur & Date */}
+              <div className="form-grid-2col" style={{ gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                    Inspecteur rapporteur
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={revirementForm.inspecteur}
+                    onChange={(e) => setRevirementForm((prev) => ({ ...prev, inspecteur: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '6px',
+                      color: 'var(--color-text-primary)',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                    Date de revirement
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={revirementForm.dateRevirement}
+                    onChange={(e) => setRevirementForm((prev) => ({ ...prev, dateRevirement: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '6px',
+                      color: 'var(--color-text-primary)',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Boutons d'action */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid var(--color-border-subtle)', paddingTop: '14px' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowRevirementModal(false)}
+                  style={{ fontSize: '12px' }}
+                >
+                  Annuler
+                </button>
+                <button type="submit" className="btn-primary" style={{ fontSize: '12px' }}>
+                  <RotateCcw size={13} />
+                  <span>Acter le revirement</span>
                 </button>
               </div>
             </form>

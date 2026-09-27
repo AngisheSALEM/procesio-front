@@ -118,7 +118,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           >
             Sélectionnez votre profil de connexion :
           </label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div className="form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <button
               type="button"
               onClick={() => handleSelectRole('admin')}

@@ -75,7 +75,7 @@ export const HistoriqueTab: React.FC<HistoriqueTabProps> = ({ logs: propLogs }) 
         padding: '20px',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '8px' }}>
         <div>
           <h3 style={{ fontSize: '14px', fontWeight: 700 }}>
             Journal d’audit et chaîne de traçabilité procédurale
@@ -120,8 +120,8 @@ export const HistoriqueTab: React.FC<HistoriqueTabProps> = ({ logs: propLogs }) 
               <History size={16} strokeWidth={1.8} />
             </div>
 
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
                 <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                   {log.action}
                 </div>

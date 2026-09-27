@@ -151,6 +151,7 @@ export const PvView: React.FC<PvViewProps> = ({
 
   const renderModal = () => (
     <div
+      className="modal-backdrop-responsive"
       style={{
         position: 'fixed',
         inset: 0,
@@ -164,13 +165,15 @@ export const PvView: React.FC<PvViewProps> = ({
       }}
     >
       <div
+        className="modal-card-responsive"
         style={{
           backgroundColor: 'var(--color-surface)',
           borderRadius: 'var(--radius-card)',
           border: '1px solid var(--color-border)',
           width: '100%',
           maxWidth: '560px',
-          overflow: 'hidden',
+          maxHeight: '90vh',
+          overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
           boxShadow: 'var(--shadow-modal)',
@@ -440,7 +443,7 @@ export const PvView: React.FC<PvViewProps> = ({
             <p style={{ fontSize: '13px', margin: 0 }}>Aucun procès-verbal dressé pour ce dossier.</p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+          <div className="cards-grid-auto" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
             {pvsList.map((item) => (
               <div
                 key={item.id}
@@ -1027,6 +1030,7 @@ export const PvView: React.FC<PvViewProps> = ({
           ========================================================================= */}
       {showEditModal && (
         <div
+          className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1040,13 +1044,15 @@ export const PvView: React.FC<PvViewProps> = ({
           }}
         >
           <div
+            className="modal-card-responsive"
             style={{
               backgroundColor: 'var(--color-surface)',
               borderRadius: 'var(--radius-card)',
               border: '1px solid var(--color-border)',
               width: '100%',
               maxWidth: '560px',
-              overflow: 'hidden',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
               boxShadow: 'var(--shadow-modal)',

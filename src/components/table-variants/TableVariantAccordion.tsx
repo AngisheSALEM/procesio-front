@@ -236,7 +236,7 @@ export const TableVariantAccordion: React.FC<TableVariantAccordionProps> = ({
                             >
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-                                  Pièces communicables (Art. 46)
+                                  Pièces communicables 
                                 </span>
                                 <span className="font-sf" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-accent)' }}>
                                   {row.piecesFournies} / {row.piecesTotal} ({ratioPieces}%)

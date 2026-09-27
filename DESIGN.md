@@ -91,3 +91,26 @@ Le modèle ergonomique sélectionné pour l'ensemble de la refonte du site est l
    - Seul le **nom de l'entreprise** est en gras (`font-weight: 700`).
    - La référence `DGDA/...` est affichée sous l'entreprise en graisse normale (`font-weight: 400`) et couleur atténuée neutre (`var(--color-text-muted)`).
 
+---
+
+## 7. Règle Stricte 60-30-10 & Bannissement des Textes Colorés
+
+L'interface doit rester sobre, institutionnelle et rigoureusement monochrome :
+1. **Interdiction formelle des textes colorés :**
+   - **Zéro couleur sur les polices :** Aucun texte en rouge, vert, jaune, turquoise, bleu, violet ou orange.
+   - Tous les textes sans exception utilisent la hiérarchie neutre Apple :
+     - `var(--color-text-primary)` (`#F5F5F7` / `#1D1D1F`) : titres, données chiffrées clés, en-têtes.
+     - `var(--color-text-secondary)` (`#D1D1D6` / `#6E6E73`) : libellés, lignes de tableaux, textes courants.
+     - `var(--color-text-muted)` (`#8E8E93`) : dates, métadonnées, sous-titres, explications.
+2. **Le bleu est réservé EXCLUSIVEMENT aux boutons d'action (CTA) :**
+   - Le bleu de marque (`var(--color-accent)` / `#007AFF`) ne peut être appliqué que sur :
+     - Les boutons primaires d'action (CTA : *Ouvrir*, *Consulter*, *Créer*, etc.).
+     - L'onglet ou la pilule actuellement sélectionnée dans la navigation.
+   - Il est formellement interdit d'utiliser le bleu sur les textes de paragraphe, les montants financiers, les icônes de carte ou les références.
+3. **Badges et statuts monochromes :**
+   - Pas de pastilles multicolores criardes (vert fluo, rouge vif, jaune, violet).
+   - Les badges d'état utilisent des contrastes de surface neutres (`var(--color-surface-muted)` / `var(--color-surface-elevated)`), une bordure discrète (`var(--color-border-subtle)`), et un texte monochrome (`var(--color-text-secondary)` ou `var(--color-text-primary)`).
+4. **Icônes 100% neutres :**
+   - Les icônes adoptent exclusivement `var(--color-text-secondary)` ou `var(--color-text-muted)`.
+   - Les conteneurs d'icônes sont en gris neutre `var(--color-surface-muted)`, sans aplats de couleurs saturées.
+

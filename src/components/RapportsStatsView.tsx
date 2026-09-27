@@ -1,134 +1,226 @@
-import React from 'react';
-import { BarChart3, ExternalLink } from 'lucide-react';
+import React, { useState } from 'react';
+import type {
+  DossierEnquete,
+  DemandeCommunication,
+  FeuilleObservation,
+  PvDetail,
+  RenseignementItem
+} from '../types';
+import type { DossierTabId } from './DossierHeader';
+import {
+  mockDossiers,
+  mockDemandesParDossier,
+  mockFeuillesParDossier,
+  mockPvsParDossier,
+  mockRenseignements
+} from '../data/mockData';
+import { SupervisionOverviewTab } from './supervision/SupervisionOverviewTab';
+import { SupervisionDossiersView } from './supervision/SupervisionDossiersView';
+import { SupervisionDemandesView } from './supervision/SupervisionDemandesView';
+import { SupervisionFeuillesView } from './supervision/SupervisionFeuillesView';
+import { SupervisionClassementsView } from './supervision/SupervisionClassementsView';
+import { SupervisionPvView } from './supervision/SupervisionPvView';
+import { SupervisionRenseignementsView } from './supervision/SupervisionRenseignementsView';
+
+export type SupervisionTabId =
+  | 'overview'
+  | 'dossiers'
+  | 'demandes'
+  | 'feuilles'
+  | 'classements'
+  | 'pv'
+  | 'renseignements';
 
 interface RapportsStatsViewProps {
-  onOpenDossier: () => void;
+  onOpenDossier: (dossierId?: string, tab?: DossierTabId) => void;
+  dossiers?: DossierEnquete[];
+  demandesParDossier?: Record<string, DemandeCommunication[]>;
+  feuillesParDossier?: Record<string, FeuilleObservation[]>;
+  pvsParDossier?: Record<string, PvDetail[]>;
+  renseignements?: RenseignementItem[];
 }
 
-export const RapportsStatsView: React.FC<RapportsStatsViewProps> = ({ onOpenDossier }) => {
-
-  const kpis = [
-    {
-      id: 'kpi-renseignements',
-      label: 'Renseignements reçus & exploités',
-      valeur: '24 / 19',
-      sousTitre: '19 exploités en ouverture d’enquête (79%)',
-      detail: 'Distingue réception et exploitation effective sans doublon.',
-      hasAction: true,
-    },
-    {
-      id: 'kpi-dossiers',
-      label: 'Dossiers en cours & retards',
-      valeur: '12 / 1',
-      sousTitre: '1 seul dossier en retard d’échéance légale',
-      detail: 'Rattaché à une date butoir de contrôle a posteriori stricte.',
-      hasAction: true,
-    },
-    {
-      id: 'kpi-demandes',
-      label: 'Demandes de communication',
-      valeur: '38',
-      sousTitre: '14 complètes • 18 partielles • 6 en attente',
-      detail: 'Traçabilité des réponses bancaires et transporteurs déclarés.',
-      hasAction: true,
-    },
-    {
-      id: 'kpi-delai',
-      label: 'Délai moyen de première réponse',
-      valeur: '11 jours',
-      sousTitre: 'Contre 15 jours légaux impartis',
-      detail: 'Point de départ : date de notification au destinataire.',
-      hasAction: false,
-    },
-    {
-      id: 'kpi-observations',
-      label: 'Feuilles d’observation & constats',
-      valeur: '29 constats',
-      sousTitre: '16 régularisés • 8 en cours • 5 confirmés pour contentieux',
-      detail: 'Comptabilisation atomique O1, O2, O3 par chef de redressement.',
-      hasAction: true,
-    },
-    {
-      id: 'kpi-pv-gelec',
-      label: 'Dossiers transmis à GELEC',
-      valeur: '5 affaires',
-      sousTitre: 'Assorties de 7 procès-verbaux d’infraction qualifiés',
-      detail: 'Exige une référence de PV formelle et confirmation de prise en charge.',
-      hasAction: true,
-    },
-  ];
+export const RapportsStatsView: React.FC<RapportsStatsViewProps> = ({
+  onOpenDossier,
+  dossiers = mockDossiers,
+  demandesParDossier = {
+    'dossier-0842': [mockDemandesParDossier['dossier-0842']],
+    'dossier-0843': [mockDemandesParDossier['dossier-0843']],
+    'dossier-0844': [mockDemandesParDossier['dossier-0844']],
+    'dossier-0845': [mockDemandesParDossier['dossier-0845']],
+    'dossier-0846': [mockDemandesParDossier['dossier-0846']],
+    'dossier-0847': [mockDemandesParDossier['dossier-0847']],
+  },
+  feuillesParDossier = {
+    'dossier-0842': [mockFeuillesParDossier['dossier-0842']],
+    'dossier-0843': [mockFeuillesParDossier['dossier-0843']],
+    'dossier-0844': [mockFeuillesParDossier['dossier-0844']],
+    'dossier-0845': [mockFeuillesParDossier['dossier-0845']],
+    'dossier-0846': [mockFeuillesParDossier['dossier-0846']],
+    'dossier-0847': [mockFeuillesParDossier['dossier-0847']],
+  },
+  pvsParDossier = mockPvsParDossier,
+  renseignements = mockRenseignements,
+}) => {
+  const [activeTab, setActiveTab] = useState<SupervisionTabId>('overview');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Banner */}
-      <div
+      {/* Institutional Supervision Top Header */}
+      {/* <div
         style={{
-          backgroundColor: 'var(--color-surface)',
-          border: 'none',
+          backgroundColor: 'transparent',
           borderRadius: 'var(--radius-card)',
-          padding: '20px',
+          padding: '20px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '16px',
         }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <BarChart3 size={18} color="var(--color-accent)" />
-          <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-            Rapports d’Activité et Statistiques Opérationnelles
-          </h2>
-        </div>
-        <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-          Principe fondamental Procezo : Chaque chiffre affiché est auditable et cliquable pour ouvrir la liste
-          des dossiers et justificatifs qui l’expliquent, éliminant les comptages manuels parallèles.
-        </div>
-      </div>
+      > */}
+        {/* <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          
+          <div>
+            <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
+              Direction des Recherches & Enquêtes Douanières
+            </h2>
+            
+          </div>
+        </div> */}
 
-      {/* KPI Interactive Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-        {kpis.map((kpi) => (
+        {/* <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+         
           <div
-            key={kpi.id}
-            onClick={() => {
-              if (kpi.hasAction) {
-                onOpenDossier();
-              }
-            }}
             style={{
-              backgroundColor: 'var(--color-surface)',
-              border: 'none',
-              borderRadius: 'var(--radius-card)',
-              padding: '18px',
-              cursor: kpi.hasAction ? 'pointer' : 'default',
-              transition: 'background var(--transition-fast)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: 'var(--color-surface-muted)',
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-btn)',
+              fontSize: '12px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>
-                {kpi.label}
-              </div>
-              {kpi.hasAction && (
-                <ExternalLink size={13} color="var(--color-accent)" />
-              )}
-            </div>
-
-            <div className="  " style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)', marginTop: '6px' }}>
-              {kpi.valeur}
-            </div>
-
-            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-accent)', marginTop: '2px' }}>
-              {kpi.sousTitre}
-            </div>
-
-            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '8px', lineHeight: 1.3 }}>
-              {kpi.detail}
-            </div>
-
-            {kpi.hasAction && (
-              <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px solid var(--color-border-subtle)', fontSize: '11px', color: 'var(--color-accent)', fontWeight: 600 }}>
-                Cliquer pour ouvrir les dossiers justificatifs →
-              </div>
-            )}
+            <Calendar size={14} color="var(--color-text-muted)" />
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--color-text-primary)',
+                fontSize: '12px',
+                fontWeight: 600,
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="2026-T3">Exercice 2026 — Trimestre 3 (En cours)</option>
+              <option value="2026-T2">Exercice 2026 — Trimestre 2</option>
+              <option value="2026-T1">Exercice 2026 — Trimestre 1</option>
+              <option value="2026-ANNUEL">Exercice 2026 — Année complète</option>
+            </select>
           </div>
-        ))}
+
+         
+          <button
+            onClick={() => {
+              alert('Génération du rapport consolidé de supervision au format PDF en cours...');
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              borderRadius: 'var(--radius-btn)',
+              backgroundColor: 'var(--color-surface-elevated)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            <Download size={14} />
+            <span>Rapport Consolidé PDF</span>
+          </button>
+        </div> */}
+      {/* </div> */}
+
+ 
+
+      {/* Active Tab View Rendering */}
+      <div>
+        {activeTab === 'overview' && (
+          <SupervisionOverviewTab
+            onNavigateSubView={(viewId) => setActiveTab(viewId)}
+            onOpenDossier={(dId, tab) => onOpenDossier(dId, tab)}
+            dossiers={dossiers}
+            renseignements={renseignements}
+            demandes={demandesParDossier}
+            feuilles={feuillesParDossier}
+            pvs={pvsParDossier}
+          />
+        )}
+
+        {activeTab === 'dossiers' && (
+          <SupervisionDossiersView
+            dossiers={dossiers}
+            demandes={demandesParDossier}
+            feuilles={feuillesParDossier}
+            pvs={pvsParDossier}
+            onOpenDossier={(dId, tab) => onOpenDossier(dId, tab)}
+            onBack={() => setActiveTab('overview')}
+          />
+        )}
+
+        {activeTab === 'demandes' && (
+          <SupervisionDemandesView
+            demandes={demandesParDossier}
+            dossiers={dossiers}
+            onOpenDossier={(dId, tab) => onOpenDossier(dId, tab)}
+            onBack={() => setActiveTab('overview')}
+          />
+        )}
+
+        {activeTab === 'feuilles' && (
+          <SupervisionFeuillesView
+            feuilles={feuillesParDossier}
+            dossiers={dossiers}
+            onOpenDossier={(dId, tab) => onOpenDossier(dId, tab)}
+            onBack={() => setActiveTab('overview')}
+          />
+        )}
+
+        {activeTab === 'classements' && (
+          <SupervisionClassementsView
+            dossiers={dossiers}
+            onOpenDossier={(dId, tab) => onOpenDossier(dId, tab)}
+            onBack={() => setActiveTab('overview')}
+          />
+        )}
+
+        {activeTab === 'pv' && (
+          <SupervisionPvView
+            pvs={pvsParDossier}
+            dossiers={dossiers}
+            onOpenDossier={(dId, tab) => onOpenDossier(dId, tab)}
+            onBack={() => setActiveTab('overview')}
+          />
+        )}
+
+        {activeTab === 'renseignements' && (
+          <SupervisionRenseignementsView
+            renseignements={renseignements}
+            dossiers={dossiers}
+            onOpenDossier={(dId, tab) => onOpenDossier(dId, tab)}
+            onBack={() => setActiveTab('overview')}
+          />
+        )}
       </div>
     </div>
   );
 };
+
+export default RapportsStatsView;
