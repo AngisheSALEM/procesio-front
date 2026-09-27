@@ -1,0 +1,360 @@
+/* ==========================================================================
+   PROCEZO — PALETTE 3 : LEGAL EMINENCE (Executive Sovereign)
+   Swatches sources : #1F2E4A | #343A40 | #CED4DA | #F8F9FA
+   ==========================================================================
+   Règles fondamentales :
+   - Règle 60-30-10 : 60% Navy/Surfaces, 30% Typographie/Structure, 10% Accents
+   - Zéro ombre portée (box-shadow: none) : Profondeur par contraste de surface
+   - Zéro bordure artificielle sur les cartes : Clarté opérationnelle
+   - Contraste WCAG 2.1 AA garanti
+   ========================================================================== */
+
+/* --- TYPOGRAPHIE OFFICIELLE APPLE SF PRO (Extraite de SF-Pro.dmg) --- */
+@font-face {
+  font-family: 'SF Pro Display';
+  src: local('SF Pro Display'), local('SFProDisplay'), url('/fonts/SF-Pro-Display-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Display';
+  src: local('SF Pro Display Medium'), local('SFProDisplay-Medium'), url('/fonts/SF-Pro-Display-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Display';
+  src: local('SF Pro Display Semibold'), local('SFProDisplay-Semibold'), url('/fonts/SF-Pro-Display-Semibold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Display';
+  src: local('SF Pro Display Bold'), local('SFProDisplay-Bold'), url('/fonts/SF-Pro-Display-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SF Pro Text';
+  src: local('SF Pro Text'), local('SFProText'), url('/fonts/SF-Pro-Text-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Text';
+  src: local('SF Pro Text Medium'), local('SFProText-Medium'), url('/fonts/SF-Pro-Text-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Text';
+  src: local('SF Pro Text Semibold'), local('SFProText-Semibold'), url('/fonts/SF-Pro-Text-Semibold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Text';
+  src: local('SF Pro Text Bold'), local('SFProText-Bold'), url('/fonts/SF-Pro-Text-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SF Pro';
+  src: local('SF Pro'), local('SFPro'), url('/fonts/SF-Pro.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* ========================================================================
+     1. THÈME SOMBRE — LEGAL EMINENCE DARK (Navy Souverain #1F2E4A)
+     ======================================================================== */
+
+  /* --- FONDS ET SURFACES --- */
+  --color-bg: #101725;
+  --color-bg-deep: #162033;
+  --color-surface: #1F2E4A;
+  --color-surface-elevated: #293D60;
+  --color-surface-muted: #1B273F;
+
+  /* --- BORDURES ET SÉPARATEURS --- */
+  --color-border: #354A6B;
+  --color-border-subtle: #263650;
+
+  /* --- TYPOGRAPHIE ET NIVEAUX DE TEXTE --- */
+  --color-text-primary: #F8F9FA;
+  --color-text-secondary: #CED4DA;
+  --color-text-muted: #8E9CAE;
+  --color-text-disabled: #596677;
+
+  /* --- COULEUR D'ACCENTUATION (Bleu Royal Eminence #4A88E8) --- */
+  --color-accent: #4A88E8;
+  --color-accent-hover: #6099ED;
+  --color-accent-pressed: #3271D1;
+  --color-on-accent: #FFFFFF;
+
+  /* --- COULEURS SÉMANTIQUES (Harmonisées Prestige Juridique) --- */
+  --color-info: #569DE6;
+  --color-info-surface: #1A2C46;
+
+  --color-success: #4BB57B;
+  --color-success-surface: #152F22;
+
+  --color-warning: #E6B443;
+  --color-warning-surface: #332812;
+
+  --color-danger: #E25752;
+  --color-danger-surface: #371A19;
+
+  /* --- TYPOGRAPHIE SYSTÈME --- */
+  --font-sans: "SF Pro Text", "SF Pro Display", "SF Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sf: "SF Mono", Menlo, Consolas, Monaco, monospace;
+
+  /* --- RAYONS DE COURBURE --- */
+  --radius-sm: 4px;
+  --radius-btn: 6px;
+  --radius-card: 10px;
+  --radius-badge: 999px;
+
+  /* --- MICRO-INTERACTIONS --- */
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+
+  /* --- EFFETS TRANSLUCIDES (Verre Navy Givré) --- */
+  --glass-bg: rgba(16, 23, 37, 0.85);
+  --glass-surface: rgba(31, 46, 74, 0.75);
+  --glass-border: rgba(206, 212, 218, 0.12);
+  --glass-border-focus: rgba(74, 136, 232, 0.45);
+  --glass-blur: blur(24px) saturate(160%);
+}
+
+/* ==========================================================================
+   2. THÈME CLAIR — LEGAL EMINENCE LIGHT (#F8F9FA Clarté Institutionnelle)
+   ========================================================================== */
+[data-theme="light"] {
+  /* --- FONDS ET SURFACES --- */
+  --color-bg: #F8F9FA;
+  --color-bg-deep: #EDF0F2;
+  --color-surface: #FFFFFF;
+  --color-surface-elevated: #F1F3F5;
+  --color-surface-muted: #E9ECEF;
+
+  /* --- BORDURES ET SÉPARATEURS (#CED4DA du visuel) --- */
+  --color-border: #CED4DA;
+  --color-border-subtle: rgba(206, 212, 218, 0.50);
+
+  /* --- TYPOGRAPHIE INSTITUTIONNELLE (#1F2E4A & #343A40) --- */
+  --color-text-primary: #1F2E4A;
+  --color-text-secondary: #343A40;
+  --color-text-muted: #6C757D;
+  --color-text-disabled: #ADB5BD;
+
+  /* --- COULEUR D'ACCENTUATION (Navy Autorité #1F2E4A) --- */
+  --color-accent: #1F2E4A;
+  --color-accent-hover: #2E4266;
+  --color-accent-pressed: #141F33;
+  --color-on-accent: #FFFFFF;
+
+  /* --- COULEURS SÉMANTIQUES (Harmonisées Instituionnelles) --- */
+  --color-info: #1E5B94;
+  --color-info-surface: #E7F1FB;
+
+  --color-success: #287948;
+  --color-success-surface: #EAF5EE;
+
+  --color-warning: #9E6700;
+  --color-warning-surface: #FDF6E2;
+
+  --color-danger: #B52B27;
+  --color-danger-surface: #FCEBEA;
+
+  /* --- EFFETS TRANSLUCIDES --- */
+  --glass-bg: rgba(248, 249, 250, 0.88);
+  --glass-surface: rgba(255, 255, 255, 0.90);
+  --glass-border: rgba(206, 212, 218, 0.55);
+  --glass-border-focus: rgba(31, 46, 74, 0.35);
+  --glass-blur: blur(24px) saturate(150%);
+}
+
+/* ==========================================================================
+   3. RÈGLES STRUCTURELLES GLOBALES ET NORMALISATION
+   ========================================================================== */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+button, .card, .panel, .modal, .badge, input, select, textarea {
+  box-shadow: none !important;
+}
+
+.card, .panel, [data-card] {
+  border: none !important;
+}
+
+.font-sf {
+  font-family: var(--font-sf);
+  font-feature-settings: "tnum" on, "lnum" on;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-deep);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--color-accent) !important;
+  outline-offset: 2px !important;
+}
+
+.card-interactive {
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  cursor: pointer;
+}
+.card-interactive:hover {
+  background-color: var(--color-surface-elevated) !important;
+  transform: translateY(-1px);
+}
+.card-interactive:active {
+  transform: scale(0.995);
+}
+
+/* ==========================================================================
+   4. HIÉRARCHIE DES BOUTONS
+   ========================================================================== */
+.btn-primary {
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  font-weight: 500;
+  border-radius: var(--radius-btn);
+  padding: 8px 16px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+.btn-primary:hover {
+  background-color: var(--color-accent-hover);
+}
+.btn-primary:active {
+  background-color: var(--color-accent-pressed);
+  transform: scale(0.98);
+}
+
+.btn-secondary {
+  background-color: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  border: none;
+  font-weight: 400;
+  border-radius: var(--radius-btn);
+  padding: 8px 16px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+.btn-secondary:hover {
+  background-color: var(--color-surface-muted);
+}
+.btn-secondary:active {
+  transform: scale(0.98);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: none;
+  font-weight: 400;
+  border-radius: var(--radius-btn);
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+.btn-ghost:hover {
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-muted);
+}
+
+/* ==========================================================================
+   5. PILULES ET BADGES DE STATUT
+   ========================================================================== */
+.badge-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-badge);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.2px;
+}
+
+.badge-status-warning {
+  background-color: var(--color-warning-surface);
+  color: var(--color-warning);
+}
+
+.badge-status-success {
+  background-color: var(--color-success-surface);
+  color: var(--color-success);
+}
+
+.badge-status-danger {
+  background-color: var(--color-danger-surface);
+  color: var(--color-danger);
+}
+
+.badge-status-info {
+  background-color: var(--color-info-surface);
+  color: var(--color-info);
+}
+
+.badge-status-neutral {
+  background-color: var(--color-surface-elevated);
+  color: var(--color-text-secondary);
+}

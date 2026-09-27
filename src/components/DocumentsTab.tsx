@@ -98,6 +98,7 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents: propDocum
           border: 'none',
           borderRadius: 'var(--radius-card)',
           padding: '18px 20px',
+          display:'none'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -152,12 +153,7 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents: propDocum
           </div>
         </div>
 
-        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
-          Le paquet de transmission vers GELEC inclut le rapport de synthèse de l'enquête, la copie certifiée de la feuille
-          d'observation n° FO/2026/018, les constats maintenus sur l'observation O3 (redevances non déclarées), et les
-          pièces probantes (extraits SWIFT et contrats de licence). Les sources protégées et renseignements d'aviseurs
-          sont automatiquement filtrés du dossier de transmission.
-        </div>
+      
       </div>
 
       {/* Documents Table */}

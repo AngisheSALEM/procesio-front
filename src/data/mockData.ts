@@ -39,7 +39,7 @@ export const mockDossiers: DossierEnquete[] = [
   {
     id: 'dossier-0842',
     reference: 'DGDA/DRK/DIR-ENQ/2026/0842',
-    objet: 'Contrôle a posteriori — Régularité de la valeur en douane déclarée sur réactifs miniers et fret CIF',
+    objet: 'Contrôle a posteriori   Régularité de la valeur en douane déclarée sur réactifs miniers et fret CIF',
     perimetre: 'Importations et exportations réalisées via le poste frontalier de Kasumbalesa (Exercices 2024-2025)',
     motifOuverture: 'Rapprochement automatisé SYDONIA et signalement DRK sur écart d’assiette taxable de fret maritime',
     unite: 'Direction des Recherches et Enquêtes Douanières (DRK)',
@@ -57,7 +57,7 @@ export const mockDossiers: DossierEnquete[] = [
       typeEntite: 'Société commerciale',
       roleDansDossier: 'Entreprise contrôlée',
       adresse: '04 Avenue des Métaux, Quartier Industriel, Lubumbashi, Haut-Katanga',
-      contact: '+243 81 555 4920 — contact@cmc-logistics.cd',
+      contact: '+243 81 555 4920   contact@cmc-logistics.cd',
     },
     equipe: [
       'Insp. Marc Kabamba (Chef de mission)',
@@ -157,7 +157,7 @@ export const mockDossiers: DossierEnquete[] = [
       },
       {
         id: 'ALT-842-2',
-        titre: 'Rapprochement SYDONIA — Suspicion de minoration de fret',
+        titre: 'Rapprochement SYDONIA : Suspicion de minoration de fret',
         message: 'Nouvel écart de 18% identifié sur les déclarations d’intrants chimiques déclarées au poste de Kasumbalesa.',
         niveau: 'AVERTISSEMENT',
         actionRequise: 'Intégrer les bordereaux SYD-KAS-2025-IM4-02311 au périmètre d’audit.',
@@ -168,7 +168,7 @@ export const mockDossiers: DossierEnquete[] = [
     echeances: [
       {
         id: 'ECH-842-1',
-        libelle: 'Relance bancaire TMB — Modèles IB et Credoc manquants',
+        libelle: 'Relance bancaire TMB : Modèles IB et Credoc manquants',
         dateButoir: '2026-10-02',
         typeEcheance: 'Demande  ',
         horodatageFixe: '2026-08-20 16:20',
@@ -195,7 +195,7 @@ export const mockDossiers: DossierEnquete[] = [
   {
     id: 'dossier-0843',
     reference: 'DGDA/DRK/DIR-ENQ/2026/0843',
-    objet: 'Contrôle documentaire et physique — Teneurs déclarées en concentrés de cobalt et droits de sortie export',
+    objet: 'Contrôle documentaire et physique : Teneurs déclarées en concentrés de cobalt et droits de sortie export',
     perimetre: 'Exportations minières au départ des usines de Kolwezi vers le corridor Sud (Exercice 2025)',
     motifOuverture: 'Signalement sur discordance entre bulletins de pesage SGS et teneurs déclarées en case 31 SYDONIA',
     unite: 'Sous-Direction des Enquêtes Lualaba (Kolwezi)',
@@ -263,7 +263,7 @@ export const mockDossiers: DossierEnquete[] = [
     alertes: [
       {
         id: 'ALT-843-1',
-        titre: 'Délai légal de réponse dépassé — Demande DC/2026/055',
+        titre: 'Délai légal de réponse dépassé : Demande DC/2026/055',
         message: 'Le laboratoire CEEC n’a pas transmis les bulletins d’analyses sous 15 jours.',
         niveau: 'CRITIQUE',
         actionRequise: 'Émettre une lettre de relance formelle avec mise en demeure sous 48h.',
@@ -293,7 +293,7 @@ export const mockDossiers: DossierEnquete[] = [
   {
     id: 'dossier-0844',
     reference: 'DGDA/DRK/DIR-ENQ/2026/0844',
-    objet: 'Audit d’apurement des régimes suspensifs — Transit sous douane de carburants et balisage électronique',
+    objet: 'Audit d’apurement des régimes suspensifs : Transit sous douane de carburants et balisage électronique',
     perimetre: 'Cargaisons pétrolières en régime T1 en provenance de Dar-es-Salaam à destination de Bukavu',
     motifOuverture: 'Alertes répétées de rupture de scellés électroniques GPS et non-apurement de manifestes',
     unite: 'Direction Provinciale Nord-Kivu & Sud-Kivu',
@@ -373,7 +373,7 @@ export const mockDossiers: DossierEnquete[] = [
   {
     id: 'dossier-0845',
     reference: 'DGDA/DRK/DIR-ENQ/2026/0845',
-    objet: 'Vérification de destination privilégiée — Exonérations d’intrants et matériel agro-industriel',
+    objet: 'Vérification de destination privilégiée : Exonérations d’intrants et matériel agro-industriel',
     perimetre: 'Contrôle de l’utilisation effective des matériels admis sous arrêté ministériel d’exonération',
     motifOuverture: 'Suspicion de revente sur le marché local d’équipements lourds dédouanés à taux zéro',
     unite: 'Direction des Recherches et Enquêtes Douanières (DRK)',
@@ -636,7 +636,7 @@ export const mockFeuillesParDossier: Record<string, FeuilleObservation> = {
     dateRedaction: '2026-08-28',
     inspecteurs: ['Marc Kabamba (Inspecteur Vérificateur)', 'Mireille Kabamba (Inspecteur Adjoint)'],
     destinataire: 'Monsieur le Directeur Général, CONGO MINING & CHEMICAL LOGISTICS SAS',
-    objetControle: 'Communication des constatations provisoires — Régularité de la valeur transactionnelle et du fret sur réactifs',
+    objetControle: 'Communication des constatations provisoires : Régularité de la valeur transactionnelle et du fret sur réactifs',
     cadreLegal: 'Décision DG/DGDA/DG/2011/296 (Articles 44 à 49) portant réglementation des contrôles a posteriori en RDC',
     statutFeuille: 'DEFENSE_RECUE',
     dateReunionCloturePrevue: '2026-10-08',

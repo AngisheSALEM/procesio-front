@@ -112,7 +112,8 @@ export type StatutDemandeCommunication =
   | 'EMISE'
   | 'REPONSE_PARTIELLE'
   | 'REPONSE_COMPLETE'
-  | 'TERMINEE';
+  | 'TERMINEE'
+  | 'ANNULEE';
 
 export interface ElementDemande {
   id: string;
@@ -162,6 +163,11 @@ export interface DemandeCommunication {
   pdfSourceNom?: string;
   pdfSourceTaille?: string;
   pdfSourceDateUpload?: string;
+  reponsePdfNom?: string;
+  reponsePdfDate?: string;
+  reponsePdfTaille?: string;
+  reponsePdfAuteur?: string;
+  reponsePdfRef?: string;
   evaluationReponse?: 'SATISFAISANTE' | 'NON_SATISFAISANTE';
   pvConstatGenere?: {
     reference: string;
@@ -241,6 +247,26 @@ export interface FeuilleObservation {
     inspecteurs: string[];
     statutTransmission: 'TRANSMIS_GLEC' | 'EN_ATTENTE_SIGNATURE';
   };
+}
+
+export interface PvDetail {
+  id: string;
+  reference: string;
+  dossierId: string;
+  datePv: string;
+  inspecteurs: string[];
+  destinataire: string;
+  objet: string;
+  cadreLegal?: string;
+  infractions: string[];
+  droitsEludesUSD: number;
+  droitsEludesCDF: number;
+  amendeUSD: number;
+  auditionDate?: string;
+  destinationContentieuse: string;
+  statutPv: 'DRESSE' | 'TRANSMIS_GLEC' | 'TRANSMIS_CONTENTIEUX' | 'CLOTURE_TRANSACTION';
+  pdfNom?: string;
+  pdfTaille?: string;
 }
 
 export type StatutTache = 'A_FAIRE' | 'EN_COURS' | 'TERMINEE';

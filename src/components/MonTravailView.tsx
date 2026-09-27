@@ -2,10 +2,8 @@ import React, { useState } from 'react';
 import {
   Search,
   Plus,
-  ArrowRight,
   Clock,
   X,
-  CheckCircle2,
   AlertTriangle
 } from 'lucide-react';
 import type { DossierEnquete, UserAccount, StatutDossier, Priorite } from '../types';
@@ -187,33 +185,47 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
           />
         </div>
 
-        {/* Status filter tabs */}
-        <div style={{ display: 'flex', gap: '4px' }}>
+        {/* Zen Smart Chips (Vues rapides par pilules) */}
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           {(['TOUS', 'EN_COURS', 'EN_ATTENTE', 'A_VALIDER'] as const).map((s) => {
             const isActive = statutFilter === s;
             const labels: Record<string, string> = {
-              TOUS: 'Tous',
+              TOUS: 'Tous les dossiers',
               EN_COURS: 'En cours',
               EN_ATTENTE: 'En attente',
               A_VALIDER: 'À valider',
             };
+            const count = s === 'TOUS' ? dossiers.length : dossiers.filter((d) => d.statut === s).length;
+
             return (
               <button
                 key={s}
                 onClick={() => setStatutFilter(s)}
                 style={{
-                  padding: '4px 10px',
-                  borderRadius: '6px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '5px 12px',
+                  borderRadius: '16px',
                   border: 'none',
-                  backgroundColor: isActive ? 'var(--color-surface-elevated)' : 'transparent',
-                  color: isActive ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                  backgroundColor: isActive ? 'var(--color-accent)' : 'var(--color-surface-elevated)',
+                  color: isActive ? 'var(--color-on-accent)' : 'var(--color-text-secondary)',
                   fontSize: '11px',
-                  fontWeight: isActive ? 700 : 500,
+                  fontWeight: isActive ? 600 : 500,
                   cursor: 'pointer',
                   transition: 'all var(--transition-fast)',
                 }}
               >
-                {labels[s]}
+                <span>{labels[s]}</span>
+                <span
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    opacity: isActive ? 0.9 : 0.6,
+                  }}
+                >
+                  {count}
+                </span>
               </button>
             );
           })}
@@ -241,13 +253,12 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
                 letterSpacing: '0.6px',
               }}
             >
-              <th style={{ padding: '12px 16px', width: '220px' }}>Réf. & Horodatage</th>
-              <th style={{ padding: '12px 16px', width: '250px' }}>Opérateur (NIF)</th>
-              <th style={{ padding: '12px 16px' }}>Objet de l’enquête</th>
+              <th style={{ padding: '12px 16px', width: '220px' }}>Date</th>
+              <th style={{ padding: '12px 16px', width: '250px' }}>Opérateur </th>
+              {/* <th style={{ padding: '12px 16px' }}>Objet de l’enquête</th> */}
               <th style={{ padding: '12px 16px', width: '110px' }}>Statut</th>
-              <th style={{ padding: '12px 16px', width: '140px' }}>Tâches / Alertes</th>
+              <th style={{ padding: '12px 16px', width: '140px' }}>Alertes</th>
               <th style={{ padding: '12px 16px', width: '110px' }}>Échéance</th>
-              <th style={{ padding: '12px 16px', width: '80px', textAlign: 'right' }}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -259,7 +270,6 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
               </tr>
             ) : (
               filteredDossiers.map((dossier) => {
-                const tachesCount = dossier.taches?.length || 0;
                 const alertesCount = dossier.alertes?.length || 0;
 
                 return (
@@ -273,28 +283,23 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
                       transition: 'background var(--transition-fast)',
                     }}
                   >
-                    {/* Ref & Horodatage */}
+                    {/* Ref & Horodatage : PAS DE COULEUR, PAS DE GRAS */}
                     <td style={{ padding: '12px 16px' }}>
-                      <div className="  " style={{ fontWeight: 700, color: 'var(--color-accent)', fontSize: '12px' }}>
-                        {dossier.reference}
-                      </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
                         <Clock size={11} />
-                        <span className="  ">{dossier.horodatageCreation || dossier.dateCreation}</span>
+                        <span className="font-sf">{dossier.horodatageCreation || dossier.dateCreation}</span>
                       </div>
                     </td>
 
-                    {/* Operator Name & NIF */}
+                    {/* Operator Name*/}
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
                         {dossier.entiteControlee.nom}
                       </div>
-                      <div className="  " style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                        NIF : {dossier.entiteControlee.nif}
-                      </div>
+
                     </td>
 
-                    {/* Investigation Object */}
+                    {/* Investigation Object
                     <td style={{ padding: '12px 16px' }}>
                       <div
                         style={{
@@ -309,7 +314,7 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
                       >
                         {dossier.objet}
                       </div>
-                    </td>
+                    </td> */}
 
                     {/* Status */}
                     <td style={{ padding: '12px 16px' }}>
@@ -346,22 +351,7 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
                     {/* Tasks & Alerts badges */}
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span
-                          title={`${tachesCount} tâches`}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '11px',
-                            color: 'var(--color-text-secondary)',
-                            backgroundColor: 'var(--color-surface-elevated)',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                          }}
-                        >
-                          <CheckCircle2 size={11} color="var(--color-info)" />
-                          <span>{tachesCount}</span>
-                        </span>
+
 
                         {alertesCount > 0 && (
                           <span
@@ -391,27 +381,7 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
                         {dossier.echeance}
                       </span>
                     </td>
-
-                    {/* Action */}
-                    <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenDossier(dossier.id);
-                        }}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: 'var(--color-accent)',
-                          cursor: 'pointer',
-                          padding: '4px',
-                          borderRadius: '4px',
-                        }}
-                        title="Ouvrir l'instruction"
-                      >
-                        <ArrowRight size={15} />
-                      </button>
-                    </td>
+                    
                   </tr>
                 );
               })
@@ -451,9 +421,7 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
                 <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
                   Ouvrir un nouveau dossier d’enquête
                 </h3>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                  L'horodatage d'ouverture officiel sera certifié automatiquement.
-                </div>
+            
               </div>
               <button
                 onClick={() => setShowCreateModal(false)}
@@ -469,7 +437,7 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
             </div>
 
             <form onSubmit={handleCreateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
+              {/* <div>
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
                   Référence officielle DGDA *
                 </label>
@@ -490,7 +458,7 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
                     outline: 'none',
                   }}
                 />
-              </div>
+              </div> */}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '10px' }}>
                 <div>
@@ -516,7 +484,7 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
                   />
                 </div>
 
-                <div>
+                {/* <div>
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
                     NIF *
                   </label>
@@ -537,7 +505,7 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
                       outline: 'none',
                     }}
                   />
-                </div>
+                </div> */}
               </div>
 
               <div>

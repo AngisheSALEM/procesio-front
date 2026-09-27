@@ -1,1141 +1,1329 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
+  Download,
   Upload,
-  ShieldAlert,
-  Send,
-  Building2,
-  X,
   Plus,
-  Trash2,
-  Paperclip,
-  Calendar,
-  Clock,
-  User,
-  ChevronRight,
-  FileSpreadsheet
+  X,
+  CheckCircle,
+  Scale,
+  ArrowLeft
 } from 'lucide-react';
-import type { DemandeCommunication, ElementDemande, UserAccount } from '../types';
-import { useCleanUI } from '../hooks/useCleanUI';
+import type { DemandeCommunication, FeuilleObservation, UserAccount } from '../types';
+import { formatDate } from '../utils/dateUtils';
 
 interface DemandeCommunicationViewProps {
-  initialDemande: DemandeCommunication;
+  demandes?: DemandeCommunication[];
+  initialDemande?: DemandeCommunication | null;
   currentUser?: UserAccount;
+  dossierNom?: string;
   onGoToFeuilleObservation?: () => void;
+  onUpdateDemande?: (demande: DemandeCommunication) => void;
+  onAddDemande?: (demande: DemandeCommunication) => void;
+  onCancelDemande?: (demandeId: string) => void;
+  onCreateFeuille?: (feuille: FeuilleObservation) => void;
+  hasFeuille?: boolean;
 }
 
 export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> = ({
+  demandes,
   initialDemande,
   currentUser,
+  dossierNom,
   onGoToFeuilleObservation,
+  onUpdateDemande,
+  onAddDemande,
+  onCancelDemande,
+  onCreateFeuille,
+  hasFeuille = false,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  useCleanUI('DemandeCommunicationView', containerRef);
+  const demandesList = (demandes && demandes.length > 0)
+    ? demandes
+    : (initialDemande ? [initialDemande] : []);
 
-  // Container-based responsive state using ResizeObserver for precision ergonomics
-  const [containerWidth, setContainerWidth] = useState<number>(1000);
+  // null = vue cartes (liste), string = id de la demande affichée en détail
+  const [selectedDemandeId, setSelectedDemandeId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.contentRect.width > 0) {
-          setContainerWidth(entry.contentRect.width);
-        }
-      }
-    });
-
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const isCompactScreen = containerWidth < 920;
-
-  const getNowTimestamp = () => {
-    const d = new Date();
-    return `${d.toISOString().split('T')[0]} ${d.toTimeString().split(' ')[0]}`;
-  };
+  const demande = selectedDemandeId
+    ? (demandesList.find((d) => d.id === selectedDemandeId) || null)
+    : null;
 
   const defaultAuteur = currentUser
     ? `${currentUser.grade} ${currentUser.prenom} ${currentUser.nom}`
-    : (initialDemande.auteur || initialDemande.redacteur || 'Inspecteur Marc Kabamba');
+    : (demande?.auteur || demande?.redacteur || 'Inspecteur Marc Kabamba');
 
-  // List of Demandes for the dossier
-  const [demandes, setDemandes] = useState<DemandeCommunication[]>([
-    initialDemande,
-    {
-      id: 'demande-043',
-      reference: 'DGDA/DRK/ENQ/DC/2026/043',
-      dossierId: initialDemande.dossierId,
-      redacteur: defaultAuteur,
-      auteur: defaultAuteur,
-      horodatage: '2026-08-28 14:30:00',
-      objet: 'Communication des manifestes maritimes et facturations de fret CIF Kasumbalesa',
-      signataireHabilite: 'Salem Mukendi (Directeur Provincial)',
-      gradeSignataire: 'Commandement de Division',
-      destinataire: {
-        nom: 'MAERSK CONGO RDC',
-        qualite: 'Armateur et transporteur maritime',
-        adresse: 'Boulevard du 30 Juin, Gombe, Kinshasa',
-      },
-      dateEmission: '2026-08-28',
-      echeanceReponse: '2026-09-15',
-      statut: 'REPONSE_COMPLETE',
-      evaluationReponse: 'SATISFAISANTE',
-      baseLegale: 'Code des douanes, Article 46 — Droit de communication sur le fret',
-      elementsDemandes: [
-        {
-          id: 'EL-M1',
-          libelle: 'Connaissements maritimes (Bill of Lading) originaux signés',
-          periodeConcernee: 'Exercice 2025',
-          motifExigence: 'Contrôle du montant réel du fret acquitté',
-          statutRemise: 'FOURNI',
-        },
-        {
-          id: 'EL-M2',
-          libelle: 'Factures d’assurance maritime et surestaries portuaires',
-          periodeConcernee: 'Exercice 2025',
-          motifExigence: 'Intégration dans la valeur en douane CIF',
-          statutRemise: 'FOURNI',
-        },
-      ],
-      reponsesRecues: [],
-      modaliteRemise: 'Voie électronique sécurisée',
-      commentairesInternes: 'Pièces communiquées dans les délais légaux.',
-      pdfSourceNom: 'Requisition_Fret_Maersk_2026.pdf',
-      pdfSourceTaille: '980 Ko',
-      pdfSourceDateUpload: '2026-08-29 10:00:00',
-    },
-  ]);
-
-  // Modal: Nouvelle demande de communication
+  // Formulaire de création / remplacement demande
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Form State for creating a new demande
-  const [createForm, setCreateForm] = useState({
-    auteur: defaultAuteur,
-    horodatage: getNowTimestamp(),
-    reference: `DGDA/DRK/ENQ/DC/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
-    destinataireNom: '',
-    destinataireQualite: '',
-    destinataireAdresse: '',
-    objet: '',
-    baseLegale: 'Code des douanes, Article 46 — Droit de communication et réquisition de pièces comptables',
-    echeanceReponse: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
-    elements: [
-      {
-        id: 'EL-01',
-        libelle: 'Copies authentifiées des messages SWIFT MT103',
-        periodeConcernee: 'Exercice 2025',
-        motifExigence: 'Contrôle de la valeur transactionnelle réelle',
-        statutRemise: 'EN_ATTENTE' as const,
-      },
-    ] as ElementDemande[],
+  // Formulaire de création de la feuille d'observation
+  const [showFeuilleModal, setShowFeuilleModal] = useState(false);
+
+  // Formulaire d'enregistrement de la réponse de l'opérateur (STRICTEMENT 5 CHAMPS)
+  const [showReponseModal, setShowReponseModal] = useState(false);
+  const [reponseForm, setReponseForm] = useState({
+    dateReception: new Date().toISOString().split('T')[0],
+    reference: '',
+    auteur: initialDemande?.destinataire?.nom || 'Direction Générale',
+    commentaire: '',
     pdfFile: null as { name: string; size: string } | null,
   });
 
-  const [newPieceLibelle, setNewPieceLibelle] = useState('');
-  const [newPiecePeriode, setNewPiecePeriode] = useState('');
-  const [newPieceMotif, setNewPieceMotif] = useState('');
+  // État du formulaire épuré : STRICTEMENT 5 champs
+  const [createForm, setCreateForm] = useState({
+    auteur: defaultAuteur,
+    destinataire: demande?.destinataire?.nom || 'CONGO MINING & CHEMICAL LOGISTICS SAS',
+    echeance: demande?.echeanceReponse || '2026-10-15',
+    objet: demande?.objet || 'Communication des manifestes de fret maritime et factures CIF Kasumbalesa',
+    pdfFile: null as { name: string; size: string } | null,
+  });
 
-  // Selected Demande for Detailed View Modal
-  const [selectedDemande, setSelectedDemande] = useState<DemandeCommunication | null>(null);
+  // Formulaire Feuille d'observation : STRICTEMENT 5 champs
+  const [feuilleForm, setFeuilleForm] = useState({
+    inspecteur: defaultAuteur,
+    destinataire: demande?.destinataire?.nom || 'CONGO MINING & CHEMICAL LOGISTICS SAS',
+    objet: `Constatations contradictoires suite au défaut de communication : ${demande?.objet || ''}`,
+    auditionPrevue: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+    pdfFile: null as { name: string; size: string } | null,
+  });
 
-  // Procedural Modals (PV de constat & Mission de contrôle)
-  const [showPvConstatModal, setShowPvConstatModal] = useState(false);
-  const [showMissionModal, setShowMissionModal] = useState(false);
+  const [notification, setNotification] = useState<string | null>(null);
 
-  // Add piece to form
-  const handleAddPieceToForm = () => {
-    if (!newPieceLibelle.trim()) return;
-    const newId = `EL-0${createForm.elements.length + 1}`;
-    setCreateForm((prev) => ({
-      ...prev,
-      elements: [
-        ...prev.elements,
-        {
-          id: newId,
-          libelle: newPieceLibelle.trim(),
-          periodeConcernee: newPiecePeriode.trim() || 'Exercice en cours',
-          motifExigence: newPieceMotif.trim() || 'Vérification douanière',
-          statutRemise: 'EN_ATTENTE',
-        },
-      ],
-    }));
-    setNewPieceLibelle('');
-    setNewPiecePeriode('');
-    setNewPieceMotif('');
+  const showToast = (msg: string) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(null), 3000);
   };
 
-  const handleAddQuickSuggestion = (libelle: string, periode: string, motif: string) => {
-    const newId = `EL-0${createForm.elements.length + 1}`;
-    setCreateForm((prev) => ({
-      ...prev,
-      elements: [
-        ...prev.elements,
-        {
-          id: newId,
-          libelle,
-          periodeConcernee: periode,
-          motifExigence: motif,
-          statutRemise: 'EN_ATTENTE',
-        },
-      ],
-    }));
-  };
-
-  const handleRemovePieceFromForm = (id: string) => {
-    setCreateForm((prev) => ({
-      ...prev,
-      elements: prev.elements.filter((el) => el.id !== id),
-    }));
-  };
-
-  // Submit New Demande
-  const handleCreateDemandeSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!createForm.destinataire.trim() || !createForm.objet.trim()) {
+      alert('Veuillez remplir le destinataire et l’objet de la demande.');
+      return;
+    }
 
+    const newId = `demande-${Date.now()}`;
     const newDemande: DemandeCommunication = {
-      id: `demande-${Date.now().toString().slice(-4)}`,
-      reference: createForm.reference,
-      dossierId: initialDemande.dossierId,
-      redacteur: createForm.auteur,
+      id: newId,
+      reference: `DGDA/DRK/ENQ/DC/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
+      dossierId: demande?.dossierId || '',
       auteur: createForm.auteur,
-      horodatage: createForm.horodatage,
+      redacteur: createForm.auteur,
+      dateEmission: new Date().toISOString().split('T')[0],
+      echeanceReponse: createForm.echeance,
       objet: createForm.objet,
-      baseLegale: createForm.baseLegale,
-      echeanceReponse: createForm.echeanceReponse,
-      signataireHabilite: 'Direction des Enquêtes Douanières',
-      gradeSignataire: 'Commandement de Division',
       destinataire: {
-        nom: createForm.destinataireNom,
-        qualite: createForm.destinataireQualite || 'Assujetti contrôlé',
-        adresse: createForm.destinataireAdresse || 'Lubumbashi, RDC',
+        nom: createForm.destinataire,
+        qualite: 'Entreprise contrôlée',
+        adresse: '',
       },
-      elementsDemandes: createForm.elements,
-      reponsesRecues: [],
-      modaliteRemise: 'Dépôt physique ou transmission sécurisée',
-      commentairesInternes: '',
-      pdfSourceNom: createForm.pdfFile ? createForm.pdfFile.name : undefined,
-      pdfSourceTaille: createForm.pdfFile ? createForm.pdfFile.size : undefined,
-      pdfSourceDateUpload: createForm.pdfFile ? createForm.horodatage : undefined,
       statut: 'EMISE',
+      signataireHabilite: 'Salem Mukendi (Directeur Provincial)',
+      gradeSignataire: 'Commandement de Division',
+      baseLegale: 'Droit de communication et contrôle douanier (Code des douanes, Article 46)',
+      elementsDemandes: [
+        {
+          id: `EL-${Date.now()}`,
+          libelle: createForm.objet,
+          periodeConcernee: 'Exercice sous contrôle',
+          motifExigence: 'Vérification de la valeur en douane',
+          statutRemise: 'EN_ATTENTE',
+        },
+      ],
+      reponsesRecues: [],
+      modaliteRemise: 'Transmission électronique et dépôt physique',
+      commentairesInternes: 'Demande officielle notifiée',
+      pdfSourceNom: createForm.pdfFile ? createForm.pdfFile.name : 'Requisition_Officielle_Art46.pdf',
     };
 
-    setDemandes((prev) => [newDemande, ...prev]);
+    if (onAddDemande) {
+      onAddDemande(newDemande);
+    } else {
+      onUpdateDemande?.(newDemande);
+    }
+    setSelectedDemandeId(newId);
     setShowCreateModal(false);
+    showToast('Nouvelle demande de communication créée avec succès.');
   };
 
-  // Update evaluation for selected demande
-  const handleUpdateEvaluation = (demandeId: string, evaluation: 'SATISFAISANTE' | 'NON_SATISFAISANTE') => {
-    setDemandes((prev) =>
-      prev.map((d) => {
-        if (d.id === demandeId) {
-          return {
-            ...d,
-            evaluationReponse: evaluation,
-            statut: evaluation === 'SATISFAISANTE' ? 'REPONSE_COMPLETE' : 'REPONSE_PARTIELLE',
-          };
-        }
-        return d;
-      })
-    );
-
-    if (selectedDemande && selectedDemande.id === demandeId) {
-      setSelectedDemande((prev) =>
-        prev
-          ? {
-              ...prev,
-              evaluationReponse: evaluation,
-              statut: evaluation === 'SATISFAISANTE' ? 'REPONSE_COMPLETE' : 'REPONSE_PARTIELLE',
-            }
-          : null
-      );
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCreateForm((prev) => ({
+        ...prev,
+        pdfFile: {
+          name: file.name,
+          size: `${Math.round(file.size / 1024)} Ko`,
+        },
+      }));
     }
   };
 
-  // Update item status in selected demande
-  const handleToggleItemStatus = (demandeId: string, itemId: string, newStatus: ElementDemande['statutRemise']) => {
-    setDemandes((prev) =>
-      prev.map((d) => {
-        if (d.id === demandeId) {
-          const updatedElements = d.elementsDemandes.map((el) =>
-            el.id === itemId ? { ...el, statutRemise: newStatus } : el
-          );
-          return { ...d, elementsDemandes: updatedElements };
-        }
-        return d;
-      })
-    );
-
-    if (selectedDemande && selectedDemande.id === demandeId) {
-      setSelectedDemande((prev) =>
-        prev
-          ? {
-              ...prev,
-              elementsDemandes: prev.elementsDemandes.map((el) =>
-                el.id === itemId ? { ...el, statutRemise: newStatus } : el
-              ),
-            }
-          : null
-      );
+  const handleFeuilleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFeuilleForm((prev) => ({
+        ...prev,
+        pdfFile: {
+          name: file.name,
+          size: `${Math.round(file.size / 1024)} Ko`,
+        },
+      }));
     }
   };
 
-  const getStatusBadge = (d: DemandeCommunication) => {
-    if (d.evaluationReponse === 'SATISFAISANTE') {
-      return { label: 'Satisfaisante', color: 'var(--color-success)', bg: 'var(--color-success-surface)' };
+  const handleFeuilleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feuilleForm.destinataire.trim() || !feuilleForm.objet.trim()) {
+      alert('Veuillez renseigner le destinataire et l’objet du contrôle.');
+      return;
     }
-    if (d.evaluationReponse === 'NON_SATISFAISANTE') {
-      return { label: 'Non satisfaisante', color: 'var(--color-danger)', bg: 'var(--color-danger-surface)' };
-    }
-    if (d.statut === 'REPONSE_PARTIELLE') {
-      return { label: 'Réponse partielle', color: 'var(--color-warning)', bg: 'var(--color-warning-surface)' };
-    }
-    return { label: 'En attente', color: 'var(--color-text-secondary)', bg: 'var(--color-surface-elevated)' };
+
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+
+    const newFeuille: FeuilleObservation = {
+      id: `fo-${Date.now()}`,
+      reference: `DGDA/DRK/FO/${now.getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
+      dossierId: demande?.dossierId || '',
+      dateRedaction: dateStr,
+      inspecteurs: [feuilleForm.inspecteur],
+      destinataire: feuilleForm.destinataire,
+      objetControle: feuilleForm.objet,
+      cadreLegal: 'Décision DG/DGDA/DG/2011/296 (Articles 44 à 49) portant réglementation des contrôles a posteriori en RDC',
+      statutFeuille: 'NOTIFIEE',
+      dateReunionCloturePrevue: feuilleForm.auditionPrevue,
+      observations: [
+        {
+          code: 'O1',
+          titre: 'Défaut de justification et pièces non satisfaisantes',
+          faitsConstates: `L’opérateur n’a pas transmis les justificatifs probants requis au titre de la réquisition ${demande?.reference || ''}. Constat d’obstacle aux vérifications douanières et carence de pièces requises.`,
+          justificatifsAssocies: ['Réquisition administrative', 'Avis de mise en demeure'],
+          referencesJuridiques: 'Code des douanes, Article 46 et Article 49',
+          questionsAssujetti: 'Fournir sous 14 jours les pièces justificatives manquantes ou explications écrites contradictoires.',
+          statutConstat: 'OUVERT',
+          analyseMotivee: 'Réponse jugée non satisfaisante. Ouverture formelle de la feuille d’observation contradictoire.',
+        },
+      ],
+      pdfSourceNom: feuilleForm.pdfFile ? feuilleForm.pdfFile.name : 'Feuille_Observation_Notifiee.pdf',
+    };
+
+    onCreateFeuille?.(newFeuille);
+    setShowFeuilleModal(false);
+    showToast('Feuille d’observation créée avec succès. L’onglet "Feuille d’observation" est désormais accessible.');
   };
 
-  return (
-    <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
-      {/* 1. Header Bar: Titre + Compteur + Bouton Nouvelle Demande de Communication */}
+  const handleReponseFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setReponseForm((prev) => ({
+        ...prev,
+        pdfFile: {
+          name: file.name,
+          size: `${Math.round(file.size / 1024)} Ko`,
+        },
+      }));
+    }
+  };
+
+  const handleReponseSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!demande) return;
+
+    const fileName = reponseForm.pdfFile ? reponseForm.pdfFile.name : 'Reponse_Operateur_Art46.pdf';
+    const fileSize = reponseForm.pdfFile ? reponseForm.pdfFile.size : '820 Ko';
+    const refCourrier = reponseForm.reference.trim() || `REP-${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`;
+
+    const updated: DemandeCommunication = {
+      ...demande,
+      statut: 'REPONSE_COMPLETE',
+      reponsePdfNom: fileName,
+      reponsePdfDate: reponseForm.dateReception,
+      reponsePdfTaille: fileSize,
+      reponsePdfAuteur: reponseForm.auteur,
+      reponsePdfRef: refCourrier,
+      reponsesRecues: [
+        {
+          id: `REP-${Date.now()}`,
+          dateReception: reponseForm.dateReception,
+          referenceCourrier: refCourrier,
+          auteur: reponseForm.auteur,
+          elementsFournisIds: demande.elementsDemandes?.map((el) => el.id) || [],
+          elementsManquantsIds: [],
+          piecesJointes: [fileName],
+          analyseEnqueteur: reponseForm.commentaire || 'Pièces justificatives produites par l’opérateur',
+          appreciation: 'SATISFAISANTE',
+          prochaineAction: 'Examiner les pièces produites',
+        },
+        ...(demande.reponsesRecues || []),
+      ],
+    };
+
+    onUpdateDemande?.(updated);
+    setShowReponseModal(false);
+    showToast('Réponse à la demande de communication enregistrée.');
+  };
+
+  const handleAnnulerDemande = () => {
+    if (window.confirm('Confirmez-vous l’annulation de cette demande de communication ?')) {
+      if (demande && onCancelDemande) {
+        onCancelDemande(demande.id);
+      } else if (demande) {
+        const updated: DemandeCommunication = {
+          ...demande,
+          statut: 'ANNULEE',
+        };
+        onUpdateDemande?.(updated);
+      }
+      showToast('Demande de communication annulée.');
+    }
+  };
+
+  const renderCreateModal = () => (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '20px',
+      }}
+    >
       <div
         style={{
+          backgroundColor: 'var(--color-surface)',
+          borderRadius: 'var(--radius-card)',
+          border: '1px solid var(--color-border)',
+          width: '100%',
+          maxWidth: '560px',
+          overflow: 'hidden',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '12px',
-          flexWrap: 'wrap',
+          flexDirection: 'column',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>
-            Demandes de communication
-          </h2>
-          <span
-            style={{
-              padding: '2px 8px',
-              borderRadius: '12px',
-              backgroundColor: 'var(--color-surface-elevated)',
-              color: 'var(--color-text-secondary)',
-              fontSize: '11px',
-              fontWeight: 700,
-            }}
-          >
-            {demandes.length}
-          </span>
-        </div>
-
-        {/* Bouton Nouvelle Demande de Communication */}
-        <button
-          onClick={() => {
-            const freshTimestamp = getNowTimestamp();
-            setCreateForm({
-              auteur: defaultAuteur,
-              horodatage: freshTimestamp,
-              reference: `DGDA/DRK/ENQ/DC/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
-              destinataireNom: initialDemande.destinataire?.nom || '',
-              destinataireQualite: initialDemande.destinataire?.qualite || '',
-              destinataireAdresse: initialDemande.destinataire?.adresse || '',
-              objet: '',
-              baseLegale: 'Code des douanes, Article 46 — Droit de communication et réquisition de pièces comptables',
-              echeanceReponse: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
-              elements: [
-                {
-                  id: 'EL-01',
-                  libelle: 'Copies authentifiées des messages SWIFT MT103',
-                  periodeConcernee: 'Exercice 2025',
-                  motifExigence: 'Contrôle de la valeur transactionnelle réelle',
-                  statutRemise: 'EN_ATTENTE',
-                },
-              ],
-              pdfFile: null,
-            });
-            setShowCreateModal(true);
-          }}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '8px 16px',
-            borderRadius: 'var(--radius-btn)',
-            backgroundColor: 'var(--color-accent)',
-            color: '#FFFFFF',
-            fontWeight: 700,
-            fontSize: '12px',
-            border: 'none',
-            cursor: 'pointer',
-            transition: 'background var(--transition-fast)',
-          }}
-        >
-          <Plus size={15} />
-          <span>Nouvelle demande de communication</span>
-        </button>
-      </div>
-
-      {/* 2. Responsive Presentation: Table on Large Screens, Responsive Card-Rows on Compact Screens */}
-      {!isCompactScreen ? (
-        /* Wide Desktop Table with strict column hierarchy and generous spacing */
         <div
           style={{
-            backgroundColor: 'var(--color-surface)',
-            borderRadius: 'var(--radius-card)',
-            border: '1px solid var(--color-border)',
-            overflowX: 'auto',
+            padding: '16px 20px',
+            borderBottom: '1px solid var(--color-border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
           }}
         >
-          <table style={{ width: '100%', minWidth: '860px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
-            <thead>
-              <tr
+          <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
+            Nouvelle Demande de Communication
+          </h2>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => setShowCreateModal(false)}
+            style={{ padding: '4px' }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <form onSubmit={handleCreateSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div>
+            <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              Auteur de la demande
+            </label>
+            <input
+              type="text"
+              required
+              value={createForm.auteur}
+              onChange={(e) => setCreateForm({ ...createForm, auteur: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                fontSize: '12px',
+                backgroundColor: 'var(--color-bg)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-btn)',
+                color: 'var(--color-text-primary)',
+                outline: 'none',
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              Destinataire (Entreprise / Opérateur)
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="Ex : CONGO MINING & CHEMICAL LOGISTICS SAS"
+              value={createForm.destinataire}
+              onChange={(e) => setCreateForm({ ...createForm, destinataire: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                fontSize: '12px',
+                backgroundColor: 'var(--color-bg)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-btn)',
+                color: 'var(--color-text-primary)',
+                outline: 'none',
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              Échéance légale de réponse
+            </label>
+            <input
+              type="date"
+              required
+              value={createForm.echeance}
+              onChange={(e) => setCreateForm({ ...createForm, echeance: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                fontSize: '12px',
+                backgroundColor: 'var(--color-bg)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-btn)',
+                color: 'var(--color-text-primary)',
+                outline: 'none',
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              Objet de la demande
+            </label>
+            <textarea
+              rows={3}
+              required
+              placeholder="Précisez la nature des pièces requises..."
+              value={createForm.objet}
+              onChange={(e) => setCreateForm({ ...createForm, objet: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                fontSize: '12px',
+                backgroundColor: 'var(--color-bg)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-btn)',
+                color: 'var(--color-text-primary)',
+                outline: 'none',
+                resize: 'vertical',
+                fontFamily: 'inherit',
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              Document PDF joint
+            </label>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '8px 12px',
+                backgroundColor: 'var(--color-bg)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-btn)',
+              }}
+            >
+              <Upload size={14} color="var(--color-text-muted)" />
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={handleFileChange}
+                style={{ fontSize: '12px', color: 'var(--color-text-secondary)', flex: 1 }}
+              />
+            </div>
+            {createForm.pdfFile && (
+              <div style={{ fontSize: '11px', color: 'var(--color-accent)', marginTop: '4px' }}>
+                Document prêt : {createForm.pdfFile.name} ({createForm.pdfFile.size})
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setShowCreateModal(false)}
+            >
+              Annuler
+            </button>
+            <button type="submit" className="btn-primary">
+              Créer la demande
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
+  // =========================================================================
+  // 1. PAGE DES CARTES : AFFICHAGE EN CARTES DE TOUTES LES DEMANDES
+  // =========================================================================
+  if (!demande) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
+        {/* Toast Notification */}
+        {notification && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              right: '24px',
+              backgroundColor: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+              padding: '12px 18px',
+              borderRadius: 'var(--radius-card)',
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              zIndex: 9999,
+            }}
+          >
+            <CheckCircle size={16} color="var(--color-accent)" />
+            <span>{notification}</span>
+          </div>
+        )}
+
+        {/* En-tête de la page des cartes */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '16px',
+            paddingBottom: '8px',
+          }}
+        >
+          <div>
+            {/* <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
+                Demandes de communication
+              </h2>
+              <span
                 style={{
-                  backgroundColor: 'var(--color-surface-elevated)',
-                  borderBottom: '1px solid var(--color-border)',
-                  color: 'var(--color-text-muted)',
                   fontSize: '11px',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
+                  fontWeight: 500,
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--color-bg)',
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-text-muted)',
                 }}
               >
-                <th style={{ padding: '14px 18px', width: '22%', minWidth: '170px' }}>Référence & Date</th>
-                <th style={{ padding: '14px 18px', width: '22%', minWidth: '180px' }}>Destinataire</th>
-                <th style={{ padding: '14px 18px', width: '28%', minWidth: '220px' }}>Objet de la demande</th>
-                <th style={{ padding: '14px 18px', width: '14%', minWidth: '130px' }}>Auteur & Échéance</th>
-                <th style={{ padding: '14px 18px', width: '14%', minWidth: '140px', textAlign: 'right' }}>Statut</th>
-              </tr>
-            </thead>
-            <tbody>
-              {demandes.map((d) => {
-                const badge = getStatusBadge(d);
-                const fourniesCount = d.elementsDemandes.filter((e) => e.statutRemise === 'FOURNI').length;
+                {demandesList.length} au total
+              </span>
+            </div> */}
 
-                return (
-                  <tr
-                    key={d.id}
-                    onClick={() => setSelectedDemande(d)}
-                    style={{
-                      borderBottom: '1px solid var(--color-border-subtle)',
-                      cursor: 'pointer',
-                      transition: 'background var(--transition-fast)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                  >
-                    {/* Col 1: Reference & Horodatage */}
-                    <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>
-                      <div className="font-sf" style={{ fontWeight: 800, color: 'var(--color-accent)', fontSize: '13px' }}>
-                        {d.reference}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                        <Clock size={12} />
-                        <span className="font-sf">{d.horodatage || d.dateEmission}</span>
-                      </div>
-                    </td>
+          </div>
 
-                    {/* Col 2: Destinataire & Type */}
-                    <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--color-text-primary)', fontSize: '13px' }}>
-                        {d.destinataire.nom}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-                        <Building2 size={12} color="var(--color-text-muted)" />
-                        <span>{d.destinataire.qualite}</span>
-                      </div>
-                    </td>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => {
+              setCreateForm({
+                auteur: defaultAuteur,
+                destinataire: dossierNom || 'CONGO MINING & CHEMICAL LOGISTICS SAS',
+                echeance: new Date(Date.now() + 21 * 86400000).toISOString().split('T')[0],
+                objet: '',
+                pdfFile: null,
+              });
+              setShowCreateModal(true);
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '12px',
+              padding: '8px 16px',
+            }}
+          >
+            <Plus size={14} />
+            <span>Nouvelle demande</span>
+          </button>
+        </div>
 
-                    {/* Col 3: Objet & Pieces count */}
-                    <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>
-                      <div
+        {/* Grille des cartes des demandes */}
+        {demandesList.length === 0 ? (
+          <div
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-card)',
+              padding: '48px 24px',
+              textAlign: 'center',
+              color: 'var(--color-text-muted)',
+            }}
+          >
+            <p style={{ fontSize: '13px', margin: 0 }}>Aucune demande de communication enregistrée pour ce dossier.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+            {demandesList.map((item) => {
+              const hasRep = Boolean(
+                item.reponsePdfNom ||
+                (item.reponsesRecues && item.reponsesRecues.length > 0 && (
+                  Boolean(item.reponsesRecues[0].piecesJointes?.length) ||
+                  Boolean(item.reponsesRecues[0].referenceCourrier)
+                ))
+              );
+
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => setSelectedDemandeId(item.id)}
+                  style={{
+                    backgroundColor: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-card)',
+                    padding: '20px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '16px',
+                    transition: 'border-color var(--transition-fast)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--color-accent)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--color-border)';
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                      <div>
+                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                          Destinataire
+                        </div>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '2px' }}>
+                          {item.destinataire?.nom || dossierNom || 'Entreprise contrôlée'}
+                        </div>
+                      </div>
+
+                      <span
                         style={{
-                          color: 'var(--color-text-primary)',
-                          lineHeight: 1.45,
-                          fontSize: '12px',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: 'var(--color-bg)',
+                          border: '1px solid var(--color-border)',
+                          color: 'var(--color-text-secondary)',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {hasRep ? 'Réponse reçue' : 'En attente'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                        Objet
+                      </div>
+                      <p
+                        style={{
+                          fontSize: '13px',
+                          color: 'var(--color-text-secondary)',
+                          lineHeight: 1.4,
+                          margin: '2px 0 0 0',
                           display: '-webkit-box',
-                          WebkitLineClamp: 2,
+                          WebkitLineClamp: 3,
                           WebkitBoxOrient: 'vertical',
                           overflow: 'hidden',
                         }}
-                        title={d.objet}
                       >
-                        {d.objet || 'Demande de communication de pièces'}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
-                        <span
-                          style={{
-                            fontSize: '10px',
-                            fontWeight: 600,
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            backgroundColor: 'var(--color-surface-elevated)',
-                            color: 'var(--color-text-secondary)',
-                            border: '1px solid var(--color-border-subtle)',
-                          }}
-                        >
-                          {d.elementsDemandes.length} pièces exigées
-                        </span>
-                        {fourniesCount > 0 && (
-                          <span style={{ fontSize: '10px', color: 'var(--color-success)', fontWeight: 600 }}>
-                            {fourniesCount} fournie{fourniesCount > 1 ? 's' : ''}
-                          </span>
-                        )}
-                        {d.pdfSourceNom && (
-                          <span style={{ fontSize: '10px', color: 'var(--color-accent)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                            <Paperclip size={10} /> PDF joint
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Col 4: Auteur & Echeance */}
-                    <td style={{ padding: '16px 18px', verticalAlign: 'top' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'var(--color-text-primary)', fontWeight: 600 }}>
-                        <Calendar size={13} color="var(--color-danger)" />
-                        <span className="font-sf">{d.echeanceReponse}</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                        <User size={11} />
-                        <span>{d.auteur || d.redacteur}</span>
-                      </div>
-                    </td>
-
-                    {/* Col 5: Statut & Action */}
-                    <td style={{ padding: '16px 18px', verticalAlign: 'top', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            padding: '4px 9px',
-                            borderRadius: '6px',
-                            backgroundColor: badge.bg,
-                            color: badge.color,
-                            fontWeight: 700,
-                            fontSize: '11px',
-                            border: `1px solid ${badge.color}35`,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: '6px',
-                              height: '6px',
-                              borderRadius: '50%',
-                              backgroundColor: badge.color,
-                            }}
-                          />
-                          {badge.label}
-                        </span>
-
-                        <div
-                          style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'var(--color-text-muted)',
-                          }}
-                        >
-                          <ChevronRight size={16} />
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        /* Responsive Card-Rows for Medium / Tablet Screen Widths (< 920px container) */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {demandes.map((d) => {
-            const badge = getStatusBadge(d);
-            const fourniesCount = d.elementsDemandes.filter((e) => e.statutRemise === 'FOURNI').length;
-
-            return (
-              <div
-                key={d.id}
-                onClick={() => setSelectedDemande(d)}
-                style={{
-                  backgroundColor: 'var(--color-surface)',
-                  borderRadius: 'var(--radius-card)',
-                  border: '1px solid var(--color-border)',
-                  padding: '16px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  cursor: 'pointer',
-                  transition: 'all var(--transition-fast)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)';
-                  e.currentTarget.style.borderColor = 'var(--color-accent)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--color-surface)';
-                  e.currentTarget.style.borderColor = 'var(--color-border)';
-                }}
-              >
-                {/* Top Row: Ref & Statut */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className="font-sf" style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-accent)' }}>
-                      {d.reference}
-                    </span>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                      • {d.horodatage || d.dateEmission}
-                    </span>
+                        {item.objet}
+                      </p>
+                    </div>
                   </div>
 
-                  <span
+                  <div
                     style={{
-                      display: 'inline-flex',
+                      paddingTop: '12px',
+                      borderTop: '1px solid var(--color-border-subtle)',
+                      display: 'flex',
                       alignItems: 'center',
-                      gap: '5px',
-                      padding: '3px 8px',
-                      borderRadius: '6px',
-                      backgroundColor: badge.bg,
-                      color: badge.color,
-                      fontWeight: 700,
+                      justifyContent: 'space-between',
                       fontSize: '11px',
-                      border: `1px solid ${badge.color}35`,
-                      whiteSpace: 'nowrap',
+                      color: 'var(--color-text-muted)',
                     }}
                   >
-                    <span
-                      style={{
-                        width: '6px',
-                        height: '6px',
-                        borderRadius: '50%',
-                        backgroundColor: badge.color,
-                      }}
-                    />
-                    {badge.label}
-                  </span>
-                </div>
-
-                {/* Destinataire & Objet */}
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                    {d.destinataire.nom}
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Building2 size={12} color="var(--color-text-muted)" />
-                    <span>{d.destinataire.qualite}</span>
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--color-text-primary)', marginTop: '8px', lineHeight: 1.45 }}>
-                    {d.objet}
-                  </div>
-
-                  {/* Badges pieces */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                    <span
-                      style={{
-                        fontSize: '10px',
-                        fontWeight: 600,
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        backgroundColor: 'var(--color-surface-elevated)',
-                        color: 'var(--color-text-secondary)',
-                        border: '1px solid var(--color-border-subtle)',
-                      }}
-                    >
-                      {d.elementsDemandes.length} pièces exigées
+                    <span>
+                      Échéance : <span className="font-sf" style={{ color: 'var(--color-text-secondary)' }}>{formatDate(item.echeanceReponse)}</span>
                     </span>
-                    {fourniesCount > 0 && (
-                      <span style={{ fontSize: '10px', color: 'var(--color-success)', fontWeight: 600 }}>
-                        {fourniesCount} fournie{fourniesCount > 1 ? 's' : ''}
-                      </span>
-                    )}
-                    {d.pdfSourceNom && (
-                      <span style={{ fontSize: '10px', color: 'var(--color-accent)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                        <Paperclip size={10} /> PDF joint
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Footer Row: Echeance, Auteur & Details button */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingTop: '10px',
-                    borderTop: '1px solid var(--color-border-subtle)',
-                    fontSize: '11px',
-                    color: 'var(--color-text-muted)',
-                    flexWrap: 'wrap',
-                    gap: '8px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      <Calendar size={12} color="var(--color-danger)" />
-                      <span>Échéance : <strong className="font-sf" style={{ color: 'var(--color-danger)' }}>{d.echeanceReponse}</strong></span>
-                    </span>
-                    <span>•</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      <User size={11} />
-                      <span>Par : <strong style={{ color: 'var(--color-text-secondary)' }}>{d.auteur || d.redacteur}</strong></span>
+                    <span style={{ color: 'var(--color-accent)', fontWeight: 500 }}>
+                      Consulter →
                     </span>
                   </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--color-accent)', fontWeight: 700, fontSize: '11px' }}>
-                    <span>Consulter les détails</span>
-                    <ChevronRight size={14} />
-                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+        )}
+
+        {/* Modal de création */}
+        {showCreateModal && renderCreateModal()}
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // 2. PAGE DÉTAIL D'UNE DEMANDE SÉLECTIONNÉE
+  // =========================================================================
+  const hasReponse = Boolean(
+    Boolean(demande.reponsePdfNom) ||
+    (demande.reponsesRecues && demande.reponsesRecues.length > 0 && (
+      (demande.reponsesRecues[0].piecesJointes && demande.reponsesRecues[0].piecesJointes.length > 0) ||
+      Boolean(demande.reponsesRecues[0].referenceCourrier)
+    ))
+  );
+
+  const reponsePdfNom =
+    demande.reponsePdfNom ||
+    demande.reponsesRecues?.[0]?.piecesJointes?.[0] ||
+    'Reponse_Operateur_Signee.pdf';
+
+  const reponseDate =
+    demande.reponsePdfDate ||
+    demande.reponsesRecues?.[0]?.dateReception;
+
+  const reponseRef =
+    demande.reponsePdfRef ||
+    demande.reponsesRecues?.[0]?.referenceCourrier;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
+      {/* Toast Notification */}
+      {notification && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            color: 'var(--color-text-primary)',
+            padding: '12px 18px',
+            borderRadius: 'var(--radius-card)',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            zIndex: 9999,
+          }}
+        >
+          <CheckCircle size={16} color="var(--color-accent)" />
+          <span>{notification}</span>
         </div>
       )}
 
-      {/* ======================================================== */}
-      {/* 3. MODAL : NOUVELLE DEMANDE DE COMMUNICATION */}
-      {/* ======================================================== */}
+      {/* Navigation Retour vers la page des cartes */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <button
+          type="button"
+          onClick={() => setSelectedDemandeId(null)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '13px',
+            color: 'var(--color-text-secondary)',
+            backgroundColor: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '6px 0',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--color-accent)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-secondary)';
+          }}
+        >
+          <ArrowLeft size={16} />
+          <span>Retour à toutes les demandes</span>
+        </button>
+      </div>
+
+      {/* =========================================================================
+          PAGE INFO ÉPURÉE : DEMANDE DE COMMUNICATION SÉLECTIONNÉE
+          ========================================================================= */}
+      <div
+        style={{
+          backgroundColor: 'var(--color-surface)',
+          borderRadius: 'var(--radius-card)',
+          border: '1px solid var(--color-border)',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px',
+        }}
+      >
+        {/* En-tête de la Page Info */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '16px',
+            // borderBottom: '1px solid var(--color-border-subtle)',
+            paddingBottom: '16px',
+          }}
+        >
+          <div>
+            {/* Référence administrative : JAMAIS en gras, JAMAIS en couleur accent */}
+            {/* <div
+              className="font-sf"
+              style={{
+                fontSize: '12px',
+                color: 'var(--color-text-muted)',
+                fontWeight: 400,
+              }}
+            >
+              {demande.reference}
+            </div> */}
+
+            {/* Nom de l'entreprise : SEULE CHOSE EN GRAS */}
+            <p
+              style={{
+                
+                color: 'var(--color-text-primary)',
+                marginTop: '6px',
+                marginBottom: '4px',
+              }}
+            >
+             <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+            Destinataire :</span> <span  style={{fontSize: '14px',
+                fontWeight: 700,}}>{demande.destinataire.nom}</span>
+            </p>
+
+            {/* Description établissement : SANS ICÔNE */}
+            {/* <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+              {demande.destinataire.qualite || 'Entreprise contrôlée'}
+              {demande.destinataire.adresse ? ` — ${demande.destinataire.adresse}` : ''}
+            </div> */}
+
+            {/* Enquêteur rédacteur : SANS ICÔNE */}
+            <div style={{ fontSize: '12px',  marginTop: '4px' }}>
+             <span style={{color: 'var(--color-text-muted)'}}>Rédacteur :</span>  <span style={{fontSize: '14px',
+                fontWeight: 700,}}>{demande.auteur || demande.redacteur || defaultAuteur}</span>
+            </div>
+          </div>
+
+          {/* Statut sobre monochromatic */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 500,
+                padding: '3px 8px',
+                borderRadius: '4px',
+                backgroundColor: 'var(--color-bg)',
+                border: '1px solid var(--color-border)',
+                color: 'var(--color-text-secondary)',
+              }}
+            >
+              {hasReponse ? 'Réponse reçue' : 'En attente'}
+            </span>
+          </div>
+        </div>
+
+        {/* Corps simplifié de la Page Info */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* 1. Objet de la réquisition */}
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>
+              Objet de la demande
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '4px', lineHeight: 1.5 }}>
+              {demande.objet}
+            </p>
+          </div>
+
+          {/* 2. Échéance légale */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '10px 12px',
+              backgroundColor: 'transparent',
+              // borderRadius: '6px',
+              // border: '1px solid var(--color-border-subtle)',
+            }}
+          >
+            
+           
+          </div>
+
+          {/* 3. Document PDF joint officiel */}
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+              Document officiel notifié
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                backgroundColor: 'var(--color-bg)',
+                borderRadius: '6px',
+                border: 'none',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div>
+                  <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', fontWeight: 500 }}>
+                    {demande.pdfSourceNom || 'Requisition_Officielle_Art46.pdf'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                    {demande.pdfSourceTaille || '940 Ko'} 
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ fontSize: '11px', padding: '6px 12px' }}
+                onClick={() => showToast('Téléchargement du document officiel...')}
+                title="Télécharger le document notifié"
+              >
+                <Download size={13} />
+              </button>
+            </div>
+          </div>
+
+          {/* 4. Réponse à la demande de communication (PDF ou Pas de réponse) */}
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+              Réponse à la demande de communication
+            </div>
+
+            {hasReponse ? (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  backgroundColor: 'var(--color-bg)',
+                  borderRadius: '6px',
+                  border: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div>
+                    <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', fontWeight: 500 }}>
+                      {reponsePdfNom}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                      {reponseDate ? `Reçue le ${formatDate(reponseDate)}` : 'Document PDF certifié'}
+                      {reponseRef ? ` — Réf : ${reponseRef}` : ''}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ fontSize: '11px', padding: '6px 12px' }}
+                    onClick={() => showToast('Téléchargement de la réponse...')}
+                    title="Télécharger la réponse"
+                  >
+                    <Download size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    style={{ fontSize: '11px', padding: '6px 10px', color: 'var(--color-text-muted)' }}
+                    onClick={() => setShowReponseModal(true)}
+                    title="Mettre à jour le fichier"
+                  >
+                    <Upload size={12} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  backgroundColor: 'var(--color-bg)',
+                  borderRadius: '6px',
+                  border: '1px dashed var(--color-border)',
+                }}
+              >
+                <span style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                  Pas de réponse
+                </span>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowReponseModal(true)}
+                  style={{ fontSize: '11px', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Upload size={12} />
+                  <span>Ajouter la réponse</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 5. Actions d'instruction simples */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px',
+              paddingTop: '12px',
+              borderTop: '1px solid var(--color-border-subtle)',
+            }}
+          >
+            {!hasReponse ? (
+              /* TANT QU'IL N'Y A PAS DE RÉPONSE */
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={handleAnnulerDemande}
+                  style={{
+                    fontSize: '12px',
+                    color: 'var(--color-text-muted)',
+                  }}
+                >
+                  <span>Annuler la demande de communication</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => setShowReponseModal(true)}
+                  style={{ fontSize: '12px' }}
+                >
+                  <Upload size={14} />
+                  <span>Ajouter la réponse</span>
+                </button>
+              </div>
+            ) : (
+              /* DÈS QU'IL Y A UNE RÉPONSE UPLOADÉE */
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => {
+                    const updated: DemandeCommunication = {
+                      ...demande,
+                      statut: 'REPONSE_COMPLETE',
+                      evaluationReponse: 'SATISFAISANTE',
+                    };
+                    onUpdateDemande?.(updated);
+                    showToast('Demande marquée comme satisfaite.');
+                  }}
+                  style={{ fontSize: '12px' }}
+                >
+                  <CheckCircle size={14} />
+                  <span>Marquer comme satisfait</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    const updated: DemandeCommunication = {
+                      ...demande,
+                      statut: 'TERMINEE',
+                      evaluationReponse: 'NON_SATISFAISANTE',
+                    };
+                    onUpdateDemande?.(updated);
+                    setFeuilleForm({
+                      inspecteur: defaultAuteur,
+                      destinataire: demande.destinataire?.nom || 'Entreprise contrôlée',
+                      objet: `Constatations contradictoires suite au défaut de communication : ${demande.objet}`,
+                      auditionPrevue: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+                      pdfFile: null,
+                    });
+                    setShowFeuilleModal(true);
+                  }}
+                  style={{ fontSize: '12px' }}
+                >
+                  <span>Non satisfait</span>
+                </button>
+
+                {demande.evaluationReponse === 'NON_SATISFAISANTE' && !hasFeuille && (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => {
+                      setFeuilleForm({
+                        inspecteur: defaultAuteur,
+                        destinataire: demande.destinataire?.nom || 'Entreprise contrôlée',
+                        objet: `Constatations contradictoires suite au défaut de communication : ${demande.objet}`,
+                        auditionPrevue: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+                        pdfFile: null,
+                      });
+                      setShowFeuilleModal(true);
+                    }}
+                    style={{
+                      fontSize: '12px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <Plus size={13} />
+                    <span>Rédiger la feuille d’observation</span>
+                  </button>
+                )}
+
+                {hasFeuille && onGoToFeuilleObservation && (
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={onGoToFeuilleObservation}
+                    style={{
+                      fontSize: '12px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      color: 'var(--color-accent)',
+                      border: '1px solid var(--color-border)',
+                    }}
+                  >
+                    <Scale size={13} />
+                    <span>Consulter la feuille d’observation</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+              <span>Échéance :</span>
+              <strong className="font-sf" style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>
+                {formatDate(demande.echeanceReponse)}
+              </strong>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+
+      {/* =========================================================================
+          MODALE DE CRÉATION : STRICTEMENT 5 CHAMPS
+          1. Auteur de la demande
+          2. Destinataire
+          3. Échéance
+          4. Objet de la demande
+          5. Fichier PDF
+          ========================================================================= */}
       {showCreateModal && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.65)',
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 110,
-            backdropFilter: 'blur(4px)',
+            zIndex: 1000,
             padding: '20px',
           }}
         >
           <div
             style={{
               backgroundColor: 'var(--color-surface)',
-              borderRadius: '16px',
-              padding: '24px',
+              borderRadius: 'var(--radius-card)',
+              border: '1px solid var(--color-border)',
               width: '100%',
-              maxWidth: '680px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
+              maxWidth: '560px',
+              overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>
-                Nouvelle Demande de Communication (Art. 46 CD)
-              </h3>
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid var(--color-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
+                Créer une Demande de Communication
+              </h2>
               <button
+                type="button"
+                className="btn-ghost"
                 onClick={() => setShowCreateModal(false)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}
+                style={{ padding: '4px' }}
               >
-                <X size={20} />
+                <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateDemandeSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* Row 1: Auteur & Horodatage */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
-                    Auteur de la demande *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={createForm.auteur}
-                    onChange={(e) => setCreateForm({ ...createForm, auteur: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--color-surface-elevated)',
-                      border: '1px solid var(--color-border)',
-                      color: 'var(--color-text-primary)',
-                      fontSize: '13px',
-                      outline: 'none',
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)' }}>
-                      Horodatage *
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setCreateForm({ ...createForm, horodatage: getNowTimestamp() })}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--color-accent)',
-                        fontSize: '10px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Actualiser
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    value={createForm.horodatage}
-                    onChange={(e) => setCreateForm({ ...createForm, horodatage: e.target.value })}
-                    className="font-sf"
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--color-surface-elevated)',
-                      border: '1px solid var(--color-border)',
-                      color: 'var(--color-text-primary)',
-                      fontSize: '13px',
-                      outline: 'none',
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Référence & Destinataire */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
-                    Référence *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={createForm.reference}
-                    onChange={(e) => setCreateForm({ ...createForm, reference: e.target.value })}
-                    className="font-sf"
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--color-surface-elevated)',
-                      border: '1px solid var(--color-border)',
-                      color: 'var(--color-accent)',
-                      fontWeight: 700,
-                      fontSize: '13px',
-                      outline: 'none',
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
-                    Destinataire *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Nom de l'organisme ou assujetti"
-                    value={createForm.destinataireNom}
-                    onChange={(e) => setCreateForm({ ...createForm, destinataireNom: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--color-surface-elevated)',
-                      border: '1px solid var(--color-border)',
-                      color: 'var(--color-text-primary)',
-                      fontSize: '13px',
-                      outline: 'none',
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Row 3: Objet de la demande */}
+            {/* Modal Form */}
+            <form onSubmit={handleCreateSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Champ 1 : Auteur de la demande */}
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
-                  Objet de la demande *
+                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Auteur de la demande
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={createForm.auteur}
+                  onChange={(e) => setCreateForm({ ...createForm, auteur: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-btn)',
+                    color: 'var(--color-text-primary)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Champ 2 : Destinataire */}
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Destinataire (Entreprise / Opérateur)
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex : CONGO MINING & CHEMICAL LOGISTICS SAS"
+                  value={createForm.destinataire}
+                  onChange={(e) => setCreateForm({ ...createForm, destinataire: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-btn)',
+                    color: 'var(--color-text-primary)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Champ 3 : Échéance */}
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Échéance légale de réponse
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={createForm.echeance}
+                  onChange={(e) => setCreateForm({ ...createForm, echeance: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-btn)',
+                    color: 'var(--color-text-primary)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Champ 4 : Objet de la demande */}
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Objet de la demande
                 </label>
                 <textarea
-                  rows={2}
+                  rows={3}
                   required
-                  placeholder="Objet et nature des pièces réquisitionnées..."
+                  placeholder="Précisez la nature des pièces requises..."
                   value={createForm.objet}
                   onChange={(e) => setCreateForm({ ...createForm, objet: e.target.value })}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
-                    borderRadius: '8px',
-                    backgroundColor: 'var(--color-surface-elevated)',
+                    fontSize: '12px',
+                    backgroundColor: 'var(--color-bg)',
                     border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-btn)',
                     color: 'var(--color-text-primary)',
-                    fontSize: '13px',
                     outline: 'none',
                     resize: 'vertical',
+                    fontFamily: 'inherit',
                   }}
                 />
               </div>
 
-              {/* Row 4: Base Légale & Échéance */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
-                    Cadre légal
-                  </label>
+              {/* Champ 5 : Fichier PDF */}
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Document PDF joint
+                </label>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '8px 12px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-btn)',
+                  }}
+                >
+                  <Upload size={14} color="var(--color-text-muted)" />
                   <input
-                    type="text"
-                    value={createForm.baseLegale}
-                    onChange={(e) => setCreateForm({ ...createForm, baseLegale: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--color-surface-elevated)',
-                      border: '1px solid var(--color-border)',
-                      color: 'var(--color-text-primary)',
-                      fontSize: '12px',
-                      outline: 'none',
-                    }}
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleFileChange}
+                    style={{ fontSize: '12px', color: 'var(--color-text-secondary)', flex: 1 }}
                   />
                 </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
-                    Échéance légale *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={createForm.echeanceReponse}
-                    onChange={(e) => setCreateForm({ ...createForm, echeanceReponse: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--color-surface-elevated)',
-                      border: '1px solid var(--color-border)',
-                      color: 'var(--color-text-primary)',
-                      fontSize: '13px',
-                      outline: 'none',
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Row 5: Pièces réquisitionnées */}
-              <div style={{ border: '1px solid var(--color-border)', borderRadius: '10px', padding: '14px', backgroundColor: 'var(--color-surface-elevated)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                    Pièces réquisitionnées ({createForm.elements.length})
-                  </label>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
-                  <button
-                    type="button"
-                    onClick={() => handleAddQuickSuggestion('Messages SWIFT MT103 authentifiés', 'Exercice 2025', 'Contrôle des règlements effectifs')}
-                    style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
-                  >
-                    + SWIFT MT103
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleAddQuickSuggestion('Relevés bancaires certifiés du compte USD', '6 derniers mois', 'Rapprochement comptable')}
-                    style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
-                  >
-                    + Relevés Bancaires
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleAddQuickSuggestion('Factures commerciales et fret maritime', 'Année 2025', 'Vérification valeur CIF')}
-                    style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
-                  >
-                    + Factures & Fret
-                  </button>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '140px', overflowY: 'auto', marginBottom: '10px' }}>
-                  {createForm.elements.map((el) => (
-                    <div
-                      key={el.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '6px 10px',
-                        borderRadius: '6px',
-                        backgroundColor: 'var(--color-surface)',
-                        border: '1px solid var(--color-border-subtle)',
-                        fontSize: '11px',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span className="font-sf" style={{ fontWeight: 700, color: 'var(--color-accent)' }}>
-                          {el.id}
-                        </span>
-                        <strong style={{ color: 'var(--color-text-primary)' }}>{el.libelle}</strong>
-                        <span style={{ color: 'var(--color-text-muted)' }}>({el.periodeConcernee})</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemovePieceFromForm(el.id)}
-                        style={{ background: 'transparent', border: 'none', color: 'var(--color-danger)', cursor: 'pointer' }}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr)) auto', gap: '8px' }}>
-                  <input
-                    type="text"
-                    placeholder="Libellé de la pièce..."
-                    value={newPieceLibelle}
-                    onChange={(e) => setNewPieceLibelle(e.target.value)}
-                    style={{
-                      padding: '7px 10px',
-                      borderRadius: '6px',
-                      backgroundColor: 'var(--color-surface)',
-                      border: '1px solid var(--color-border)',
-                      color: 'var(--color-text-primary)',
-                      fontSize: '11px',
-                      outline: 'none',
-                    }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Période (ex: 2025)"
-                    value={newPiecePeriode}
-                    onChange={(e) => setNewPiecePeriode(e.target.value)}
-                    style={{
-                      padding: '7px 10px',
-                      borderRadius: '6px',
-                      backgroundColor: 'var(--color-surface)',
-                      border: '1px solid var(--color-border)',
-                      color: 'var(--color-text-primary)',
-                      fontSize: '11px',
-                      outline: 'none',
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddPieceToForm}
-                    disabled={!newPieceLibelle.trim()}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '7px 12px',
-                      borderRadius: '6px',
-                      backgroundColor: newPieceLibelle.trim() ? 'var(--color-accent)' : 'var(--color-surface)',
-                      color: newPieceLibelle.trim() ? '#FFFFFF' : 'var(--color-text-muted)',
-                      border: '1px solid var(--color-border)',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      cursor: newPieceLibelle.trim() ? 'pointer' : 'not-allowed',
-                    }}
-                  >
-                    <Plus size={13} />
-                    <span>Ajouter</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Row 6: Upload PDF (Optionnel) */}
-              <div style={{ border: '1px dashed var(--color-border)', borderRadius: '10px', padding: '14px', backgroundColor: 'var(--color-surface)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Paperclip size={14} color="var(--color-accent)" />
-                    Document PDF de la réquisition <em>(Optionnel)</em>
-                  </label>
-                  {createForm.pdfFile && (
-                    <button
-                      type="button"
-                      onClick={() => setCreateForm({ ...createForm, pdfFile: null })}
-                      style={{ background: 'none', border: 'none', color: 'var(--color-danger)', fontSize: '11px', cursor: 'pointer' }}
-                    >
-                      Détacher
-                    </button>
-                  )}
-                </div>
-
-                {createForm.pdfFile ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', backgroundColor: 'var(--color-surface-elevated)', borderRadius: '8px' }}>
-                    <FileSpreadsheet size={18} color="var(--color-accent)" />
-                    <div style={{ fontSize: '12px' }}>
-                      <strong style={{ color: 'var(--color-text-primary)' }}>{createForm.pdfFile.name}</strong>
-                      <span style={{ color: 'var(--color-text-muted)', marginLeft: '6px' }}>({createForm.pdfFile.size})</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCreateForm((prev) => ({
-                          ...prev,
-                          pdfFile: {
-                            name: 'Demande_Communication_Art46_2026.pdf',
-                            size: '1.2 Mo',
-                          },
-                        }));
-                      }}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        backgroundColor: 'var(--color-surface-elevated)',
-                        border: '1px solid var(--color-border)',
-                        color: 'var(--color-accent)',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                      }}
-                    >
-                      <Upload size={12} />
-                      <span>Charger PDF scanné</span>
-                    </button>
+                {createForm.pdfFile && (
+                  <div style={{ fontSize: '11px', color: 'var(--color-success)', marginTop: '4px' }}>
+                    Document prêt : {createForm.pdfFile.name} ({createForm.pdfFile.size})
                   </div>
                 )}
               </div>
 
-              {/* Form Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+              {/* Boutons d'action du formulaire */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
                 <button
                   type="button"
+                  className="btn-ghost"
                   onClick={() => setShowCreateModal(false)}
-                  className="btn-secondary"
                 >
                   Annuler
                 </button>
-                <button
-                  type="submit"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '9px 18px',
-                    borderRadius: 'var(--radius-btn)',
-                    backgroundColor: 'var(--color-accent)',
-                    color: '#FFFFFF',
-                    fontWeight: 700,
-                    fontSize: '12px',
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Send size={14} />
-                  <span>Créer la demande de communication</span>
+                <button type="submit" className="btn-primary">
+                  Créer la demande
                 </button>
               </div>
             </form>
@@ -1143,425 +1331,414 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
         </div>
       )}
 
-      {/* ======================================================== */}
-      {/* 4. MODAL : DÉTAIL D'UNE DEMANDE DE COMMUNICATION */}
-      {/* ======================================================== */}
-      {selectedDemande && (
+      {/* =========================================================================
+          MODALE DE CRÉATION : FEUILLE D'OBSERVATION (STRICTEMENT 5 CHAMPS)
+          1. Inspecteur vérificateur
+          2. Destinataire ou entreprise cible
+          3. Audition contradictoire prévue
+          4. Objet du contrôle
+          5. Document PDF joint
+          ========================================================================= */}
+      {showFeuilleModal && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.65)',
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 110,
-            backdropFilter: 'blur(4px)',
+            zIndex: 1000,
             padding: '20px',
           }}
         >
           <div
             style={{
               backgroundColor: 'var(--color-surface)',
-              borderRadius: '16px',
-              padding: '24px',
+              borderRadius: 'var(--radius-card)',
+              border: '1px solid var(--color-border)',
               width: '100%',
-              maxWidth: '720px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
+              maxWidth: '560px',
+              overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
             }}
           >
             {/* Modal Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <div className="font-sf" style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-accent)' }}>
-                  {selectedDemande.reference}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                  Destinataire : <strong>{selectedDemande.destinataire.nom}</strong>
-                </div>
-              </div>
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid var(--color-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
+                Créer une Feuille d'Observation
+              </h2>
               <button
-                onClick={() => setSelectedDemande(null)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}
+                type="button"
+                className="btn-ghost"
+                onClick={() => setShowFeuilleModal(false)}
+                style={{ padding: '4px' }}
               >
-                <X size={20} />
+                <X size={16} />
               </button>
             </div>
 
-            {/* Metadata Summary */}
+            {/* Modal Form */}
+            <form onSubmit={handleFeuilleSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Champ 1 : Inspecteur vérificateur */}
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Inspecteur vérificateur
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={feuilleForm.inspecteur}
+                  onChange={(e) => setFeuilleForm({ ...feuilleForm, inspecteur: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-btn)',
+                    color: 'var(--color-text-primary)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Champ 2 : Destinataire */}
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Destinataire ou entreprise cible
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={feuilleForm.destinataire}
+                  onChange={(e) => setFeuilleForm({ ...feuilleForm, destinataire: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-btn)',
+                    color: 'var(--color-text-primary)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Champ 3 : Date d'audition contradictoire */}
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Audition contradictoire prévue (Date)
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={feuilleForm.auditionPrevue}
+                  onChange={(e) => setFeuilleForm({ ...feuilleForm, auditionPrevue: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-btn)',
+                    color: 'var(--color-text-primary)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Champ 4 : Objet du contrôle */}
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Objet du contrôle
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={feuilleForm.objet}
+                  onChange={(e) => setFeuilleForm({ ...feuilleForm, objet: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-btn)',
+                    color: 'var(--color-text-primary)',
+                    outline: 'none',
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+
+              {/* Champ 5 : Fichier PDF */}
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Document PDF des observations notifiées
+                </label>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '8px 12px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-btn)',
+                  }}
+                >
+                  <Upload size={14} color="var(--color-text-muted)" />
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleFeuilleFileChange}
+                    style={{ fontSize: '12px', color: 'var(--color-text-secondary)', flex: 1 }}
+                  />
+                </div>
+                {feuilleForm.pdfFile && (
+                  <div style={{ fontSize: '11px', color: 'var(--color-success)', marginTop: '4px' }}>
+                    Document prêt : {feuilleForm.pdfFile.name} ({feuilleForm.pdfFile.size})
+                  </div>
+                )}
+              </div>
+
+              {/* Boutons d'action du formulaire */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setShowFeuilleModal(false)}
+                >
+                  Annuler
+                </button>
+                <button type="submit" className="btn-primary">
+                  Créer la feuille d’observation
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODALE : ENREGISTRER LA RÉPONSE DE L'OPÉRATEUR (STRICTEMENT 5 CHAMPS)
+          1. Fichier PDF de la réponse
+          2. Date de réception
+          3. Référence du courrier opérateur
+          4. Signataire / Représentant
+          5. Observations de l'enquêteur
+          ========================================================================= */}
+      {showReponseModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              borderRadius: 'var(--radius-card)',
+              border: '1px solid var(--color-border)',
+              width: '100%',
+              maxWidth: '560px',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: 'var(--shadow-modal)',
+            }}
+          >
             <div
               style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                gap: '10px',
-                padding: '12px',
-                borderRadius: '8px',
-                backgroundColor: 'var(--color-surface-elevated)',
-                fontSize: '12px',
+                padding: '16px 20px',
+                borderBottom: '1px solid var(--color-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
               }}
             >
               <div>
-                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', display: 'block' }}>Auteur :</span>
-                <strong>{selectedDemande.auteur || selectedDemande.redacteur}</strong>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>
+                  Enregistrer la réponse à la demande de communication
+                </h3>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                  Téléversement des pièces justificatives transmises par l'opérateur
+                </div>
               </div>
-              <div>
-                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', display: 'block' }}>Horodatage :</span>
-                <span className="font-sf">{selectedDemande.horodatage || selectedDemande.dateEmission}</span>
-              </div>
-              <div>
-                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', display: 'block' }}>Échéance légale :</span>
-                <span className="font-sf" style={{ color: 'var(--color-danger)', fontWeight: 700 }}>
-                  {selectedDemande.echeanceReponse}
-                </span>
-              </div>
-              <div>
-                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', display: 'block' }}>Statut :</span>
-                <span style={{ color: getStatusBadge(selectedDemande).color, fontWeight: 700 }}>
-                  {getStatusBadge(selectedDemande).label}
-                </span>
-              </div>
-            </div>
-
-            {/* Objet */}
-            <div style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>
-              <strong>Objet :</strong> {selectedDemande.objet}
-            </div>
-
-            {/* Evaluation Toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)', flexWrap: 'wrap', gap: '8px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                Évaluation de la conformité :
-              </span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => handleUpdateEvaluation(selectedDemande.id, 'SATISFAISANTE')}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    border: selectedDemande.evaluationReponse === 'SATISFAISANTE' ? '2px solid var(--color-success)' : '1px solid var(--color-border)',
-                    backgroundColor: selectedDemande.evaluationReponse === 'SATISFAISANTE' ? 'var(--color-success-surface)' : 'transparent',
-                    color: selectedDemande.evaluationReponse === 'SATISFAISANTE' ? 'var(--color-success)' : 'var(--color-text-secondary)',
-                    fontWeight: 600,
-                    fontSize: '11px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  🟢 Réponse satisfaisante
-                </button>
-                <button
-                  onClick={() => handleUpdateEvaluation(selectedDemande.id, 'NON_SATISFAISANTE')}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    border: selectedDemande.evaluationReponse === 'NON_SATISFAISANTE' ? '2px solid var(--color-danger)' : '1px solid var(--color-border)',
-                    backgroundColor: selectedDemande.evaluationReponse === 'NON_SATISFAISANTE' ? 'var(--color-danger-surface)' : 'transparent',
-                    color: selectedDemande.evaluationReponse === 'NON_SATISFAISANTE' ? 'var(--color-danger)' : 'var(--color-text-secondary)',
-                    fontWeight: 600,
-                    fontSize: '11px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  🔴 Réponse non satisfaisante
-                </button>
-              </div>
-            </div>
-
-            {/* Actions if Non Satisfaisante */}
-            {selectedDemande.evaluationReponse === 'NON_SATISFAISANTE' && (
-              <div
-                style={{
-                  padding: '12px',
-                  borderRadius: '8px',
-                  backgroundColor: 'var(--color-danger-surface)',
-                  border: '1px solid rgba(212, 90, 86, 0.3)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  flexWrap: 'wrap',
-                }}
-              >
-                <button
-                  onClick={() => setShowPvConstatModal(true)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    backgroundColor: 'var(--color-danger)',
-                    color: '#FFFFFF',
-                    fontWeight: 600,
-                    fontSize: '11px',
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <ShieldAlert size={13} />
-                  <span>Lancer un PV de constat</span>
-                </button>
-
-                <button
-                  onClick={() => setShowMissionModal(true)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    backgroundColor: 'var(--color-surface)',
-                    color: 'var(--color-text-primary)',
-                    fontWeight: 600,
-                    fontSize: '11px',
-                    border: '1px solid var(--color-border)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Building2 size={13} />
-                  <span>Lancer une mission sur place</span>
-                </button>
-
-                {onGoToFeuilleObservation && (
-                  <button
-                    onClick={() => {
-                      setSelectedDemande(null);
-                      onGoToFeuilleObservation();
-                    }}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '6px 10px',
-                      borderRadius: '6px',
-                      backgroundColor: 'transparent',
-                      color: 'var(--color-accent)',
-                      fontWeight: 600,
-                      fontSize: '11px',
-                      border: '1px solid var(--color-accent)',
-                      cursor: 'pointer',
-                      marginLeft: 'auto',
-                    }}
-                  >
-                    <span>Formaliser feuille d’observation</span>
-                    <ChevronRight size={12} />
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Pièces réquisitionnées Table */}
-            <div>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '6px' }}>
-                Pièces réquisitionnées ({selectedDemande.elementsDemandes.length})
-              </div>
-              <div style={{ overflowX: 'auto', border: '1px solid var(--color-border)', borderRadius: '8px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: 'var(--color-surface-elevated)', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-                      <th style={{ padding: '8px 10px' }}>Réf.</th>
-                      <th style={{ padding: '8px 10px' }}>Libellé</th>
-                      <th style={{ padding: '8px 10px' }}>Période</th>
-                      <th style={{ padding: '8px 10px' }}>Statut</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedDemande.elementsDemandes.map((el) => (
-                      <tr key={el.id} style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
-                        <td className="font-sf" style={{ padding: '8px 10px', fontWeight: 700, color: 'var(--color-accent)' }}>
-                          {el.id}
-                        </td>
-                        <td style={{ padding: '8px 10px', color: 'var(--color-text-primary)' }}>
-                          {el.libelle}
-                        </td>
-                        <td style={{ padding: '8px 10px', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
-                          {el.periodeConcernee}
-                        </td>
-                        <td style={{ padding: '8px 10px' }}>
-                          <select
-                            value={el.statutRemise}
-                            onChange={(e) =>
-                              handleToggleItemStatus(
-                                selectedDemande.id,
-                                el.id,
-                                e.target.value as ElementDemande['statutRemise']
-                              )
-                            }
-                            style={{
-                              padding: '3px 6px',
-                              borderRadius: '4px',
-                              fontSize: '10px',
-                              fontWeight: 600,
-                              backgroundColor: 'var(--color-surface-elevated)',
-                              color: 'var(--color-text-primary)',
-                              border: '1px solid var(--color-border)',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <option value="FOURNI">Fourni</option>
-                            <option value="EN_ATTENTE">En attente</option>
-                            <option value="INCOMPLET">Incomplet</option>
-                            <option value="MANQUANT">Manquant</option>
-                          </select>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '8px', borderTop: '1px solid var(--color-border)' }}>
               <button
                 type="button"
-                onClick={() => setSelectedDemande(null)}
-                className="btn-secondary"
-              >
-                Fermer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* 5. MODAL : PROCÈS-VERBAL DE CONSTAT */}
-      {/* ======================================================== */}
-      {showPvConstatModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.65)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 120,
-            backdropFilter: 'blur(4px)',
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: '16px',
-              padding: '24px',
-              width: '100%',
-              maxWidth: '520px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-danger)', margin: 0 }}>
-                Procès-Verbal de Constat (Art. 46 CD)
-              </h3>
-              <button
-                onClick={() => setShowPvConstatModal(false)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div style={{ backgroundColor: 'var(--color-surface-elevated)', padding: '12px', borderRadius: '8px', fontSize: '12px', lineHeight: 1.5 }}>
-              <div><strong>Référence :</strong> <span className="font-sf">PV-CONST/2026/DRK/019</span></div>
-              <div><strong>Infraction :</strong> Défaut de communication de pièces comptables obligatoires.</div>
-              <div><strong>Amende légale :</strong> 5 000 USD</div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button type="button" onClick={() => setShowPvConstatModal(false)} className="btn-secondary">
-                Annuler
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (selectedDemande) {
-                    handleUpdateEvaluation(selectedDemande.id, 'NON_SATISFAISANTE');
-                  }
-                  setShowPvConstatModal(false);
-                }}
+                onClick={() => setShowReponseModal(false)}
                 style={{
-                  padding: '7px 14px',
-                  borderRadius: 'var(--radius-btn)',
-                  backgroundColor: 'var(--color-danger)',
-                  color: '#FFFFFF',
-                  fontWeight: 600,
-                  fontSize: '12px',
+                  background: 'none',
                   border: 'none',
+                  color: 'var(--color-text-muted)',
                   cursor: 'pointer',
+                  padding: '4px',
                 }}
               >
-                Certifier le PV
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* 6. MODAL : MISSION DE CONTRÔLE SUR PLACE */}
-      {/* ======================================================== */}
-      {showMissionModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.65)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 120,
-            backdropFilter: 'blur(4px)',
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: '16px',
-              padding: '24px',
-              width: '100%',
-              maxWidth: '520px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>
-                Mission de Contrôle sur Place
-              </h3>
-              <button
-                onClick={() => setShowMissionModal(false)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}
-              >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            <div style={{ backgroundColor: 'var(--color-surface-elevated)', padding: '12px', borderRadius: '8px', fontSize: '12px', lineHeight: 1.5 }}>
-              <div><strong>Ordre de mission :</strong> <span className="font-sf">OM-2026/DRK/DIR-ENQ/084</span></div>
-              <div><strong>Cible :</strong> {selectedDemande?.destinataire.nom}</div>
-              <div><strong>Durée :</strong> 7 jours ouvrables</div>
-            </div>
+            <form onSubmit={handleReponseSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Champ 1 : Fichier PDF */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                  Fichier PDF de la réponse transmise *
+                </label>
+                <div
+                  style={{
+                    border: '1px dashed var(--color-border)',
+                    borderRadius: '6px',
+                    padding: '14px',
+                    textAlign: 'center',
+                    backgroundColor: 'var(--color-bg)',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => document.getElementById('file-upload-reponse')?.click()}
+                >
+                  <input
+                    id="file-upload-reponse"
+                    type="file"
+                    accept=".pdf"
+                    style={{ display: 'none' }}
+                    onChange={handleReponseFileChange}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                    <Upload size={18} color="var(--color-accent)" />
+                    <span style={{ fontSize: '12px', color: 'var(--color-text-primary)', fontWeight: 500 }}>
+                      {reponseForm.pdfFile ? reponseForm.pdfFile.name : 'Sélectionner le PDF de la réponse'}
+                    </span>
+                    <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
+                      {reponseForm.pdfFile ? reponseForm.pdfFile.size : 'Format PDF certifié (max 25 Mo)'}
+                    </span>
+                  </div>
+                </div>
+              </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button type="button" onClick={() => setShowMissionModal(false)} className="btn-secondary">
-                Annuler
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowMissionModal(false)}
-                className="btn-primary"
-              >
-                Valider l'Ordre de Mission
-              </button>
-            </div>
+              {/* Champ 2 : Date de réception */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                  Date de réception *
+                </label>
+                <input
+                  type="date"
+                  value={reponseForm.dateReception}
+                  onChange={(e) => setReponseForm((prev) => ({ ...prev, dateReception: e.target.value }))}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '13px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '6px',
+                    color: 'var(--color-text-primary)',
+                  }}
+                />
+              </div>
+
+              {/* Champ 3 : Référence du courrier opérateur */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                  Référence du courrier de l'opérateur
+                </label>
+                <input
+                  type="text"
+                  value={reponseForm.reference}
+                  onChange={(e) => setReponseForm((prev) => ({ ...prev, reference: e.target.value }))}
+                  placeholder="Ex : CMCL/DIR/CONF/2026/042"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '13px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '6px',
+                    color: 'var(--color-text-primary)',
+                  }}
+                />
+              </div>
+
+              {/* Champ 4 : Auteur / Représentant */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                  Auteur ou représentant de l'entreprise
+                </label>
+                <input
+                  type="text"
+                  value={reponseForm.auteur}
+                  onChange={(e) => setReponseForm((prev) => ({ ...prev, auteur: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '13px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '6px',
+                    color: 'var(--color-text-primary)',
+                  }}
+                />
+              </div>
+
+              {/* Champ 5 : Observations de l'inspecteur */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+                  Observations préliminaires de l'inspecteur
+                </label>
+                <textarea
+                  value={reponseForm.commentaire}
+                  onChange={(e) => setReponseForm((prev) => ({ ...prev, commentaire: e.target.value }))}
+                  rows={2}
+                  placeholder="Ex : Transmission des pièces comptables et manifestes demandés..."
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: '13px',
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '6px',
+                    color: 'var(--color-text-primary)',
+                    resize: 'vertical',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowReponseModal(false)}
+                  style={{ fontSize: '12px' }}
+                >
+                  Annuler
+                </button>
+                <button type="submit" className="btn-primary" style={{ fontSize: '12px' }}>
+                  <Upload size={13} />
+                  <span>Enregistrer la réponse</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

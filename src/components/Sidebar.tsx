@@ -61,6 +61,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Rapports & Stats',
       icon: <BarChart3 size={18} strokeWidth={1.8} />,
     },
+    // {
+    //   id: 'components',
+    //   label: 'Lab Tableaux UX',
+    //   icon: <Table size={18} strokeWidth={1.8} />,
+    // },
     {
       id: 'parametres',
       label: 'Paramètres',
@@ -74,6 +79,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Mon travail',
       icon: <Briefcase size={18} strokeWidth={1.8} />,
     },
+    // {
+    //   id: 'components',
+    //   label: 'Lab Tableaux UX',
+    //   icon: <Table size={18} strokeWidth={1.8} />,
+    // },
     {
       id: 'renseignements',
       label: 'Renseignements',

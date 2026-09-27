@@ -168,7 +168,7 @@ export const ParametresView: React.FC<ParametresViewProps> = ({
             <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'block' }}>
               Matricule DGDA
             </label>
-            <div className="font-sf" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-accent)', marginTop: '4px' }}>
+            <div className=" " style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-accent)', marginTop: '4px' }}>
               {user.matricule}
             </div>
           </div>

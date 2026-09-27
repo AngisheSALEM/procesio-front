@@ -1,232 +1,222 @@
 /* ==========================================================================
-   PROCEZO — SYSTÈME DE DESIGN & CHARTE GRAPHIQUE OFFICIELLE (DGDA)
+   PROCEZO — PALETTE 1 : APPLE MODERN (Stickdazzle)
+   Swatches sources : #F5F5F7 | #1D1D1F | #AAAAAA | #007AFF
    ==========================================================================
    Règles fondamentales :
-   - Règle 60-30-10 : 60% Fond/Surfaces sombres, 30% Typographie/Structure, 10% Accents
-   - Zéro ombre portée (box-shadow: none) : La hiérarchie repose sur le contraste des surfaces
-   - Zéro bordure artificielle sur les cartes : Épure et lisibilité opérationnelle
-   - Contraste WCAG 2.1 AA garanti pour le travail des inspecteurs et vérificateurs
+   - Règle 60-30-10 : 60% Fond/Surfaces, 30% Typographie/Structure, 10% Accents
+   - Zéro ombre portée (box-shadow: none) : Profondeur par contraste de surface
+   - Zéro bordure artificielle sur les cartes : Clarté opérationnelle
+   - Contraste WCAG 2.1 AA garanti
    ========================================================================== */
+
+/* --- TYPOGRAPHIE OFFICIELLE APPLE SF PRO (Extraite de SF-Pro.dmg) --- */
+@font-face {
+  font-family: 'SF Pro Display';
+  src: local('SF Pro Display'), local('SFProDisplay'), url('/fonts/SF-Pro-Display-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Display';
+  src: local('SF Pro Display Medium'), local('SFProDisplay-Medium'), url('/fonts/SF-Pro-Display-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Display';
+  src: local('SF Pro Display Semibold'), local('SFProDisplay-Semibold'), url('/fonts/SF-Pro-Display-Semibold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Display';
+  src: local('SF Pro Display Bold'), local('SFProDisplay-Bold'), url('/fonts/SF-Pro-Display-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SF Pro Text';
+  src: local('SF Pro Text'), local('SFProText'), url('/fonts/SF-Pro-Text-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Text';
+  src: local('SF Pro Text Medium'), local('SFProText-Medium'), url('/fonts/SF-Pro-Text-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Text';
+  src: local('SF Pro Text Semibold'), local('SFProText-Semibold'), url('/fonts/SF-Pro-Text-Semibold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SF Pro Text';
+  src: local('SF Pro Text Bold'), local('SFProText-Bold'), url('/fonts/SF-Pro-Text-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'SF Pro';
+  src: local('SF Pro'), local('SFPro'), url('/fonts/SF-Pro.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   /* ========================================================================
-     1. THÈME SOMBRE PAR DÉFAUT (Midnight Slate / Noir Obsidienne DGDA)
+     1. THÈME SOMBRE — APPLE MODERN DARK (#1D1D1F Titanite)
      ======================================================================== */
 
-  /* --- FONDS ET SURFACES (Structure d'arrière-plan de l'application) --- */
-
-  /* Fond principal de toute l'application (body, arrière-plan global de l'écran) */
-  --color-bg: #13191E;
-
-  /* Fond en retrait plus profond : barre latérale (sidebar), rail de navigation, piste de défilement */
-  --color-bg-deep: #1C2A36;
-
-  /* Surface standard : fond des panneaux principaux, conteneurs, modales de dialogue, tableau de données */
-  --color-surface:#1C2A36;
-
-  /* Surface surélevée : fond des champs de formulaire (inputs), cartes interactives, survol de lignes de tableau */
-  --color-surface-elevated: #4B5966;
-
-  /* Surface atténuée : arrière-plan des en-têtes de tableau (thead), badges neutres, zones désactivées */
-  --color-surface-muted: #1C2A36;
-
+  /* --- FONDS ET SURFACES --- */
+  --color-bg: #1D1D1F;
+  --color-bg-deep: #161618;
+  --color-surface: #242426;
+  --color-surface-elevated: #2F2F32;
+  --color-surface-muted: #28282B;
 
   /* --- BORDURES ET SÉPARATEURS --- */
-
-  /* Bordure principale : délimitation des inputs, bordure inférieure des lignes de tableau, séparateurs de panneaux */
-  --color-border: #3D3C44;
-
-  /* Bordure discrète : séparateurs internes légers entre sections secondaires */
-  --color-border-subtle: #2E2D33;
-
+  --color-border: #38383B;
+  --color-border-subtle: #2B2B2E;
 
   /* --- TYPOGRAPHIE ET NIVEAUX DE TEXTE --- */
+  --color-text-primary: #F5F5F7;
+  --color-text-secondary: #D1D1D6;
+  --color-text-muted: #8E8E93;
+  --color-text-disabled: #636366;
 
-  /* Texte primaire : niveau de contraste maximal pour les titres majeurs, références officielles et valeurs clés */
-  --color-text-primary: #F6F8F8;
+  /* --- COULEUR D'ACCENTUATION (Apple System Blue #007AFF) --- */
+  --color-accent: #007AFF;
+  --color-accent-hover: #1A88FF;
+  --color-accent-pressed: #0062CC;
+  --color-on-accent: #FFFFFF;
 
-  /* Texte secondaire : libellés des champs (labels), sous-titres, texte de corps, noms de colonnes */
-  --color-text-secondary: #EDF1F1;
+  /* --- COULEURS SÉMANTIQUES (Apple Dark Spectrum) --- */
+  --color-info: #64D2FF;
+  --color-info-surface: #142938;
 
-  /* Texte atténué : horodatages certifiés, identifiants secondaires, métadonnées, textes d'aide */
-  --color-text-muted:#B5C4CC;
+  --color-success: #30D158;
+  --color-success-surface: #152E1D;
 
-  /* Texte désactivé : éléments non modifiables ou actions temporairement indisponibles */
-  --color-text-disabled: #736f6b;
+  --color-warning: #FFD60A;
+  --color-warning-surface: #332B10;
 
-
-  /* --- COULEUR D'ACCENTUATION ET D'ACTION (Identité Procezo / DGDA) --- */
-
-  /* Accent principal : bouton d'action principale ("Nouveau dossier", "+ Nouvelle tâche"), onglet actif, focus */
-  --color-accent: #4aa9e4;
-
-  /* Accent au survol (hover) : retour visuel lors du passage de la souris sur un bouton ou lien d'action */
-  --color-accent-hover: #4aa9e4;
-
-  /* Accent à l'enfoncement (active/pressed) : retour visuel lors du clic sur le bouton */
-  --color-accent-pressed: #4aa9e4;
-
-  /* Couleur du texte/icône SUR le fond d'accentuation (garantit la lisibilité sur fond bleu d'accent) */
-  --color-on-accent: #222126;
-
-
-  /* --- COULEURS SÉMANTIQUES MÉTIER (Statuts, Alertes et Échéances) --- */
-
-  /* Information / Instruction douanière : texte et icônes d'information neutre */
-  --color-info: #7094B0;
-  /* Fond teinté du badge d'information */
-  --color-info-surface: #1C2A36;
-
-  /* Succès / Validation : dossier clôturé conforme, tâche terminée (case cochée), délai respecté */
-  --color-success: #6FA982;
-  /* Fond teinté du badge de succès */
-  --color-success-surface: #1A2E22;
-
-  /* Avertissement / Attention : échéance proche, dossier "En attente", tâche urgente, signalement moyen */
-  --color-warning: #E4B74A;
-  /* Fond teinté du badge d'avertissement */
-  --color-warning-surface: #332814;
-
-  /* Danger / Alerte critique : délai légal dépassé, anomalie grave, discordance majeure SYDONIA, blocage */
-  --color-danger: #D45A56;
-  /* Fond teinté du badge d'alerte critique */
-  --color-danger-surface: #381D1D;
-
+  --color-danger: #FF453A;
+  --color-danger-surface: #381917;
 
   /* --- TYPOGRAPHIE SYSTÈME --- */
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-sf: "SF Mono", "JetBrains Mono", Menlo, Consolas, Monaco, monospace;
+  --font-sans: "SF Pro Text", "SF Pro Display", "SF Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sf: "SF Mono", Menlo, Consolas, Monaco, monospace;
 
+  /* --- RAYONS DE COURBURE --- */
+  --radius-sm: 4px;
+  --radius-btn: 8px;
+  --radius-card: 12px;
+  --radius-badge: 999px;
 
-  /* --- RAYONS DE COURBURE (Arrondis) --- */
-  --radius-sm: 4px;       /* Petits indicateurs, pouces de barre de défilement */
-  --radius-btn: 6px;      /* Boutons d'action */
-  --radius-card: 8px;     /* Cartes et panneaux */
-  --radius-badge: 999px;  /* Badges et pilules de statut */
-
-
-  /* --- MICRO-INTERACTIONS (Transitions fluides) --- */
+  /* --- MICRO-INTERACTIONS --- */
   --transition-fast: 150ms ease;
   --transition-normal: 200ms ease;
 
-
-  /* --- EFFETS TRANSLUCIDES (Verre givré / Liquid glass pour en-têtes flottants) --- */
-  --glass-bg:#1C2A36;
-  --glass-surface: #4B5966;
-  --glass-border: #0d0d0d01;
-  --glass-border-focus: rgba(40, 84, 121, 0.45);
-  --glass-blur: blur(24px) saturate(160%);
+  /* --- EFFETS TRANSLUCIDES (Liquid Glass Apple) --- */
+  --glass-bg: rgba(29, 29, 31, 0.82);
+  --glass-surface: rgba(47, 47, 50, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-focus: rgba(0, 122, 255, 0.45);
+  --glass-blur: blur(24px) saturate(180%);
 }
-
 
 /* ==========================================================================
-   2. THÈME CLAIR MONOCHROMATIQUE (Palette : #839292, #B8C7C7, #EFFFFF, #EDF1F1, #FFFFFF)
+   2. THÈME CLAIR — APPLE MODERN LIGHT (#F5F5F7 Clean Canvas)
    ========================================================================== */
-
 [data-theme="light"] {
-  /* --- FONDS ET SURFACES DE LA PALETTE MONOCHROMATIQUE --- */
-
-  /* Fond principal de l'application : Cyan glacier très clair (#EFFFFF) */
-  --color-bg: #F6F8F8;
-
-  /* Fond en retrait (sidebar / rails / barre latérale) : Blanc givré doux (#EDF1F1) */
-  --color-bg-deep: #EDF1F1;
-
-  /* Surface standard (panneaux, tableaux, conteneurs, modales) : Blanc pur (#FFFFFF) */
-  --color-surface: #EDF1F1;
-
-  /* Surface surélevée (inputs, cartes interactives, survol de lignes) : Blanc givré (#EDF1F1) */
-  --color-surface-elevated: ;
-
-  /* Surface atténuée (en-têtes thead, badges neutres) : Glacier pâle (#EFFFFF) */
-  --color-surface-muted: #EDF1F1;
-
+  /* --- FONDS ET SURFACES --- */
+  --color-bg: #F5F5F7;
+  --color-bg-deep: #EBEBED;
+  --color-surface: #FFFFFF;
+  --color-surface-elevated: #F0F0F2;
+  --color-surface-muted: #EAEAEF;
 
   /* --- BORDURES ET SÉPARATEURS --- */
+  --color-border: #D2D2D7;
+  --color-border-subtle: #E5E5EA;
 
-  /* Bordure principale : Ardoise cyan douce (#B8C7C7) */
-  --color-border: #B8C7C7;
+  /* --- TYPOGRAPHIE ET NIVEAUX DE TEXTE --- */
+  --color-text-primary: #1D1D1F;
+  --color-text-secondary: #424245;
+  --color-text-muted: #86868B;
+  --color-text-disabled: #AAAAAA;
 
-  /* Bordure subtile : Ardoise cyan translucide (#B8C7C7 à 45%) */
-  --color-border-subtle: rgba(184, 199, 199, 0.45);
-
-
-  /* --- TYPOGRAPHIE HAUTE LISIBILITÉ (Conservée intacte sans modification) --- */
-
-  /* Texte primaire : Noir absolu pour contraste maximal */
-  --color-text-primary: #000000;
-
-  /* Texte secondaire : Charbon très sombre pour sous-titres, libellés et headers */
-  --color-text-secondary: #171E1E;
-
-  /* Texte atténué : Ardoise chaude pour horodatages, NIF, métadonnées */
-  --color-text-muted: #434B4B;
-
-  /* Texte désactivé : Ardoise claire pour éléments inactifs */
-  --color-text-disabled: #757E7E;
-
-
-  /* --- ACCENTUATION MONOCHROME ÉLÉGANTE --- */
-
-  /* Accent principal : Ardoise minérale sauge (#839292) pour boutons et sélecteurs */
-  --color-accent: #2976AD;
-
-  /* Accent au survol (hover) : Ardoise minérale foncée (#718080) */
-  --color-accent-hover: #2976AD;
-
-  /* Accent enfoncé (active) : Ardoise minérale dense (#5E6C6C) */
-  --color-accent-pressed: #2976AD;
-
-  /* Texte sur bouton accentué : Blanc pur (#FFFFFF) garantissant le contraste */
+  /* --- COULEUR D'ACCENTUATION --- */
+  --color-accent: #007AFF;
+  --color-accent-hover: #0066D6;
+  --color-accent-pressed: #0051B3;
   --color-on-accent: #FFFFFF;
 
+  /* --- COULEURS SÉMANTIQUES (Apple Light Spectrum) --- */
+  --color-info: #007AFF;
+  --color-info-surface: #EBF5FF;
 
-  /* --- COULEURS SÉMANTIQUES (Harmonisées aux tons minéraux et glacier) --- */
+  --color-success: #34C759;
+  --color-success-surface: #EBF9EE;
 
-  /* Information / Instruction douanière */
-  --color-info: #5B7285;
-  --color-info-surface: #EBF1F5;
+  --color-warning: #FF9500;
+  --color-warning-surface: #FFF7EB;
 
-  /* Succès / Validation (Vert sauge minéral) */
-  --color-success: #4E7B5C;
-  --color-success-surface: #ECF4EF;
+  --color-danger: #FF3B30;
+  --color-danger-surface: #FFECEB;
 
-  /* Avertissement / Attention (Ocre minéral) */
-  --color-warning: #947124;
-  --color-warning-surface: #FAF4E8;
-
-  /* Danger / Alerte critique (Brique minérale) */
-  --color-danger: #A83E3A;
-  --color-danger-surface: #FAEBEB;
-
-
-  /* --- EFFETS TRANSLUCIDES (Verre givré clair minéral) --- */
-  --glass-bg: #EDF1F1;
+  /* --- EFFETS TRANSLUCIDES --- */
+  --glass-bg: rgba(245, 245, 247, 0.85);
   --glass-surface: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(184, 199, 199, 0.50);
-  --glass-border-focus: rgba(131, 146, 146, 0.55);
-  --glass-blur: blur(24px) saturate(140%);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-border-focus: rgba(0, 122, 255, 0.35);
+  --glass-blur: blur(24px) saturate(180%);
 }
-
 
 /* ==========================================================================
    3. RÈGLES STRUCTURELLES GLOBALES ET NORMALISATION
    ========================================================================== */
-
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-body {
+html, body {
   font-family: var(--font-sans);
   background-color: var(--color-bg);
   color: var(--color-text-primary);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   min-height: 100vh;
+}
+
+/* Forcer l'héritage de la police SF Pro sur tous les contrôles interactifs */
+button, input, select, textarea, optgroup {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: "SF Pro Display", var(--font-sans);
+  letter-spacing: -0.015em;
 }
 
 /* Règle DGDA : Zéro ombre portée pour une interface épurée et sans distraction */
@@ -239,14 +229,13 @@ button, .card, .panel, .modal, .badge, input, select, textarea {
   border: none !important;
 }
 
-/* Police à chasse fixe (Monospace) pour références DGDA, numéros de déclaration et horodatages */
+/* Police à chiffres tabulaires certifiée SF */
 .font-sf {
-  font-family: var(--font-sf);
-  font-feature-settings: "tnum" on, "lnum" on;
-  
+  font-family: "SF Pro Text", var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
-/* Barres de défilement discrètes et intégrées au thème */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -265,13 +254,11 @@ button, .card, .panel, .modal, .badge, input, select, textarea {
   background: var(--color-text-muted);
 }
 
-/* Anneaux de focus pour l'accessibilité au clavier (Norme WCAG 2.1 AA) */
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 2px solid var(--color-accent) !important;
   outline-offset: 2px !important;
 }
 
-/* Cartes et lignes interactives avec micro-interaction au survol */
 .card-interactive {
   transition: background-color var(--transition-fast), transform var(--transition-fast);
   cursor: pointer;
@@ -287,13 +274,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* ==========================================================================
    4. HIÉRARCHIE DES BOUTONS
    ========================================================================== */
-
-/* Bouton principal : Action clé (ex: "Nouveau dossier", "Enregistrer") */
 .btn-primary {
   background-color: var(--color-accent);
   color: var(--color-on-accent);
   border: none;
-  font-weight: 600;
+  font-weight: 500;
   border-radius: var(--radius-btn);
   padding: 8px 16px;
   font-size: 12px;
@@ -311,12 +296,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   transform: scale(0.98);
 }
 
-/* Bouton secondaire : Action de support (ex: "Annuler", "Filtres") */
 .btn-secondary {
   background-color: var(--color-surface-elevated);
   color: var(--color-text-primary);
   border: none;
-  font-weight: 500;
+  font-weight: 400;
   border-radius: var(--radius-btn);
   padding: 8px 16px;
   font-size: 12px;
@@ -333,12 +317,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   transform: scale(0.98);
 }
 
-/* Bouton fantôme / transparent : Actions discrètes ou de navigation */
 .btn-ghost {
   background: transparent;
   color: var(--color-text-secondary);
   border: none;
-  font-weight: 500;
+  font-weight: 400;
   border-radius: var(--radius-btn);
   padding: 6px 12px;
   font-size: 12px;
@@ -354,9 +337,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 /* ==========================================================================
-   5. PILULES ET BADGES DE STATUT (Théorie des couleurs douanières)
+   5. PILULES ET BADGES DE STATUT
    ========================================================================== */
-
 .badge-status {
   display: inline-flex;
   align-items: center;
@@ -364,36 +346,31 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   padding: 4px 10px;
   border-radius: var(--radius-badge);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.2;
   letter-spacing: 0.2px;
 }
 
-/* Badge Avertissement (Jaune / Ocre) : Échéances imminentes, dossiers en attente */
 .badge-status-warning {
   background-color: var(--color-warning-surface);
   color: var(--color-warning);
 }
 
-/* Badge Succès (Vert) : Tâches terminées, dossiers conformes */
 .badge-status-success {
   background-color: var(--color-success-surface);
   color: var(--color-success);
 }
 
-/* Badge Danger (Rouge) : Alertes graves, retards critiques, fraudes suspectées */
 .badge-status-danger {
   background-color: var(--color-danger-surface);
   color: var(--color-danger);
 }
 
-/* Badge Information (Bleu-gris) : Dossiers sous instruction, traçabilité */
 .badge-status-info {
   background-color: var(--color-info-surface);
   color: var(--color-info);
 }
 
-/* Badge Neutre : Métadonnées secondaires, rôles, filtres inactifs */
 .badge-status-neutral {
   background-color: var(--color-surface-elevated);
   color: var(--color-text-secondary);
