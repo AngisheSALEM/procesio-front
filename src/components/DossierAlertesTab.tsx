@@ -5,6 +5,7 @@ import {
   X
 } from 'lucide-react';
 import type { AlerteDossier, UserAccount } from '../types';
+import { ModalPortal } from './common/ModalPortal';
 
 interface DossierAlertesTabProps {
   alertes: AlerteDossier[];
@@ -171,8 +172,9 @@ export const DossierAlertesTab: React.FC<DossierAlertesTabProps> = ({
 
       {/* Creation Modal */}
       {showModal && (
-        <div
-          className="modal-backdrop-responsive"
+        <ModalPortal>
+          <div
+            className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -333,6 +335,7 @@ export const DossierAlertesTab: React.FC<DossierAlertesTabProps> = ({
             </form>
           </div>
         </div>
+      </ModalPortal>
       )}
     </div>
   );

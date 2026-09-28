@@ -27,6 +27,7 @@ import {
 } from '../data/mockData';
 import { TablePagination } from './common/TablePagination';
 import { isAssignedToUser } from '../utils/userUtils';
+import { ModalPortal } from './common/ModalPortal';
 
 interface RenseignementsViewProps {
   renseignements?: RenseignementItem[];
@@ -301,7 +302,9 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
     e.preventDefault();
     if (!selectedRenseignement || !dossierNom.trim()) return;
 
+    const generatedId = `dossier-${Date.now().toString().slice(-4)}`;
     const newDossierData = {
+      id: generatedId,
       reference: `DGDA/DRK/DIR-ENQ/${new Date().getFullYear()}/08${Math.floor(50 + Math.random() * 49)}`,
       objet: dossierObjet.trim(),
       perimetre: `Contrôle contradictoire issu du renseignement ${selectedRenseignement.reference} (Origine : ${selectedRenseignement.origine})`,
@@ -330,7 +333,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
       ...selectedRenseignement,
       statut: 'Dossier d’enquête ouvert',
       effetProduit: 'ENQUETE_EN_COURS',
-      dossiersLies: [...(selectedRenseignement.dossiersLies || []), newDossierData.reference],
+      dossiersLies: Array.from(new Set([...(selectedRenseignement.dossiersLies || []), generatedId, newDossierData.reference])),
     };
 
     setItems((prev) => prev.map((r) => (r.id === selectedRenseignement.id ? updatedR : r)));
@@ -514,7 +517,10 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
               {hasDossier ? (
                 <button
                   type="button"
-                  onClick={() => onOpenDossier(selectedRenseignement.dossiersLies[0])}
+                  onClick={() => {
+                    const targetId = linkedDossier ? linkedDossier.id : (selectedRenseignement.dossiersLies?.[0] || '');
+                    if (targetId) onOpenDossier(targetId);
+                  }}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -765,20 +771,21 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
 
         {/* Modal de Création de Dossier depuis le Renseignement */}
         {showCreateDossierModal && (
-          <div
-            className="modal-backdrop-responsive"
-            style={{
-              position: 'fixed',
-              inset: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.65)',
-              backdropFilter: 'blur(4px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000,
-              padding: '20px',
-            }}
-          >
+          <ModalPortal>
+            <div
+              className="modal-backdrop-responsive"
+              style={{
+                position: 'fixed',
+                inset: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 99999,
+                padding: '20px',
+              }}
+            >
             <div
               className="modal-card-responsive"
               style={{
@@ -1042,6 +1049,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
               </form>
             </div>
           </div>
+          </ModalPortal>
         )}
       </div>
     );
@@ -1291,20 +1299,21 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
 
       {/* Modal : Nouvelle Demande de Renseignement (Admin) */}
       {showCreateRenseignementModal && (
-        <div
-          className="modal-backdrop-responsive"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px',
-          }}
-        >
+        <ModalPortal>
+          <div
+            className="modal-backdrop-responsive"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.65)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 99999,
+              padding: '20px',
+            }}
+          >
           <div
             className="modal-card-responsive"
             style={{
@@ -1326,9 +1335,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                 <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>
                   Nouvelle Demande de Renseignement
                 </h3>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                  Enregistrement, qualification et affectation de l’information à l'agent
-                </div>
+                
               </div>
               <button
                 type="button"
@@ -1572,6 +1579,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

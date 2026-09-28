@@ -13,6 +13,7 @@ import {
 import type { FeuilleObservation, UserAccount } from '../types';
 import type { DossierTabId } from './DossierHeader';
 import { formatDate } from '../utils/dateUtils';
+import { ModalPortal } from './common/ModalPortal';
 
 interface FeuilleObservationViewProps {
   feuilles?: FeuilleObservation[];
@@ -245,8 +246,9 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
   };
 
   const renderCreateModal = () => (
-    <div
-      className="modal-backdrop-responsive"
+    <ModalPortal>
+      <div
+        className="modal-backdrop-responsive"
       style={{
         position: 'fixed',
         inset: 0,
@@ -514,6 +516,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
         </form>
       </div>
     </div>
+  </ModalPortal>
   );
 
   // =========================================================================
@@ -1135,8 +1138,9 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
           5. Champ du fichier PDF
           ========================================================================= */}
       {showCreateModal && (
-        <div
-          className="modal-backdrop-responsive"
+        <ModalPortal>
+          <div
+            className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1339,6 +1343,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             </form>
           </div>
         </div>
+      </ModalPortal>
       )}
 
       {/* =========================================================================
@@ -1346,8 +1351,9 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
           Strictement 5 champs clairs
           ========================================================================= */}
       {showPvModal && (
-        <div
-          className="modal-backdrop-responsive"
+        <ModalPortal>
+          <div
+            className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1511,6 +1517,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             </form>
           </div>
         </div>
+      </ModalPortal>
       )}
       {/* =========================================================================
           MODALE DE SATISFACTION & CLÔTURE SANS SUITE (FEUILLE D'OBSERVATION)
@@ -1518,8 +1525,9 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
           et d'enregistrer ce motif pour classer le dossier sans suite.
           ========================================================================= */}
       {showSatisfactionModal && (
-        <div
-          className="modal-backdrop-responsive"
+        <ModalPortal>
+          <div
+            className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1714,12 +1722,14 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             </form>
           </div>
         </div>
+      </ModalPortal>
       )}
 
       {/* MODAL : Revirement sur le jugement (Feuille d'observation) */}
       {showRevirementModal && (
-        <div
-          className="modal-backdrop-responsive"
+        <ModalPortal>
+          <div
+            className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1949,6 +1959,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             </form>
           </div>
         </div>
+      </ModalPortal>
       )}
     </div>
   );

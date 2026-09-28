@@ -11,6 +11,7 @@ import {
 import type { DossierEnquete, FeuilleObservation, UserAccount, DocumentItem, PvDetail } from '../types';
 import type { DossierTabId } from './DossierHeader';
 import { formatDate } from '../utils/dateUtils';
+import { ModalPortal } from './common/ModalPortal';
 
 interface PvViewProps {
   dossier: DossierEnquete;
@@ -155,20 +156,21 @@ export const PvView: React.FC<PvViewProps> = ({
   };
 
   const renderModal = () => (
-    <div
-      className="modal-backdrop-responsive"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.65)',
-        backdropFilter: 'blur(4px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: '20px',
-      }}
-    >
+    <ModalPortal>
+      <div
+        className="modal-backdrop-responsive"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '20px',
+        }}
+      >
       <div
         className="modal-card-responsive"
         style={{
@@ -366,6 +368,7 @@ export const PvView: React.FC<PvViewProps> = ({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 
   // =========================================================================

@@ -39,16 +39,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Supervision & Stats',
       icon: <BarChart3 size={18} strokeWidth={1.8} />,
     },
+        {
+      id: 'renseignements',
+      label: 'Renseignements',
+      icon: <Radio size={18} strokeWidth={1.8} />,
+    },
     {
       id: 'mon-travail',
       label: 'Tous les Dossiers',
       icon: <Briefcase size={18} strokeWidth={1.8} />,
     },
-    {
-      id: 'renseignements',
-      label: 'Renseignements',
-      icon: <Radio size={18} strokeWidth={1.8} />,
-    },
+
     {
       id: 'parametres',
       label: 'Paramètres',

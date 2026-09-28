@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { DossierEnquete, DemandeCommunication, FeuilleObservation, UserAccount, PvDetail } from '../types';
 import { formatDate } from '../utils/dateUtils';
+import { ModalPortal } from './common/ModalPortal';
 
 interface VueEnsembleTabProps {
   dossier: DossierEnquete;
@@ -577,20 +578,21 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
           MODALE FORMULAIRE : DEMANDE DE COMMUNICATION (5 CHAMPS STRICTS)
           ========================================================================= */}
       {showDemandeModal && (
-        <div
-          className="modal-backdrop-responsive"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px',
-          }}
-        >
+        <ModalPortal>
+          <div
+            className="modal-backdrop-responsive"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.65)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 99999,
+              padding: '20px',
+            }}
+          >
           <div
             className="modal-card-responsive"
             style={{
@@ -788,26 +790,28 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* =========================================================================
           MODALE FORMULAIRE : FEUILLE D'OBSERVATION (5 CHAMPS STRICTS)
           ========================================================================= */}
       {showFeuilleModal && (
-        <div
-          className="modal-backdrop-responsive"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px',
-          }}
-        >
+        <ModalPortal>
+          <div
+            className="modal-backdrop-responsive"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.65)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 99999,
+              padding: '20px',
+            }}
+          >
           <div
             className="modal-card-responsive"
             style={{
@@ -1005,6 +1009,7 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

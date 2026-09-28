@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Menu } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { DossierHeader, type DossierTabId } from './components/DossierHeader';
@@ -144,27 +144,37 @@ export function App() {
   // Documents et PV du dossier
   const [documentsParDossier, setDocumentsParDossier] = useState<Record<string, DocumentItem[]>>(mockDocumentsParDossier);
 
+  const dossiersRef = useRef(dossiers);
+  useEffect(() => {
+    dossiersRef.current = dossiers;
+  }, [dossiers]);
+
   // 5. Selected Dossier persistence (garantit qu'un enquêteur n'accède qu'à un dossier qui lui est assigné)
   const [selectedDossierId, setSelectedDossierId] = useState<string>(() => {
     const saved = localStorage.getItem(STORAGE_SELECTED_DOSSIER);
     const initialUser = mockUsers[userRole];
     const allowed = mockDossiers.filter((d) => isAssignedToUser(d.responsable, d.equipe, initialUser));
-    if (saved && allowed.some((d) => d.id === saved)) {
+    if (saved && (mockDossiers.some((d) => d.id === saved || d.reference === saved) || saved.startsWith('dossier-'))) {
       return saved;
     }
     return allowed[0]?.id || mockDossiers[0].id;
   });
 
   // 6. Navigation route persistence: prioritize URL hash, then localStorage
-  const getNavFromHash = useCallback((role: UserRole): string => {
+  const getNavFromHash = useCallback((role: UserRole, currentDossiers: DossierEnquete[]): string => {
     const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0];
     if (hash.startsWith('dossier/')) {
-      const dId = hash.replace('dossier/', '');
+      const dId = decodeURIComponent(hash.replace('dossier/', ''));
       const user = mockUsers[role];
-      const target = mockDossiers.find((d) => d.id === dId);
-      if (target && isAssignedToUser(target.responsable, target.equipe, user)) {
+      const target = currentDossiers.find((d) => d.id === dId || d.reference === dId);
+      if (target) {
+        if (isAssignedToUser(target.responsable, target.equipe, user)) {
+          setSelectedDossierId(target.id);
+          localStorage.setItem(STORAGE_SELECTED_DOSSIER, target.id);
+          return 'dossier-detail';
+        }
+      } else if (dId) {
         setSelectedDossierId(dId);
-        localStorage.setItem(STORAGE_SELECTED_DOSSIER, dId);
         return 'dossier-detail';
       }
       return role === 'admin' ? 'rapports-stats' : 'mon-travail';
@@ -189,7 +199,7 @@ export function App() {
     return role === 'admin' ? 'rapports-stats' : 'mon-travail';
   }, []);
 
-  const [activeNav, setActiveNav] = useState<string>(() => getNavFromHash(userRole));
+  const [activeNav, setActiveNav] = useState<string>(() => getNavFromHash(userRole, dossiers));
 
   // 7. Dossier Tab persistence
   const [activeDossierTab, setActiveDossierTab] = useState<DossierTabId>(() => {
@@ -237,7 +247,7 @@ export function App() {
   // Listen to browser Back / Forward buttons (Hash change event)
   useEffect(() => {
     const handleHashChange = () => {
-      const currentRoute = getNavFromHash(userRole);
+      const currentRoute = getNavFromHash(userRole, dossiersRef.current);
       setActiveNav(currentRoute);
     };
 
@@ -292,22 +302,28 @@ export function App() {
     setActiveNav(id);
   };
 
-  const handleOpenDossier = (dossierId: string, initialTab?: DossierTabId) => {
+  const handleOpenDossier = (dossierIdOrRef: string, initialTab?: DossierTabId) => {
+    const allKnown = dossiersRef.current.length > 0 ? dossiersRef.current : dossiers;
+    const target = allKnown.find((d) => d.id === dossierIdOrRef || d.reference === dossierIdOrRef) ||
+                   visibleDossiers.find((d) => d.id === dossierIdOrRef || d.reference === dossierIdOrRef);
+
+    const resolvedId = target ? target.id : dossierIdOrRef;
+
     // Si l'utilisateur est enquêteur, vérifier qu'il a bien l'autorisation d'accéder au dossier
-    if (currentUser.role === 'enqueteur') {
-      const isAllowed = visibleDossiers.some((d) => d.id === dossierId);
+    if (currentUser.role === 'enqueteur' && target) {
+      const isAllowed = isAssignedToUser(target.responsable, target.equipe, currentUser);
       if (!isAllowed) {
         return;
       }
     }
-    setSelectedDossierId(dossierId);
-    localStorage.setItem(STORAGE_SELECTED_DOSSIER, dossierId);
+    setSelectedDossierId(resolvedId);
+    localStorage.setItem(STORAGE_SELECTED_DOSSIER, resolvedId);
     if (initialTab) {
       setActiveDossierTab(initialTab);
       localStorage.setItem(STORAGE_TAB, initialTab);
     }
     setActiveNav('dossier-detail');
-    window.location.hash = `#/dossier/${dossierId}`;
+    window.location.hash = `#/dossier/${resolvedId}`;
   };
 
   const handleBackToDashboard = () => {
@@ -318,7 +334,13 @@ export function App() {
   // Résolution du dossier actif : strictement restreint aux dossiers autorisés
   const currentDossier = useMemo(() => {
     const list = currentUser.role === 'admin' ? dossiers : visibleDossiers;
-    return list.find((d) => d.id === selectedDossierId) || list[0] || dossiers[0] || mockDossiers[0];
+    return (
+      list.find((d) => d.id === selectedDossierId || d.reference === selectedDossierId) ||
+      dossiers.find((d) => d.id === selectedDossierId || d.reference === selectedDossierId) ||
+      list[0] ||
+      dossiers[0] ||
+      mockDossiers[0]
+    );
   }, [dossiers, visibleDossiers, selectedDossierId, currentUser.role]);
   const currentDemandes = demandesParDossier[currentDossier.id] || [];
   const currentFeuilles = feuillesParDossier[currentDossier.id] || [];
@@ -589,13 +611,20 @@ export function App() {
   const handleCreateDossier = (data: any, renseignementId?: string) => {
     const now = new Date();
     const timestamp = `${now.toISOString().split('T')[0]} ${now.toTimeString().split(' ')[0]}`;
-    const newId = `dossier-${Date.now().toString().slice(-4)}`;
+    const newId = data.id || `dossier-${Date.now().toString().slice(-4)}`;
+
+    const currentUserNameWithGrade = `${currentUser.grade} ${currentUser.prenom} ${currentUser.nom}`;
+    const assignedResponsable = data.responsable?.trim() || currentUserNameWithGrade;
+    const assignedEquipe = Array.isArray(data.equipe) && data.equipe.length > 0
+      ? (data.equipe.some((m: string) => m.toLowerCase().includes(currentUser.nom.toLowerCase())) ? data.equipe : [...data.equipe, `${currentUserNameWithGrade} (Chef de mission)`])
+      : [`${currentUserNameWithGrade} (Chef de mission)`];
 
     const newDossier: DossierEnquete = {
       ...data,
       id: newId,
+      responsable: assignedResponsable,
+      equipe: assignedEquipe,
       horodatageCreation: timestamp,
-      equipe: data.equipe && data.equipe.length > 0 ? data.equipe : [`${currentUser.grade} ${currentUser.prenom} ${currentUser.nom} (Chef de mission)`],
       operationsDouanieres: [],
       renseignementsLiesIds: renseignementId ? [renseignementId] : [],
       taches: [],
@@ -632,16 +661,20 @@ export function App() {
                 ...r,
                 statut: 'Dossier d’enquête ouvert',
                 effetProduit: 'ENQUETE_EN_COURS',
-                dossiersLies: [...(r.dossiersLies || []), newId],
+                dossiersLies: Array.from(new Set([...(r.dossiersLies || []), newId, newDossier.reference])),
               }
             : r
         )
       );
     }
 
-    if (currentUser.role !== 'admin') {
-      handleOpenDossier(newId);
-    }
+    // Ouvrir directement et immédiatement le nouveau dossier
+    setSelectedDossierId(newId);
+    localStorage.setItem(STORAGE_SELECTED_DOSSIER, newId);
+    setActiveDossierTab('vue-ensemble');
+    localStorage.setItem(STORAGE_TAB, 'vue-ensemble');
+    setActiveNav('dossier-detail');
+    window.location.hash = `#/dossier/${newId}`;
   };
 
   const handleAddRenseignement = (newR: RenseignementItem) => {
