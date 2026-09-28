@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import type { FeuilleObservation, DossierEnquete } from '../../types';
 import type { DossierTabId } from '../DossierHeader';
+import { TablePagination } from '../common/TablePagination';
 
 interface SupervisionFeuillesViewProps {
   feuilles: Record<string, FeuilleObservation[]>;
@@ -21,6 +22,8 @@ export const SupervisionFeuillesView: React.FC<SupervisionFeuillesViewProps> = (
 }) => {
   const [search, setSearch] = useState('');
   const [filterStatut, setFilterStatut] = useState<string>('TOUS');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 6;
 
   // Flatten observations across all observation sheets
   const allObservations = Object.entries(feuilles).flatMap(([dossierId, fList]) => {
@@ -256,57 +259,68 @@ export const SupervisionFeuillesView: React.FC<SupervisionFeuillesViewProps> = (
                 </td>
               </tr>
             ) : (
-              filtered.map(({ feuille, observation, dossier }) => (
-                <tr
-                  key={`${feuille.id}-${observation.code}`}
-                  onClick={() => onOpenDossier(feuille.dossierId || (dossier ? dossier.id : ''), 'constats-defense')}
-                  className="card-interactive"
-                  style={{
-                    borderBottom: '1px solid var(--color-border)',
-                    cursor: 'pointer',
-                    transition: 'background var(--transition-fast)',
-                  }}
-                >
-                  {/* Entreprise: Bold per DESIGN.md */}
-                  <td style={{ padding: '12px 16px' }}>
-                    <div style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                      {dossier ? dossier.entiteControlee.nom : feuille.destinataire}
-                    </div>
-                  </td>
+              filtered
+                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                .map(({ feuille, observation, dossier }) => (
+                  <tr
+                    key={`${feuille.id}-${observation.code}`}
+                    onClick={() => onOpenDossier(feuille.dossierId || (dossier ? dossier.id : ''), 'constats-defense')}
+                    className="card-interactive"
+                    style={{
+                      borderBottom: '1px solid var(--color-border)',
+                      cursor: 'pointer',
+                      transition: 'background var(--transition-fast)',
+                    }}
+                  >
+                    {/* Entreprise: Bold per DESIGN.md */}
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                        {dossier ? dossier.entiteControlee.nom : feuille.destinataire}
+                      </div>
+                    </td>
 
-                  {/* Code & Réf: Muted per DESIGN.md */}
-                  <td style={{ padding: '12px 16px' }}>
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                      Rédigée le {feuille.dateRedaction}
-                    </div>
-                  </td>
+                    {/* Code & Réf: Muted per DESIGN.md */}
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                        Rédigée le {feuille.dateRedaction}
+                      </div>
+                    </td>
 
-                  <td style={{ padding: '12px 16px', maxWidth: '300px' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--color-text-primary)', fontSize: '12px' }}>
-                      {observation.titre}
-                    </div>
-                  </td>
+                    <td style={{ padding: '12px 16px', maxWidth: '300px' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--color-text-primary)', fontSize: '12px' }}>
+                        {observation.titre}
+                      </div>
+                    </td>
 
-                  <td style={{ padding: '12px 16px' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                      {observation.statutConstat === 'CLOS_REGULARISE'
-                        ? 'Régularisé'
-                        : observation.statutConstat === 'MAINTENU_CONTENTIEUX'
-                        ? 'Contentieux'
-                        : observation.statutConstat === 'EN_ATTENTE_REPONSE'
-                        ? 'En attente'
-                        : observation.statutConstat === 'REPONSE_RECUE'
-                        ? 'Réponse reçue'
-                        : observation.statutConstat === 'OUVERT'
-                        ? 'Ouvert'
-                        : String(observation.statutConstat || 'Autre')}
-                    </span>
-                  </td>
-                </tr>
-              ))
+                    <td style={{ padding: '12px 16px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                        {observation.statutConstat === 'CLOS_REGULARISE'
+                          ? 'Régularisé'
+                          : observation.statutConstat === 'MAINTENU_CONTENTIEUX'
+                          ? 'Contentieux'
+                          : observation.statutConstat === 'EN_ATTENTE_REPONSE'
+                          ? 'En attente'
+                          : observation.statutConstat === 'REPONSE_RECUE'
+                          ? 'Réponse reçue'
+                          : observation.statutConstat === 'OUVERT'
+                          ? 'Ouvert'
+                          : String(observation.statutConstat || 'Autre')}
+                      </span>
+                    </td>
+                  </tr>
+                ))
             )}
           </tbody>
         </table>
+
+        {/* Pagination discrète */}
+        <TablePagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          itemLabel="constats"
+        />
       </div>
     </div>
   );

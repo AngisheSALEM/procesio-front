@@ -12,6 +12,7 @@ import type {
   PvDetail
 } from '../../types';
 import type { DossierTabId } from '../DossierHeader';
+import { TablePagination } from '../common/TablePagination';
 
 interface SupervisionDossiersViewProps {
   dossiers: DossierEnquete[];
@@ -24,8 +25,8 @@ interface SupervisionDossiersViewProps {
 
 export const SupervisionDossiersView: React.FC<SupervisionDossiersViewProps> = ({
   dossiers,
-  demandes,
-  feuilles,
+  demandes: _demandes,
+  feuilles: _feuilles,
   pvs,
   onOpenDossier,
   onBack,
@@ -33,6 +34,8 @@ export const SupervisionDossiersView: React.FC<SupervisionDossiersViewProps> = (
   const [search, setSearch] = useState('');
   const [filterStatut, setFilterStatut] = useState<'TOUS' | 'AVEC_PV' | 'CLASSE_SANS_SUITE' | 'EN_COURS' | 'CONTENTIEUX'>('TOUS');
   const [selectedInspector, setSelectedInspector] = useState<string>('TOUS');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 6;
 
   // Collect inspectors
   const inspecteurs = Array.from(new Set(dossiers.map((d) => d.responsable).filter(Boolean)));
@@ -240,8 +243,8 @@ export const SupervisionDossiersView: React.FC<SupervisionDossiersViewProps> = (
               <th style={{ padding: '12px 16px' }}>Entreprise Contrôlée</th>
               <th style={{ padding: '12px 16px' }}>Référence & Date</th>
               <th style={{ padding: '12px 16px' }}>Inspecteur Coté</th>
-              <th style={{ padding: '12px 16px' }}>Actes Procéduraux</th>
-              <th style={{ padding: '12px 16px' }}>Statut & Issue</th>
+        
+              <th style={{ padding: '12px 16px' }}>Statut </th>
               <th style={{ padding: '12px 16px' }}>Échéance</th>
             </tr>
           </thead>
@@ -253,96 +256,87 @@ export const SupervisionDossiersView: React.FC<SupervisionDossiersViewProps> = (
                 </td>
               </tr>
             ) : (
-              filtered.map((d) => {
-                const dDemandes = demandes[d.id] || [];
-                const dFeuilles = feuilles[d.id] || [];
-                const dPvs = pvs[d.id] || [];
+              filtered
+                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                .map((d) => {
+                  const dPvs = pvs[d.id] || [];
 
-                return (
-                  <tr
-                    key={d.id}
-                    onClick={() => onOpenDossier(d.id, 'vue-ensemble')}
-                    className="card-interactive"
-                    style={{
-                      borderBottom: '1px solid var(--color-border)',
-                      cursor: 'pointer',
-                      transition: 'background var(--transition-fast)',
-                    }}
-                  >
-                    {/* Entreprise: Bold anchor per DESIGN.md */}
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                        {d.entiteControlee.nom}
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                        NIF: {d.entiteControlee.nif} • {d.entiteControlee.typeEntite}
-                      </div>
-                    </td>
-
-                    {/* Référence: Muted & regular font per DESIGN.md */}
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: '12px' }}>
-                        {d.reference}
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                        Ouvert le {d.dateCreation}
-                      </div>
-                    </td>
-
-                    {/* Inspecteur */}
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>
-                        {d.responsable}
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                        {d.unite.replace('Direction des Recherches et Enquêtes Douanières', 'DRED')}
-                      </div>
-                    </td>
-
-                    {/* Actes Procéduraux */}
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                          • {dDemandes.length} Demande(s) de communication
+                  return (
+                    <tr
+                      key={d.id}
+                      onClick={() => onOpenDossier(d.id, 'vue-ensemble')}
+                      className="card-interactive"
+                      style={{
+                        borderBottom: '1px solid var(--color-border)',
+                        cursor: 'pointer',
+                        transition: 'background var(--transition-fast)',
+                      }}
+                    >
+                      {/* Entreprise: Bold anchor per DESIGN.md */}
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                          {d.entiteControlee.nom}
                         </div>
-                        <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                          • {dFeuilles.length} Feuille(s) d’observation
-                        </div>
-                      </div>
-                    </td>
+                      
+                      </td>
 
-                    {/* Statut & Issue */}
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                        {d.hasPv || dPvs.length > 0
-                          ? `PV Dressé (${dPvs[0]?.reference || 'DGDA/PV'})`
-                          : d.decisionCloture === 'CLASSE_SANS_SUITE' || d.statut === 'CLOTURE'
-                          ? 'Classé sans suite'
-                          : d.statut === 'EN_COURS'
-                          ? 'En cours'
-                          : d.statut === 'A_VALIDER'
-                          ? 'À valider'
-                          : d.statut.replace('_', ' ')}
-                      </span>
-                      {(d.hasPv || dPvs.length > 0) && (
-                        <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                          ${(d.droitsEludesUSD || dPvs[0]?.droitsEludesUSD || 0).toLocaleString()} USD éludés
+                      {/* Référence: Muted & regular font per DESIGN.md */}
+                      <td style={{ padding: '12px 16px' }}>
+                       
+                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                          Ouvert le {d.dateCreation}
                         </div>
-                      )}
-                    </td>
+                      </td>
 
-                    {/* Échéance */}
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                        {d.echeance}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
+                      {/* Inspecteur */}
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>
+                          {d.responsable}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                          
+                        </div>
+                      </td>
+
+                      
+
+                      {/* Statut & Issue */}
+                      <td style={{ padding: '12px 16px' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                          {d.hasPv || dPvs.length > 0
+                            ? `PV Dressé `
+                            : d.decisionCloture === 'CLASSE_SANS_SUITE' || d.statut === 'CLOTURE'
+                            ? 'Classé sans suite'
+                            : d.statut === 'EN_COURS'
+                            ? 'En cours'
+                            : d.statut === 'A_VALIDER'
+                            ? 'À valider'
+                            : d.statut.replace('_', ' ')}
+                        </span>
+                      
+                      </td>
+
+                      {/* Échéance */}
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                          {d.echeance}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
             )}
           </tbody>
         </table>
+
+        {/* Pagination discrète */}
+        <TablePagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          itemLabel="dossiers"
+        />
       </div>
     </div>
   );

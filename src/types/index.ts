@@ -117,6 +117,8 @@ export interface DossierEnquete {
   dateCloture?: string;
   hasPv?: boolean;
   pvIds?: string[];
+  hasFeuille?: boolean;
+  hasDemande?: boolean;
   droitsEludesUSD?: number;
   droitsEludesCDF?: number;
   amendeUSD?: number;
@@ -300,6 +302,7 @@ export interface PvDetail {
   inspecteurs: string[];
   destinataire: string;
   objet: string;
+  typePv?: string;
   cadreLegal?: string;
   infractions: string[];
   droitsEludesUSD: number;

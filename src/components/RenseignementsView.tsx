@@ -6,7 +6,7 @@ import {
   ExternalLink,
   X,
   CheckCircle,
-  Briefcase,
+  FolderPlus,
   Upload
 } from 'lucide-react';
 import type {
@@ -25,6 +25,8 @@ import {
   mockFeuillesParDossier,
   mockPvsParDossier
 } from '../data/mockData';
+import { TablePagination } from './common/TablePagination';
+import { isAssignedToUser } from '../utils/userUtils';
 
 interface RenseignementsViewProps {
   renseignements?: RenseignementItem[];
@@ -58,6 +60,8 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   const [showCreateRenseignementModal, setShowCreateRenseignementModal] = useState(false);
   const [showCreateDossierModal, setShowCreateDossierModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 6;
 
   // Sync internal items if prop updates
   React.useEffect(() => {
@@ -90,11 +94,12 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
 
   // Formulaire de Création de Dossier
   const [dossierNom, setDossierNom] = useState('');
-  const [dossierNif, setDossierNif] = useState('A1099882Z');
-  const [dossierRccm, setDossierRccm] = useState('CD/LSH/RCCM/24-B-00812');
+  const dossierNif = 'A1099882Z';
+  const dossierRccm = 'CD/LSH/RCCM/24-B-00812';
   const [dossierTypeCible, setDossierTypeCible] = useState('Entreprise commerciale');
   const [dossierPourLeCompteDe, setDossierPourLeCompteDe] = useState('');
   const [dossierAdresse, setDossierAdresse] = useState('04 Avenue des Métaux, Quartier Industriel, Lubumbashi');
+  const [dossierContact, setDossierContact] = useState('+243 81 234 5678 — contact@entreprise.cd');
   const [dossierObjet, setDossierObjet] = useState('');
   const [dossierResponsable, setDossierResponsable] = useState('');
   const [dossierPriorite, setDossierPriorite] = useState<Priorite>('NORMALE');
@@ -104,12 +109,52 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
     return d.toISOString().split('T')[0];
   });
 
-  // Filtrage selon le rôle : l'inspecteur ne voit que les renseignements qui lui sont affectés
-  const visibleItems = items.filter((r) => {
-    if (currentUser.role === 'admin') return true;
-    const nom = currentUser.nom.toLowerCase();
-    return r.coteA && r.coteA.toLowerCase().includes(nom);
-  });
+  // Détermination précise du statut procédural du renseignement
+  const getRenseignementStatut = (ren: RenseignementItem): string => {
+    const linkedDossier = dossiers.find((d) =>
+      ren.dossiersLies && (
+        ren.dossiersLies.includes(d.id) ||
+        ren.dossiersLies.includes(d.reference)
+      )
+    );
+
+    if (!linkedDossier) {
+      if (ren.effetProduit === 'CLASSE_SANS_SUITE' || ren.statut === 'CLASSE_SANS_SUITE') {
+        return 'Classé sans suite';
+      }
+      return 'En attente d’enquête';
+    }
+
+    // 1. PV établi
+    const pvs = pvsParDossier[linkedDossier.id];
+    const hasPv = (Array.isArray(pvs) && pvs.length > 0) || linkedDossier.hasPv || ren.pvGenereRef;
+    if (hasPv) {
+      return 'PV établi';
+    }
+
+    // 2. Feuille d'observation
+    const feuilles = feuillesParDossier[linkedDossier.id];
+    const hasFeuille = (Array.isArray(feuilles) && feuilles.length > 0) || (feuilles && !Array.isArray(feuilles));
+    if (hasFeuille) {
+      return 'Feuille d’observation';
+    }
+
+    // 3. Demande de communication
+    const demandes = demandesParDossier[linkedDossier.id];
+    const hasDemande = (Array.isArray(demandes) && demandes.length > 0) || (demandes && !Array.isArray(demandes));
+    if (hasDemande) {
+      return 'Demande de communication';
+    }
+
+    if (linkedDossier.decisionCloture === 'CLASSE_SANS_SUITE') {
+      return 'Classé sans suite';
+    }
+
+    return 'Dossier d’enquête ouvert';
+  };
+
+  // Filtrage selon le rôle : l'enquêteur ne voit que les renseignements qui lui sont formellement assignés
+  const visibleItems = items.filter((r) => isAssignedToUser(r.coteA, null, currentUser));
 
   // Filtrage par recherche et source
   const filteredItems = visibleItems.filter((r) => {
@@ -135,9 +180,9 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
     return true;
   });
 
-  // Renseignement actuellement sélectionné pour la page de détail
+  // Renseignement actuellement sélectionné pour la page de détail (strictement restreint aux renseignements visibles)
   const selectedRenseignement = selectedId
-    ? items.find((r) => r.id === selectedId) || null
+    ? visibleItems.find((r) => r.id === selectedId) || null
     : null;
 
   const handleUploadedFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -183,7 +228,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
       serviceDestinataire: 'Division des Recherches & Enquêtes Douanières',
       statut: 'Enregistré & Affecté',
       dossiersLies: [],
-      cotePar: `${currentUser.grade} ${currentUser.prenom} ${currentUser.nom}`,
+      cotePar: `${currentUser.prenom} ${currentUser.nom}`,
       coteA: formAffectation,
       dateCotation: todayDate,
       degreFiabilite: 'B2 — Source qualifiée, faits à vérifier',
@@ -196,7 +241,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
         {
           etape: '1. Enregistrement de la demande de renseignement',
           date: todayDate,
-          acteur: `${currentUser.grade} ${currentUser.nom}`,
+          acteur: `${currentUser.prenom} ${currentUser.nom}`,
           statut: 'TERMINE',
           commentaire: `Renseignement enregistré depuis la source : ${formSource}.`,
         },
@@ -246,7 +291,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
 
     setDossierNom(defaultNom);
     setDossierObjet(selectedRenseignement.objet);
-    setDossierResponsable(selectedRenseignement.coteA || `${currentUser.grade} ${currentUser.nom}`);
+    setDossierResponsable(selectedRenseignement.coteA || `${currentUser.prenom} ${currentUser.nom}`);
     setDossierPriorite((selectedRenseignement.priorite as Priorite) || 'NORMALE');
     setShowCreateDossierModal(true);
   };
@@ -262,7 +307,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
       perimetre: `Contrôle contradictoire issu du renseignement ${selectedRenseignement.reference} (Origine : ${selectedRenseignement.origine})`,
       motifOuverture: `Ouverture consécutive à l’exploitation du renseignement qualifié ${selectedRenseignement.reference}`,
       unite: 'Direction des Recherches et Enquêtes Douanières (DRK)',
-      responsable: dossierResponsable.trim() || selectedRenseignement.coteA || `${currentUser.grade} ${currentUser.nom}`,
+      responsable: dossierResponsable.trim() || selectedRenseignement.coteA || `${currentUser.prenom} ${currentUser.nom}`,
       statut: 'EN_COURS' as const,
       priorite: dossierPriorite,
       echeance: dossierEcheance,
@@ -277,7 +322,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
         pourLeCompteDe: dossierPourLeCompteDe.trim() || undefined,
         roleDansDossier: 'Entreprise contrôlée' as const,
         adresse: dossierAdresse.trim() || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
-        contact: 'direction@entreprise.cd',
+        contact: dossierContact.trim() || '+243 81 234 5678 — contact@entreprise.cd',
       },
     };
 
@@ -373,7 +418,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
     }
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
+      <div key={`renseignement-detail-${selectedRenseignement.id}`} className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
         {/* Toast Notification */}
         {toastMessage && (
           <div
@@ -461,7 +506,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                 {selectedRenseignement.objet}
               </h2>
               <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '6px' }}>
-                Reçu et enregistré le {selectedRenseignement.dateReception} • Statut : {selectedRenseignement.statut}
+                Reçu et enregistré le {selectedRenseignement.dateReception} • Statut : <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{getRenseignementStatut(selectedRenseignement)}</span>
               </div>
             </div>
 
@@ -505,7 +550,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                     cursor: 'pointer',
                   }}
                 >
-                  <Briefcase size={14} />
+                  <FolderPlus size={15} />
                   <span>Création du dossier</span>
                 </button>
               )}
@@ -793,47 +838,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                 </div>
 
                 <div className="form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '5px' }}>
-                      NIF
-                    </label>
-                    <input
-                      type="text"
-                      value={dossierNif}
-                      onChange={(e) => setDossierNif(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        borderRadius: 'var(--radius-btn)',
-                        backgroundColor: 'var(--color-bg)',
-                        border: '1px solid var(--color-border)',
-                        color: 'var(--color-text-primary)',
-                        fontSize: '12px',
-                        outline: 'none',
-                      }}
-                    />
-                  </div>
 
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '5px' }}>
-                      RCCM
-                    </label>
-                    <input
-                      type="text"
-                      value={dossierRccm}
-                      onChange={(e) => setDossierRccm(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        borderRadius: 'var(--radius-btn)',
-                        backgroundColor: 'var(--color-bg)',
-                        border: '1px solid var(--color-border)',
-                        color: 'var(--color-text-primary)',
-                        fontSize: '12px',
-                        outline: 'none',
-                      }}
-                    />
-                  </div>
                 </div>
 
                 {/* Type de cible & Pour le compte de */}
@@ -889,7 +894,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                 {/* Champ Adresse géographique */}
                 <div>
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '5px' }}>
-                    Adresse géographique de l'entité *
+                    Adresse
                   </label>
                   <input
                     type="text"
@@ -897,6 +902,30 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                     placeholder="Ex : 04 Avenue des Métaux, Quartier Industriel, Lubumbashi"
                     value={dossierAdresse}
                     onChange={(e) => setDossierAdresse(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-btn)',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '12px',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+
+                {/* Champ Contact de l'entité */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '5px' }}>
+                    Contact officiel (téléphone, email) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex : +243 81 234 5678 — contact@entreprise.cd"
+                    value={dossierContact}
+                    onChange={(e) => setDossierContact(e.target.value)}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
@@ -1022,7 +1051,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   // 2. VUE PRINCIPALE : TABLEAU DES RENSEIGNEMENTS
   // =========================================================================
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div key="renseignements-list" className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Toast Notification */}
       {toastMessage && (
         <div
@@ -1062,19 +1091,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
             <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>
               Renseignements Douaniers
             </h1>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                padding: '2px 8px',
-                borderRadius: '6px',
-                backgroundColor: 'var(--color-surface)',
-                color: 'var(--color-accent)',
-                fontFamily: 'SF Mono, monospace',
-              }}
-            >
-              {visibleItems.length} enregistrements
-            </span>
+           
           </div>
         </div>
 
@@ -1208,68 +1225,68 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                 </td>
               </tr>
             ) : (
-              filteredItems.map((ren) => (
-                <tr
-                  key={ren.id}
-                  onClick={() => setSelectedId(ren.id)}
-                  style={{
-                    borderBottom: '1px solid var(--color-border)',
-                    transition: 'background var(--transition-fast)',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-muted)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  {/* Date */}
-                  <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
-                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
-                      {ren.dateReception}
-                    </div>
-                   
-                  </td>
+              filteredItems
+                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                .map((ren) => (
+                  <tr
+                    key={ren.id}
+                    onClick={() => setSelectedId(ren.id)}
+                    style={{
+                      borderBottom: '1px solid var(--color-border)',
+                      transition: 'background var(--transition-fast)',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-muted)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    {/* Date */}
+                    <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
+                        {ren.dateReception}
+                      </div>
+                    </td>
 
-                  {/* Origine & Source */}
-                  <td style={{ padding: '12px 16px', maxWidth: '220px' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--color-text-primary)', fontSize: '12px' }}>
-                      {ren.origine}
-                    </div>
-                  </td>
+                    {/* Origine & Source */}
+                    <td style={{ padding: '12px 16px', maxWidth: '220px' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--color-text-primary)', fontSize: '12px' }}>
+                        {ren.origine}
+                      </div>
+                    </td>
 
-                  
+                    {/* Priorité */}
+                    <td style={{ padding: '12px 16px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                        {ren.priorite || 'Normale'}
+                      </span>
+                    </td>
 
-                  {/* Priorité */}
-                  <td style={{ padding: '12px 16px' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                      {ren.priorite || 'Normale'}
-                    </span>
-                  </td>
+                    {/* Agent affecté */}
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                        {ren.coteA || 'Non coté'}
+                      </div>
+                    </td>
 
-                  {/* Agent affecté */}
-                  <td style={{ padding: '12px 16px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                      {ren.coteA || 'Non coté'}
-                    </div>
-
-                  </td>
-
-                  {/* Statut & Issue */}
-                  <td style={{ padding: '12px 16px' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                      {ren.dossiersLies && ren.dossiersLies.length > 0
-                        ? `Dossier ouvert `
-                        : ren.effetProduit === 'CLASSE_SANS_SUITE'
-                        ? 'Classé sans suite'
-                        : 'En cours d’instruction'}
-                    </span>
-                  </td>
-
-                  {/* Action */}
-                
-                </tr>
-              ))
+                    {/* Statut & Issue */}
+                    <td style={{ padding: '12px 16px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
+                        {getRenseignementStatut(ren)}
+                      </span>
+                    </td>
+                  </tr>
+                ))
             )}
           </tbody>
         </table>
+
+        {/* Pagination discrète */}
+        <TablePagination
+          currentPage={currentPage}
+          totalItems={filteredItems.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          itemLabel="renseignements"
+        />
       </div>
 
       {/* Modal : Nouvelle Demande de Renseignement (Admin) */}
@@ -1379,27 +1396,37 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '5px' }}>
                   Pièces disponibles & Documents justificatifs
                 </label>
-                <div
+                <label
                   style={{
+                    position: 'relative',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    padding: '8px 12px',
+                    padding: '9px 12px',
                     backgroundColor: 'var(--color-bg)',
                     border: '1px solid var(--color-border)',
                     borderRadius: 'var(--radius-btn)',
+                    cursor: 'pointer',
                     marginBottom: '6px',
+                    transition: 'border-color var(--transition-fast)',
                   }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-text-secondary)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}
                 >
                   <Upload size={14} color="var(--color-text-muted)" />
+                  <span style={{ fontSize: '12px', color: formUploadedFiles.length > 0 ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1 }}>
+                    {formUploadedFiles.length > 0
+                      ? `${formUploadedFiles.length} document(s) sélectionné(s)`
+                      : 'Cliquer pour choisir les pièces disponibles...'}
+                  </span>
                   <input
                     type="file"
                     multiple
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg"
                     onChange={handleUploadedFilesChange}
-                    style={{ fontSize: '12px', color: 'var(--color-text-secondary)', flex: 1 }}
+                    style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
                   />
-                </div>
+                </label>
 
                 {formUploadedFiles.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '6px' }}>

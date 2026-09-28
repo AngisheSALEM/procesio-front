@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type { DossierEnquete } from '../../types';
 import type { DossierTabId } from '../DossierHeader';
+import { TablePagination } from '../common/TablePagination';
 
 interface SupervisionClassementsViewProps {
   dossiers: DossierEnquete[];
@@ -19,6 +20,8 @@ export const SupervisionClassementsView: React.FC<SupervisionClassementsViewProp
   onBack,
 }) => {
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 6;
 
   // Filter dossiers that are closed without action / classés sans suite
   const closedDossiers = dossiers.filter(
@@ -169,49 +172,60 @@ export const SupervisionClassementsView: React.FC<SupervisionClassementsViewProp
                 </td>
               </tr>
             ) : (
-              filtered.map((d) => (
-                <tr
-                  key={d.id}
-                  onClick={() => onOpenDossier(d.id, 'vue-ensemble')}
-                  className="card-interactive"
-                  style={{
-                    borderBottom: '1px solid var(--color-border)',
-                    cursor: 'pointer',
-                    transition: 'background var(--transition-fast)',
-                  }}
-                >
-                  <td style={{ padding: '12px 16px' }}>
-                    <div style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: '12px' }}>
-                      {d.reference}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                      <Calendar size={11} />
-                      <span>Clôturé le {d.dateCloture || '14/09/2026'}</span>
-                    </div>
-                  </td>
+              filtered
+                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                .map((d) => (
+                  <tr
+                    key={d.id}
+                    onClick={() => onOpenDossier(d.id, 'vue-ensemble')}
+                    className="card-interactive"
+                    style={{
+                      borderBottom: '1px solid var(--color-border)',
+                      cursor: 'pointer',
+                      transition: 'background var(--transition-fast)',
+                    }}
+                  >
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: '12px' }}>
+                        {d.reference}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                        <Calendar size={11} />
+                        <span>Clôturé le {d.dateCloture || '14/09/2026'}</span>
+                      </div>
+                    </td>
 
-                  <td style={{ padding: '12px 16px' }}>
-                    <div style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                      {d.entiteControlee.nom}
-                    </div>
-                  </td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                        {d.entiteControlee.nom}
+                      </div>
+                    </td>
 
-                  <td style={{ padding: '12px 16px' }}>
-                    <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>
-                      {d.responsable}
-                    </div>
-                  </td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>
+                        {d.responsable}
+                      </div>
+                    </td>
 
-                  <td style={{ padding: '12px 16px' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                      Classé sans suite
-                    </span>
-                  </td>
-                </tr>
-              ))
+                    <td style={{ padding: '12px 16px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                        Classé sans suite
+                      </span>
+                    </td>
+                  </tr>
+                ))
             )}
           </tbody>
         </table>
+
+        {/* Pagination discrète */}
+        <TablePagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          itemLabel="dossiers classés"
+        />
       </div>
     </div>
   );

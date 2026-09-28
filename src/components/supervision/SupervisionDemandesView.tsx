@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import type { DemandeCommunication, DossierEnquete } from '../../types';
 import type { DossierTabId } from '../DossierHeader';
+import { TablePagination } from '../common/TablePagination';
 
 interface SupervisionDemandesViewProps {
   demandes: Record<string, DemandeCommunication[]>;
@@ -21,6 +22,8 @@ export const SupervisionDemandesView: React.FC<SupervisionDemandesViewProps> = (
 }) => {
   const [search, setSearch] = useState('');
   const [filterStatut, setFilterStatut] = useState<string>('TOUS');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 6;
 
   // Flatten all demandes
   const allDemandes = Object.entries(demandes).flatMap(([dossierId, list]) => {
@@ -245,72 +248,83 @@ export const SupervisionDemandesView: React.FC<SupervisionDemandesViewProps> = (
                 </td>
               </tr>
             ) : (
-              filtered.map(({ demande, dossier }) => {
-                const totalElements = demande.elementsDemandes.length;
-                const fournis = demande.elementsDemandes.filter((e) => e.statutRemise === 'FOURNI').length;
+              filtered
+                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                .map(({ demande, dossier }) => {
+                  const totalElements = demande.elementsDemandes.length;
+                  const fournis = demande.elementsDemandes.filter((e) => e.statutRemise === 'FOURNI').length;
 
-                return (
-                  <tr
-                    key={demande.id}
-                    onClick={() => onOpenDossier(demande.dossierId || (dossier ? dossier.id : ''), 'actions-echanges')}
-                    className="card-interactive"
-                    style={{
-                      borderBottom: '1px solid var(--color-border)',
-                      cursor: 'pointer',
-                      transition: 'background var(--transition-fast)',
-                    }}
-                  >
-                    {/* Destinataire: Anchor */}
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                        {demande.destinataire.nom}
-                      </div>
-                    </td>
+                  return (
+                    <tr
+                      key={demande.id}
+                      onClick={() => onOpenDossier(demande.dossierId || (dossier ? dossier.id : ''), 'actions-echanges')}
+                      className="card-interactive"
+                      style={{
+                        borderBottom: '1px solid var(--color-border)',
+                        cursor: 'pointer',
+                        transition: 'background var(--transition-fast)',
+                      }}
+                    >
+                      {/* Destinataire: Anchor */}
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                          {demande.destinataire.nom}
+                        </div>
+                      </td>
 
-                    {/* Référence / Date */}
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                        {demande.dateEmission || '20/08/2026'}
-                      </div>
-                    </td>
+                      {/* Référence / Date */}
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                          {demande.dateEmission || '20/08/2026'}
+                        </div>
+                      </td>
 
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>
-                        {dossier ? dossier.entiteControlee.nom : demande.dossierId}
-                      </div>
-                    </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>
+                          {dossier ? dossier.entiteControlee.nom : demande.dossierId}
+                        </div>
+                      </td>
 
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                        {demande.echeanceReponse}
-                      </div>
-                    </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                          {demande.echeanceReponse}
+                        </div>
+                      </td>
 
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                        {fournis} / {totalElements} pièces remises
-                      </div>
-                    </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                          {fournis} / {totalElements} pièces remises
+                        </div>
+                      </td>
 
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                        {demande.statut === 'REPONSE_COMPLETE'
-                          ? 'Complète'
-                          : demande.statut === 'REPONSE_PARTIELLE'
-                          ? 'Partielle'
-                          : demande.statut === 'EMISE'
-                          ? 'Émise'
-                          : demande.statut === 'A_VALIDER'
-                          ? 'À valider'
-                          : demande.statut.replace('_', ' ')}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })
+                      <td style={{ padding: '12px 16px' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                          {demande.statut === 'REPONSE_COMPLETE'
+                            ? 'Complète'
+                            : demande.statut === 'REPONSE_PARTIELLE'
+                            ? 'Partielle'
+                            : demande.statut === 'EMISE'
+                            ? 'Émise'
+                            : demande.statut === 'A_VALIDER'
+                            ? 'À valider'
+                            : demande.statut.replace('_', ' ')}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
             )}
           </tbody>
         </table>
+
+        {/* Pagination discrète */}
+        <TablePagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          itemLabel="demandes"
+        />
       </div>
     </div>
   );

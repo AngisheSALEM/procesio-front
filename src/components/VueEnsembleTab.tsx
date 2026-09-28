@@ -727,18 +727,26 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
                 <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                   {demande ? 'Mettre à jour le fichier PDF joint' : 'Document PDF joint'}
                 </label>
-                <div
+                <label
                   style={{
+                    position: 'relative',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    padding: '8px 12px',
+                    padding: '9px 12px',
                     backgroundColor: 'var(--color-bg)',
                     border: '1px solid var(--color-border)',
                     borderRadius: 'var(--radius-btn)',
+                    cursor: 'pointer',
+                    transition: 'border-color var(--transition-fast)',
                   }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-text-secondary)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}
                 >
                   <Upload size={14} color="var(--color-text-muted)" />
+                  <span style={{ fontSize: '12px', color: demandeForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {demandeForm.pdfFile ? `${demandeForm.pdfFile.name} (${demandeForm.pdfFile.size})` : 'Cliquer pour choisir un document PDF...'}
+                  </span>
                   <input
                     type="file"
                     accept=".pdf"
@@ -751,9 +759,9 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
                         }));
                       }
                     }}
-                    style={{ fontSize: '12px', color: 'var(--color-text-secondary)', flex: 1 }}
+                    style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
                   />
-                </div>
+                </label>
                 {demandeForm.pdfFile ? (
                   <div style={{ fontSize: '11px', color: 'var(--color-success)', marginTop: '4px' }}>
                     Nouveau fichier : {demandeForm.pdfFile.name}
@@ -936,18 +944,26 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
                 <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                   {feuille ? 'Mettre à jour le fichier PDF notifié' : 'Document PDF des observations'}
                 </label>
-                <div
+                <label
                   style={{
+                    position: 'relative',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    padding: '8px 12px',
+                    padding: '9px 12px',
                     backgroundColor: 'var(--color-bg)',
                     border: '1px solid var(--color-border)',
                     borderRadius: 'var(--radius-btn)',
+                    cursor: 'pointer',
+                    transition: 'border-color var(--transition-fast)',
                   }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-text-secondary)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}
                 >
                   <Upload size={14} color="var(--color-text-muted)" />
+                  <span style={{ fontSize: '12px', color: feuilleForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {feuilleForm.pdfFile ? `${feuilleForm.pdfFile.name} (${feuilleForm.pdfFile.size})` : 'Cliquer pour choisir un document PDF...'}
+                  </span>
                   <input
                     type="file"
                     accept=".pdf"
@@ -960,9 +976,9 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
                         }));
                       }
                     }}
-                    style={{ fontSize: '12px', color: 'var(--color-text-secondary)', flex: 1 }}
+                    style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
                   />
-                </div>
+                </label>
                 {feuilleForm.pdfFile ? (
                   <div style={{ fontSize: '11px', color: 'var(--color-success)', marginTop: '4px' }}>
                     Nouveau fichier : {feuilleForm.pdfFile.name}

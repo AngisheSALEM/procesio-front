@@ -55,8 +55,8 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
     : null;
 
   const defaultAuteur = currentUser
-    ? `${currentUser.grade} ${currentUser.prenom} ${currentUser.nom}`
-    : (demande?.auteur || demande?.redacteur || 'Inspecteur Marc Kabamba');
+    ? `${currentUser.prenom} ${currentUser.nom}`
+    : (demande?.auteur?.replace(/^(Inspecteur|Contrôleur|Directeur|Chef de Bureau)\s+/i, '') || demande?.redacteur?.replace(/^(Inspecteur|Contrôleur|Directeur|Chef de Bureau)\s+/i, '') || 'Marc Kabamba');
 
   // Formulaire de création / remplacement demande
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -509,25 +509,33 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
               Document PDF joint
             </label>
-            <div
+            <label
               style={{
+                position: 'relative',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                padding: '8px 12px',
+                padding: '9px 12px',
                 backgroundColor: 'var(--color-bg)',
                 border: '1px solid var(--color-border)',
                 borderRadius: 'var(--radius-btn)',
+                cursor: 'pointer',
+                transition: 'border-color var(--transition-fast)',
               }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-text-secondary)')}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}
             >
               <Upload size={14} color="var(--color-text-muted)" />
+              <span style={{ fontSize: '12px', color: createForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {createForm.pdfFile ? `${createForm.pdfFile.name} (${createForm.pdfFile.size})` : 'Cliquer pour choisir un document PDF...'}
+              </span>
               <input
                 type="file"
                 accept=".pdf"
                 onChange={handleFileChange}
-                style={{ fontSize: '12px', color: 'var(--color-text-secondary)', flex: 1 }}
+                style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
               />
-            </div>
+            </label>
             {createForm.pdfFile && (
               <div style={{ fontSize: '11px', color: 'var(--color-accent)', marginTop: '4px' }}>
                 Document prêt : {createForm.pdfFile.name} ({createForm.pdfFile.size})
@@ -557,7 +565,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
   // =========================================================================
   if (!demande) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
+      <div key="demande-cards-list" className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
         {/* Toast Notification */}
         {notification && (
           <div
@@ -795,7 +803,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
     demande.reponsesRecues?.[0]?.referenceCourrier;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
+    <div key={`demande-detail-${demande.id}`} className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
       {/* Toast Notification */}
       {notification && (
         <div
@@ -1534,25 +1542,33 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                   Document PDF joint
                 </label>
-                <div
+                <label
                   style={{
+                    position: 'relative',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    padding: '8px 12px',
+                    padding: '9px 12px',
                     backgroundColor: 'var(--color-bg)',
                     border: '1px solid var(--color-border)',
                     borderRadius: 'var(--radius-btn)',
+                    cursor: 'pointer',
+                    transition: 'border-color var(--transition-fast)',
                   }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-text-secondary)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}
                 >
                   <Upload size={14} color="var(--color-text-muted)" />
+                  <span style={{ fontSize: '12px', color: createForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {createForm.pdfFile ? `${createForm.pdfFile.name} (${createForm.pdfFile.size})` : 'Cliquer pour choisir un document PDF...'}
+                  </span>
                   <input
                     type="file"
                     accept=".pdf"
                     onChange={handleFileChange}
-                    style={{ fontSize: '12px', color: 'var(--color-text-secondary)', flex: 1 }}
+                    style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
                   />
-                </div>
+                </label>
                 {createForm.pdfFile && (
                   <div style={{ fontSize: '11px', color: 'var(--color-success)', marginTop: '4px' }}>
                     Document prêt : {createForm.pdfFile.name} ({createForm.pdfFile.size})
@@ -1812,25 +1828,33 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                   Document PDF des observations notifiées
                 </label>
-                <div
+                <label
                   style={{
+                    position: 'relative',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    padding: '8px 12px',
+                    padding: '9px 12px',
                     backgroundColor: 'var(--color-bg)',
                     border: '1px solid var(--color-border)',
                     borderRadius: 'var(--radius-btn)',
+                    cursor: 'pointer',
+                    transition: 'border-color var(--transition-fast)',
                   }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-text-secondary)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}
                 >
                   <Upload size={14} color="var(--color-text-muted)" />
+                  <span style={{ fontSize: '12px', color: feuilleForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {feuilleForm.pdfFile ? `${feuilleForm.pdfFile.name} (${feuilleForm.pdfFile.size})` : 'Cliquer pour choisir un document PDF...'}
+                  </span>
                   <input
                     type="file"
                     accept=".pdf"
                     onChange={handleFeuilleFileChange}
-                    style={{ fontSize: '12px', color: 'var(--color-text-secondary)', flex: 1 }}
+                    style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
                   />
-                </div>
+                </label>
                 {feuilleForm.pdfFile && (
                   <div style={{ fontSize: '11px', color: 'var(--color-success)', marginTop: '4px' }}>
                     Document prêt : {feuilleForm.pdfFile.name} ({feuilleForm.pdfFile.size})
@@ -1984,27 +2008,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 />
               </div>
 
-              {/* Champ 3 : Référence du courrier opérateur */}
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
-                  Référence du courrier de l'opérateur
-                </label>
-                <input
-                  type="text"
-                  value={reponseForm.reference}
-                  onChange={(e) => setReponseForm((prev) => ({ ...prev, reference: e.target.value }))}
-                  placeholder="Ex : CMCL/DIR/CONF/2026/042"
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '13px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '6px',
-                    color: 'var(--color-text-primary)',
-                  }}
-                />
-              </div>
+             
 
               {/* Champ 4 : Auteur / Représentant */}
               <div>
@@ -2162,30 +2166,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 </div>
               </div>
 
-              {/* Champ 2 : Décision de clôture */}
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
-                  Décision d’instruction retenue
-                </label>
-                <div
-                  style={{
-                    padding: '8px 12px',
-                    backgroundColor: 'var(--color-surface-muted)',
-                    border: '1px solid var(--color-border-subtle)',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: 'var(--color-text-primary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                  }}
-                >
-                  <CheckCircle size={14} color="var(--color-text-primary)" />
-                  <span>Classement sans suite immédiat (Dossier régulier)</span>
-                </div>
-              </div>
-
+              
               {/* Champ 3 : Inspecteur & Date */}
               <div className="form-grid-2col" style={{ gap: '12px' }}>
                 <div>
@@ -2385,8 +2366,9 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                       color: 'var(--color-text-primary)',
                     }}
                   />
-                  <div
+                  <label
                     style={{
+                      position: 'relative',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
@@ -2394,9 +2376,16 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                       border: '1px dashed var(--color-border)',
                       borderRadius: '6px',
                       backgroundColor: 'var(--color-bg)',
+                      cursor: 'pointer',
+                      transition: 'border-color var(--transition-fast)',
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-text-secondary)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}
                   >
                     <Upload size={14} color="var(--color-text-muted)" />
+                    <span style={{ fontSize: '12px', color: revirementForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {revirementForm.pdfFile ? `${revirementForm.pdfFile.name} (${revirementForm.pdfFile.size})` : 'Cliquer pour joindre un justificatif...'}
+                    </span>
                     <input
                       type="file"
                       accept=".pdf,.png,.jpg,.jpeg"
@@ -2410,9 +2399,9 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                           }));
                         }
                       }}
-                      style={{ fontSize: '12px', color: 'var(--color-text-secondary)', flex: 1 }}
+                      style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
                     />
-                  </div>
+                  </label>
                 </div>
               </div>
 

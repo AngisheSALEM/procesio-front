@@ -20,9 +20,7 @@ export const ParametresView: React.FC<ParametresViewProps> = ({
         <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
           Paramètres du système
         </h1>
-        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-          Gérez l’apparence visuelle de l’application, vos préférences et votre profil utilisateur.
-        </p>
+    
       </div>
 
       {/* Theme Preference Card (as requested: theme switcher in settings) */}
@@ -39,7 +37,7 @@ export const ParametresView: React.FC<ParametresViewProps> = ({
             Apparence & Thème visuel
           </h2>
           <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-            Basculez entre le thème sombre officiel DGDA et le thème clair haute lisibilité.
+            Basculez entre le thème sombre et  le thème clair haute lisibilité.
           </p>
         </div>
 
@@ -70,21 +68,19 @@ export const ParametresView: React.FC<ParametresViewProps> = ({
                   width: '40px',
                   height: '40px',
                   borderRadius: '10px',
-                  backgroundColor: '#1A191E',
+                  backgroundColor: 'none',
                   border: '1px solid #3D3C44',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#E4B74A',
+                  color: '#535251',
                 }}
               >
                 <Moon size={20} strokeWidth={2} />
               </div>
               <div>
                 <div style={{ fontSize: '14px', fontWeight: 600 }}>Thème Sombre (Midnight Slate)</div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                  Recommandé pour un confort prolongé
-                </div>
+               
               </div>
             </div>
             {theme === 'dark' && <Check size={18} color="var(--color-accent)" strokeWidth={2.5} />}

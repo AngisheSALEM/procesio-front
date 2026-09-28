@@ -5,7 +5,6 @@ import {
   X,
   CheckCircle,
   Scale,
-  Send,
   Printer,
   ArrowLeft
 } from 'lucide-react';
@@ -37,8 +36,8 @@ export const PvView: React.FC<PvViewProps> = ({
   onAddPv,
 }) => {
   const defaultAuteur = currentUser
-    ? `${currentUser.grade} ${currentUser.prenom} ${currentUser.nom}`
-    : (feuille?.inspecteurs?.[0] || 'Inspecteur Marc Kabamba');
+    ? `${currentUser.prenom} ${currentUser.nom}`
+    : (feuille?.inspecteurs?.[0]?.replace(/^(Inspecteur|Contrôleur|Directeur|Chef de Bureau)\s+/i, '') || 'Marc Kabamba');
 
   // PV par défaut synthétisé si la feuille d'observation a un PV GLEC
   const fallbackPvs: PvDetail[] = feuille?.pvInfractionGlec ? [{
@@ -46,14 +45,15 @@ export const PvView: React.FC<PvViewProps> = ({
     reference: feuille.pvInfractionGlec.reference,
     dossierId: dossier.id,
     datePv: feuille.pvInfractionGlec.date,
+    typePv: 'Procès-verbal d’infraction',
     inspecteurs: feuille.pvInfractionGlec.inspecteurs,
     destinataire: feuille.destinataire || dossier.entiteControlee.nom,
     objet: feuille.objetControle || dossier.objet,
     cadreLegal: feuille.cadreLegal,
     infractions: feuille.pvInfractionGlec.infractions,
-    droitsEludesUSD: feuille.pvInfractionGlec.droitsEludesUSD,
-    droitsEludesCDF: feuille.pvInfractionGlec.droitsEludesCDF,
-    amendeUSD: feuille.pvInfractionGlec.amendeUSD,
+    droitsEludesUSD: 0,
+    droitsEludesCDF: 0,
+    amendeUSD: 0,
     destinationContentieuse: 'Transmission à la Division Contentieuse DRK Lubumbashi & Parquet près le Tribunal de Grande Instance',
     statutPv: 'TRANSMIS_CONTENTIEUX',
     pdfNom: 'PV_Infraction_Douaniere_Officiel.pdf',
@@ -75,10 +75,12 @@ export const PvView: React.FC<PvViewProps> = ({
   const [showEditModal, setShowEditModal] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
-  // Formulaire modal STRICTEMENT 5 champs
+  // Formulaire modal avec référence, date, type, objet, inspecteurs, infractions, destination
   const [modalForm, setModalForm] = useState({
     reference: `DGDA/DRK/PV-INF/${new Date().getFullYear()}/089`,
     date: new Date().toISOString().split('T')[0],
+    typePv: 'Procès-verbal d’infraction',
+    objet: dossier.objet || '',
     inspecteurs: defaultAuteur,
     infractions: 'Minoration de la valeur en douane taxable et carence de justificatifs probants (Articles 356 et 357 du Code des douanes)',
     destination: 'Transmission à la Division Contentieuse DRK Lubumbashi & Parquet près le Tribunal de Grande Instance',
@@ -91,7 +93,7 @@ export const PvView: React.FC<PvViewProps> = ({
 
   const handleModalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!modalForm.reference.trim() || !modalForm.inspecteurs.trim()) {
+    if (!modalForm.reference.trim() || !modalForm.inspecteurs.trim() || !modalForm.objet.trim()) {
       alert('Veuillez remplir les informations obligatoires.');
       return;
     }
@@ -110,14 +112,15 @@ export const PvView: React.FC<PvViewProps> = ({
         reference: modalForm.reference,
         dossierId: dossier.id,
         datePv: modalForm.date,
+        typePv: modalForm.typePv || 'Procès-verbal d’infraction',
         destinataire: dossier.entiteControlee.nom,
         inspecteurs: inspArray.length > 0 ? inspArray : [defaultAuteur],
-        objet: `Infraction constatée aux opérations de dédouanement - ${dossier.objet}`,
+        objet: modalForm.objet.trim(),
         cadreLegal: 'Articles 356, 357, 398 et 402 du Code des douanes (Loi n° 10/002)',
         infractions: updatedInfractions.length > 0 ? updatedInfractions : ['Minoration de la valeur en douane taxable'],
-        droitsEludesUSD: 45000,
-        droitsEludesCDF: 125000000,
-        amendeUSD: 90000,
+        droitsEludesUSD: 0,
+        droitsEludesCDF: 0,
+        amendeUSD: 0,
         destinationContentieuse: modalForm.destination,
         statutPv: 'DRESSE',
         pdfNom: 'PV_Infraction_Douaniere_Officiel.pdf',
@@ -138,6 +141,8 @@ export const PvView: React.FC<PvViewProps> = ({
         ...activePv,
         reference: modalForm.reference,
         datePv: modalForm.date,
+        typePv: modalForm.typePv || activePv.typePv || 'Procès-verbal d’infraction',
+        objet: modalForm.objet.trim() || activePv.objet,
         inspecteurs: inspArray.length > 0 ? inspArray : activePv.inspecteurs,
         infractions: updatedInfractions.length > 0 ? updatedInfractions : activePv.infractions,
         destinationContentieuse: modalForm.destination,
@@ -212,15 +217,17 @@ export const PvView: React.FC<PvViewProps> = ({
         </div>
 
         <form onSubmit={handleModalSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+
           <div>
             <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
-              Référence officielle du PV *
+              Date de verbalisation *
             </label>
             <input
-              type="text"
+              type="date"
               required
-              value={modalForm.reference}
-              onChange={(e) => setModalForm((prev) => ({ ...prev, reference: e.target.value }))}
+              value={modalForm.date}
+              onChange={(e) => setModalForm((prev) => ({ ...prev, date: e.target.value }))}
               style={{
                 width: '100%',
                 padding: '8px 12px',
@@ -235,13 +242,38 @@ export const PvView: React.FC<PvViewProps> = ({
 
           <div>
             <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
-              Date de verbalisation *
+              Type de procès-verbal *
+            </label>
+            <select
+              value={modalForm.typePv}
+              onChange={(e) => setModalForm((prev) => ({ ...prev, typePv: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                fontSize: '13px',
+                backgroundColor: 'var(--color-bg)',
+                border: '1px solid var(--color-border)',
+                borderRadius: '6px',
+                color: 'var(--color-text-primary)',
+              }}
+            >
+              <option value="Procès-verbal d’infraction">Procès-verbal d’infraction</option>
+              <option value="Procès-verbal de constat">Procès-verbal de constat</option>
+              <option value="Procès-verbal de saisie">Procès-verbal de saisie</option>
+              <option value="Procès-verbal d’audition">Procès-verbal d’audition</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+              Objet du procès-verbal *
             </label>
             <input
-              type="date"
+              type="text"
               required
-              value={modalForm.date}
-              onChange={(e) => setModalForm((prev) => ({ ...prev, date: e.target.value }))}
+              value={modalForm.objet}
+              onChange={(e) => setModalForm((prev) => ({ ...prev, objet: e.target.value }))}
+              placeholder="Ex: Infraction constatée aux opérations de dédouanement..."
               style={{
                 width: '100%',
                 padding: '8px 12px',
@@ -341,7 +373,7 @@ export const PvView: React.FC<PvViewProps> = ({
   // =========================================================================
   if (!activePv) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
+      <div key="pv-cards-list" className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
         {/* Toast Notification */}
         {notification && (
           <div
@@ -409,6 +441,8 @@ export const PvView: React.FC<PvViewProps> = ({
               setModalForm({
                 reference: `DGDA/DRK/PV-INF/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
                 date: new Date().toISOString().split('T')[0],
+                typePv: 'Procès-verbal d’infraction',
+                objet: dossier.objet || '',
                 inspecteurs: defaultAuteur,
                 infractions: 'Minoration de la valeur en douane taxable et carence de justificatifs probants (Articles 356 et 357 du Code des douanes)',
                 destination: 'Transmission à la Division Contentieuse DRK Lubumbashi & Parquet près le Tribunal de Grande Instance',
@@ -478,20 +512,7 @@ export const PvView: React.FC<PvViewProps> = ({
                       </div>
                     </div>
 
-                    <span
-                      style={{
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        padding: '3px 8px',
-                        borderRadius: '4px',
-                        backgroundColor: 'var(--color-bg)',
-                        border: '1px solid var(--color-border)',
-                        color: 'var(--color-text-secondary)',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {item.statutPv === 'TRANSMIS_CONTENTIEUX' ? 'Transmis GLEC' : 'Dressé'}
-                    </span>
+                  
                   </div>
 
                   <div>
@@ -516,7 +537,7 @@ export const PvView: React.FC<PvViewProps> = ({
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
                     <span>
-                      Droits éludés : <strong className="font-sf" style={{ color: 'var(--color-text-primary)' }}>{item.droitsEludesUSD.toLocaleString()} USD</strong>
+                      Type : <strong style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{item.typePv || 'Procès-verbal d’infraction'}</strong>
                     </span>
                   </div>
                 </div>
@@ -557,6 +578,7 @@ export const PvView: React.FC<PvViewProps> = ({
     id: activePv.id,
     reference: activePv.reference,
     date: activePv.datePv,
+    typePv: activePv.typePv || 'Procès-verbal d’infraction',
     destinataire: activePv.destinataire,
     inspecteurs: activePv.inspecteurs.join(', '),
     motif: activePv.objet,
@@ -572,7 +594,7 @@ export const PvView: React.FC<PvViewProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
+    <div key={`pv-detail-${activePv.id}`} className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
       {/* Toast Notification */}
       {notification && (
         <div
@@ -651,6 +673,11 @@ export const PvView: React.FC<PvViewProps> = ({
           }}
         >
           <div>
+            {/* Type de PV */}
+            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>
+              {pvData.typePv}
+            </div>
+
             {/* Destinataire : Nom de l'entreprise en GRAS */}
             <p
               style={{
@@ -708,6 +735,8 @@ export const PvView: React.FC<PvViewProps> = ({
                 setModalForm({
                   reference: pvData.reference,
                   date: pvData.date,
+                  typePv: pvData.typePv,
+                  objet: pvData.motif,
                   inspecteurs: pvData.inspecteurs,
                   infractions: pvData.infractions.join('\n'),
                   destination: pvData.destination,
@@ -867,65 +896,7 @@ export const PvView: React.FC<PvViewProps> = ({
               ))}
             </div>
 
-            {/* Chiffrage douanier condensé et net */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '12px',
-                marginTop: '12px',
-              }}
-            >
-              <div
-                style={{
-                  padding: '12px 14px',
-                  backgroundColor: 'var(--color-bg)',
-                  borderRadius: '6px',
-                }}
-              >
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-                  Droits & taxes éludés
-                </div>
-                <div className="font-sf" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '4px' }}>
-                  {pvData.droitsEludesUSD.toLocaleString()} USD
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                  {/* ≈ {pvData.droitsEludesCDF.toLocaleString()} CDF */}
-                </div>
-              </div>
 
-              <div
-                style={{
-                  padding: '12px 14px',
-                  backgroundColor: 'var(--color-bg)',
-                  borderRadius: '6px',
-                }}
-              >
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-                  Amende légale encourue
-                </div>
-                <div className="font-sf" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '4px' }}>
-                  {pvData.amendeUSD.toLocaleString()} USD
-                </div>
-               
-              </div>
-
-              <div
-                style={{
-                  padding: '12px 14px',
-                  backgroundColor: 'var(--color-bg)',
-                  borderRadius: '6px',
-                }}
-              >
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-                  Préjudice total réclamé
-                </div>
-                <div className="font-sf" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '4px' }}>
-                  {(pvData.droitsEludesUSD + pvData.amendeUSD).toLocaleString()} USD
-                </div>
-            
-              </div>
-            </div>
           </div>
 
           {/* 5. Orientation contentieuse & Juridiction */}
@@ -967,7 +938,7 @@ export const PvView: React.FC<PvViewProps> = ({
               flexWrap: 'wrap',
             }}
           >
-            <button
+            {/* <button
               type="button"
               className="btn-primary"
               onClick={() => {
@@ -977,15 +948,18 @@ export const PvView: React.FC<PvViewProps> = ({
             >
               <Send size={14} />
               <span>Confirmer le relais GELEC</span>
-            </button>
+            </button> */}
 
             <button
               type="button"
               className="btn-secondary"
               onClick={() => {
+                setModalMode('edit');
                 setModalForm({
                   reference: pvData.reference,
                   date: pvData.date,
+                  typePv: pvData.typePv,
+                  objet: pvData.motif,
                   inspecteurs: pvData.inspecteurs,
                   infractions: pvData.infractions.join('\n'),
                   destination: pvData.destination,
@@ -1020,205 +994,8 @@ export const PvView: React.FC<PvViewProps> = ({
         </div>
       </div>
 
-      {/* =========================================================================
-          MODALE D'ÉDITION : STRICTEMENT 5 CHAMPS
-          1. Référence officielle du PV
-          2. Date de verbalisation
-          3. Inspecteurs verbalisateurs
-          4. Infractions constatées
-          5. Destination contentieuse
-          ========================================================================= */}
-      {showEditModal && (
-        <div
-          className="modal-backdrop-responsive"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px',
-          }}
-        >
-          <div
-            className="modal-card-responsive"
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: 'var(--radius-card)',
-              border: '1px solid var(--color-border)',
-              width: '100%',
-              maxWidth: '560px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: 'var(--shadow-modal)',
-            }}
-          >
-            <div
-              style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid var(--color-border)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div>
-                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>
-                  {modalMode === 'create' ? 'Dresser un nouveau procès-verbal' : 'Modifier les éléments du procès-verbal'}
-                </h3>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                  {modalMode === 'create' ? 'Enregistrement officiel de la qualification des infractions douanières' : 'Ajustement des mentions officielles et des qualifications d\'infraction'}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowEditModal(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--color-text-muted)',
-                  cursor: 'pointer',
-                  padding: '4px',
-                }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleModalSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* Champ 1 : Référence officielle */}
-              {/* <div>
-                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
-                  Référence officielle du PV *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={modalForm.reference}
-                  onChange={(e) => setModalForm((prev) => ({ ...prev, reference: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '13px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '6px',
-                    color: 'var(--color-text-primary)',
-                  }}
-                />
-              </div> */}
-
-              {/* Champ 2 : Date de verbalisation */}
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
-                  Date de verbalisation *
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={modalForm.date}
-                  onChange={(e) => setModalForm((prev) => ({ ...prev, date: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '13px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '6px',
-                    color: 'var(--color-text-primary)',
-                  }}
-                />
-              </div>
-
-              {/* Champ 3 : Inspecteurs verbalisateurs */}
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
-                  Inspecteurs verbalisateurs *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={modalForm.inspecteurs}
-                  onChange={(e) => setModalForm((prev) => ({ ...prev, inspecteurs: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '13px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '6px',
-                    color: 'var(--color-text-primary)',
-                  }}
-                />
-              </div>
-
-              {/* Champ 4 : Infractions constatées */}
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
-                  Infractions constatées (1 par ligne) *
-                </label>
-                <textarea
-                  rows={3}
-                  required
-                  value={modalForm.infractions}
-                  onChange={(e) => setModalForm((prev) => ({ ...prev, infractions: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '12px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '6px',
-                    color: 'var(--color-text-primary)',
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                  }}
-                />
-              </div>
-
-              {/* Champ 5 : Destination contentieuse */}
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
-                  Destination contentieuse & Mesures
-                </label>
-                <input
-                  type="text"
-                  value={modalForm.destination}
-                  onChange={(e) => setModalForm((prev) => ({ ...prev, destination: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '13px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '6px',
-                    color: 'var(--color-text-primary)',
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setShowEditModal(false)}
-                  style={{ fontSize: '12px' }}
-                >
-                  Annuler
-                </button>
-                <button type="submit" className="btn-primary" style={{ fontSize: '12px' }}>
-                  {modalMode === 'create' ? 'Dresser le PV' : 'Enregistrer les modifications'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Modale d'édition / création */}
+      {showEditModal && renderModal()}
     </div>
   );
 };

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type { DossierEnquete, PvDetail } from '../../types';
 import type { DossierTabId } from '../DossierHeader';
+import { TablePagination } from '../common/TablePagination';
 
 interface SupervisionPvViewProps {
   pvs: Record<string, PvDetail[]>;
@@ -21,6 +22,8 @@ export const SupervisionPvView: React.FC<SupervisionPvViewProps> = ({
   onBack,
 }) => {
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 6;
 
   // Flatten PVs across all dossiers
   const allPvItems = Object.entries(pvs).flatMap(([dossierId, pList]) => {
@@ -31,10 +34,6 @@ export const SupervisionPvView: React.FC<SupervisionPvViewProps> = ({
     }));
   });
 
-  // Calculate aggregates
-  const dossiersCount = new Set(allPvItems.map((x) => x.pv.dossierId)).size;
-  const totalDroitsUSD = allPvItems.reduce((acc, x) => acc + (x.pv.droitsEludesUSD || 0), 0);
-  const totalAmendesUSD = allPvItems.reduce((acc, x) => acc + (x.pv.amendeUSD || 0), 0);
 
   // Filter
   const filtered = allPvItems.filter(({ pv, dossier }) => {
@@ -49,7 +48,7 @@ export const SupervisionPvView: React.FC<SupervisionPvViewProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Top Banner & Financial Metrics */}
+      {/* Top Banner */}
       <div
         style={{
           backgroundColor: 'none',
@@ -94,43 +93,7 @@ export const SupervisionPvView: React.FC<SupervisionPvViewProps> = ({
         </div>
 
         {/* 4 Cards - Same style as SupervisionOverviewTab */}
-        <div className="kpi-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-          <div style={{ backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-card)', border: '1px solid var(--color-border-subtle)', padding: '20px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-              Total Dossiers avec PV
-            </div>
-            <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)', marginTop: '4px' }}>
-              {dossiersCount} affaires
-            </div>
-          </div>
 
-          <div style={{ backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-card)', border: '1px solid var(--color-border-subtle)', padding: '20px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-              Droits Éludés Constatés ($ USD)
-            </div>
-            <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)', marginTop: '4px' }}>
-              ${totalDroitsUSD.toLocaleString()}
-            </div>
-          </div>
-
-          <div style={{ backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-card)', border: '1px solid var(--color-border-subtle)', padding: '20px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-              Amendes Légales Prévues
-            </div>
-            <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)', marginTop: '4px' }}>
-              ${totalAmendesUSD.toLocaleString()}
-            </div>
-          </div>
-
-          <div style={{ backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-card)', border: '1px solid var(--color-border-subtle)', padding: '20px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-              Relais GELEC & Parquet
-            </div>
-            <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)', marginTop: '4px' }}>
-              100%
-            </div>
-          </div>
-        </div>
 
         {/* Search */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
@@ -184,7 +147,7 @@ export const SupervisionPvView: React.FC<SupervisionPvViewProps> = ({
             >
               <th style={{ padding: '12px 16px' }}>Dossier Lié & Entité</th>
               <th style={{ padding: '12px 16px' }}>Inspecteurs Verbalisateurs</th>
-              <th style={{ padding: '12px 16px' }}>Droits Éludés & Amendes</th>
+              <th style={{ padding: '12px 16px' }}>Type de PV</th>
               <th style={{ padding: '12px 16px' }}>Destination Contentieuse</th>
               <th style={{ padding: '12px 16px' }}>Date</th>
             </tr>
@@ -197,57 +160,65 @@ export const SupervisionPvView: React.FC<SupervisionPvViewProps> = ({
                 </td>
               </tr>
             ) : (
-              filtered.map(({ pv, dossier }) => (
-                <tr
-                  key={pv.id}
-                  onClick={() => onOpenDossier(pv.dossierId || (dossier ? dossier.id : ''), 'documents')}
-                  className="card-interactive"
-                  style={{
-                    borderBottom: '1px solid var(--color-border)',
-                    cursor: 'pointer',
-                    transition: 'background var(--transition-fast)',
-                  }}
-                >
-                  <td style={{ padding: '12px 16px' }}>
-                    <div style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                      {pv.destinataire}
-                    </div>
-                  </td>
+              filtered
+                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                .map(({ pv, dossier }) => (
+                  <tr
+                    key={pv.id}
+                    onClick={() => onOpenDossier(pv.dossierId || (dossier ? dossier.id : ''), 'documents')}
+                    className="card-interactive"
+                    style={{
+                      borderBottom: '1px solid var(--color-border)',
+                      cursor: 'pointer',
+                      transition: 'background var(--transition-fast)',
+                    }}
+                  >
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                        {pv.destinataire}
+                      </div>
+                    </td>
 
-                  <td style={{ padding: '12px 16px' }}>
-                    <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>
-                      {pv.inspecteurs.join(', ')}
-                    </div>
-                  </td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>
+                        {pv.inspecteurs.join(', ')}
+                      </div>
+                    </td>
 
-                  <td style={{ padding: '12px 16px' }}>
-                    <div style={{ fontWeight: 700, color: 'var(--color-text-primary)', fontSize: '13px' }}>
-                      ${pv.droitsEludesUSD.toLocaleString()} USD
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                      Amende : ${pv.amendeUSD.toLocaleString()} USD
-                    </div>
-                  </td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--color-text-primary)', fontSize: '13px' }}>
+                        {pv.typePv || 'Procès-verbal d’infraction'}
+                      </div>
+                    </td>
 
-                  <td style={{ padding: '12px 16px', maxWidth: '240px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--color-text-primary)' }}>
-                      <Send size={12} color="var(--color-text-muted)" />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {pv.destinationContentieuse}
-                      </span>
-                    </div>
-                  </td>
+                    <td style={{ padding: '12px 16px', maxWidth: '240px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--color-text-primary)' }}>
+                        <Send size={12} color="var(--color-text-muted)" />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {pv.destinationContentieuse}
+                        </span>
+                      </div>
+                    </td>
 
-                  <td style={{ padding: '12px 16px' }}>
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                      Dressé le {pv.datePv}
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                        Dressé le {pv.datePv}
+                      </div>
+                    </td>
+                  </tr>
+                ))
             )}
           </tbody>
         </table>
+
+        {/* Pagination discrète */}
+        <TablePagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          itemLabel="procès-verbaux"
+        />
       </div>
     </div>
   );

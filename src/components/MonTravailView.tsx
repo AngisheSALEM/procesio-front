@@ -4,6 +4,8 @@ import {
   Clock
 } from 'lucide-react';
 import type { DossierEnquete, UserAccount } from '../types';
+import { TablePagination } from './common/TablePagination';
+import { isAssignedToUser } from '../utils/userUtils';
 
 interface MonTravailViewProps {
   dossiers: DossierEnquete[];
@@ -19,16 +21,11 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statutFilter, setStatutFilter] = useState<'TOUS' | 'EN_COURS' | 'EN_ATTENTE' | 'A_VALIDER'>('TOUS');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 6;
 
-  // Filter dossiers according to user role (inspectors only see their assigned dossiers, admin sees all)
-  const visibleDossiers = dossiers.filter((d) => {
-    if (user.role === 'admin') return true;
-    const nom = user.nom.toLowerCase();
-    return (
-      d.responsable.toLowerCase().includes(nom) ||
-      (d.equipe && d.equipe.some((m) => m.toLowerCase().includes(nom)))
-    );
-  });
+  // Filtrage strict : l'enquêteur ne voit que les dossiers qui lui sont personnellement assignés
+  const visibleDossiers = dossiers.filter((d) => isAssignedToUser(d.responsable, d.equipe, user));
 
   // Filter dossiers
   const filteredDossiers = visibleDossiers.filter((d) => {
@@ -52,19 +49,7 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
             <h1 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
               Dossiers d’Enquête
             </h1>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                padding: '2px 8px',
-                borderRadius: '6px',
-                backgroundColor: 'var(--color-surface)',
-                color: 'var(--color-accent)',
-                fontFamily: 'SF Mono, monospace',
-              }}
-            >
-              {visibleDossiers.length} dossiers
-            </span>
+           
           </div>
         </div>
       </div>
@@ -188,104 +173,69 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
                 </td>
               </tr>
             ) : (
-              filteredDossiers.map((dossier) => {
-                return (
-                  <tr
-                    key={dossier.id}
-                    onClick={() => onOpenDossier(dossier.id)}
-                    className="card-interactive"
-                    style={{
-                      borderBottom: '1px solid var(--color-border)',
-                      cursor: 'pointer',
-                      transition: 'background var(--transition-fast)',
-                    }}
-                  >
-                   
+              filteredDossiers
+                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                .map((dossier) => {
+                  return (
+                    <tr
+                      key={dossier.id}
+                      onClick={() => onOpenDossier(dossier.id)}
+                      className="card-interactive"
+                      style={{
+                        borderBottom: '1px solid var(--color-border)',
+                        cursor: 'pointer',
+                        transition: 'background var(--transition-fast)',
+                      }}
+                    >
+                      {/* Operator Name*/}
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                          {dossier.entiteControlee.nom}
+                        </div>
+                      </td>
 
-                    {/* Operator Name*/}
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                        {dossier.entiteControlee.nom}
-                      </div>
+                      {/* Status */}
+                      <td style={{ padding: '12px 16px' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                          {dossier.statut === 'EN_COURS'
+                            ? 'En cours'
+                            : dossier.statut === 'A_VALIDER'
+                            ? 'À valider'
+                            : dossier.statut === 'EN_ATTENTE'
+                            ? 'En attente'
+                            : 'Clôturé'}
+                        </span>
+                      </td>
 
-                    </td>
+                      {/* Ref & Horodatage */}
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                          <Clock size={11} />
+                          <span className="font-sf">{dossier.horodatageCreation || dossier.dateCreation}</span>
+                        </div>
+                      </td>
 
-                    {/* Investigation Object
-                    <td style={{ padding: '12px 16px' }}>
-                      <div
-                        style={{
-                          color: 'var(--color-text-secondary)',
-                          fontSize: '12px',
-                          lineHeight: 1.4,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {dossier.objet}
-                      </div>
-                    </td> */}
-
-                    {/* Status */}
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                        {dossier.statut === 'EN_COURS'
-                          ? 'En cours'
-                          : dossier.statut === 'A_VALIDER'
-                          ? 'À valider'
-                          : dossier.statut === 'EN_ATTENTE'
-                          ? 'En attente'
-                          : 'Clôturé'}
-                      </span>
-                    </td>
-
-                    {/* Tasks & Alerts badges */}
-                    {/* <td style={{ padding: '12px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-
-
-                        {alertesCount > 0 && (
-                          <span
-                            title={`${alertesCount} alertes`}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              color: 'var(--color-warning)',
-                              backgroundColor: 'var(--color-warning-surface)',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                            }}
-                          >
-                            <AlertTriangle size={11} />
-                            <span>{alertesCount}</span>
-                          </span>
-                        )}
-                      </div>
-                    </td> */}
-                         {/* Ref & Horodatage : PAS DE COULEUR, PAS DE GRAS */}
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                        <Clock size={11} />
-                        <span className="font-sf">{dossier.horodatageCreation || dossier.dateCreation}</span>
-                      </div>
-                    </td>
-                    {/* Deadline */}
-                    <td style={{ padding: '12px 16px' }}>
-                      <span className="  " style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
-                        {dossier.echeance}
-                      </span>
-                    </td>
-                    
-                  </tr>
-                );
-              })
+                      {/* Deadline */}
+                      <td style={{ padding: '12px 16px' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
+                          {dossier.echeance}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
             )}
           </tbody>
         </table>
+
+        {/* Pagination discrète */}
+        <TablePagination
+          currentPage={currentPage}
+          totalItems={filteredDossiers.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          itemLabel="dossiers"
+        />
       </div>
     </div>
   );

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import {
   Search,
-  Shield,
   ArrowLeft
 } from 'lucide-react';
 import type { RenseignementItem, DossierEnquete } from '../../types';
 import type { DossierTabId } from '../DossierHeader';
+import { TablePagination } from '../common/TablePagination';
 
 interface SupervisionRenseignementsViewProps {
   renseignements: RenseignementItem[];
@@ -23,6 +23,8 @@ export const SupervisionRenseignementsView: React.FC<SupervisionRenseignementsVi
   const [search, setSearch] = useState('');
   const [selectedInspector, setSelectedInspector] = useState<string>('TOUS');
   const [selectedEffet, setSelectedEffet] = useState<string>('TOUS');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 6;
 
   // Extract distinct inspectors from cotations
   const inspecteursCotes = Array.from(
@@ -64,6 +66,32 @@ export const SupervisionRenseignementsView: React.FC<SupervisionRenseignementsVi
 
     return true;
   });
+
+  const getRenseignementStatut = (ren: RenseignementItem) => {
+    const linkedDossierId = ren.dossiersLies?.[0];
+    const linkedDossier = linkedDossierId && _dossiers ? _dossiers.find((d) => d.id === linkedDossierId) : null;
+
+    if (!linkedDossier) {
+      if (ren.effetProduit === 'CLASSE_SANS_SUITE') return 'Classé sans suite';
+      if (ren.effetProduit === 'ENQUETE_OUVERTE_AVEC_PV') return 'PV établi';
+      if (ren.dossiersLies && ren.dossiersLies.length > 0) return 'Demande de communication';
+      return 'En attente d’enquête';
+    }
+
+    if (linkedDossier.hasPv || ren.pvGenereRef || ren.effetProduit === 'ENQUETE_OUVERTE_AVEC_PV') {
+      return 'PV établi';
+    }
+    if (linkedDossier.hasFeuille) {
+      return 'Feuille d’observation';
+    }
+    if (linkedDossier.hasDemande || (ren.dossiersLies && ren.dossiersLies.length > 0)) {
+      return 'Demande de communication';
+    }
+    if (linkedDossier.decisionCloture === 'CLASSE_SANS_SUITE' || ren.effetProduit === 'CLASSE_SANS_SUITE') {
+      return 'Classé sans suite';
+    }
+    return 'Dossier d’enquête ouvert';
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -253,10 +281,10 @@ export const SupervisionRenseignementsView: React.FC<SupervisionRenseignementsVi
               }}
             >
               <th style={{ padding: '12px 16px' }}>Date</th>
-              <th style={{ padding: '12px 16px' }}>Origine & Fiabilité</th>
-              <th style={{ padding: '12px 16px' }}>Qui a été coté (Affectation)</th>
-              <th style={{ padding: '12px 16px' }}>Effet Produit & Dossier Lié</th>
-              <th style={{ padding: '12px 16px' }}>Résultat Financier</th>
+              <th style={{ padding: '12px 16px' }}>Origine</th>
+              <th style={{ padding: '12px 16px' }}>Affectation</th>
+              <th style={{ padding: '12px 16px' }}>Statut de la procédure</th>
+             
             </tr>
           </thead>
           <tbody>
@@ -267,71 +295,61 @@ export const SupervisionRenseignementsView: React.FC<SupervisionRenseignementsVi
                 </td>
               </tr>
             ) : (
-              filtered.map((ren) => (
-                <tr
-                  key={ren.id}
-                  onClick={() => onOpenDossier(ren.dossiersLies?.[0] || 'dossier-0842', 'vue-ensemble')}
-                  style={{
-                    borderBottom: '1px solid var(--color-border)',
-                    transition: 'background var(--transition-fast)',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-muted)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <td style={{ padding: '14px 16px' }}>
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                      Reçu le {ren.dateReception}
-                    </div>
-                  </td>
-
-                  <td style={{ padding: '14px 16px', maxWidth: '240px' }}>
-                    <div style={{ fontWeight: 700, color: 'var(--color-text-primary)', fontSize: '12px' }}>
-                      {ren.origine}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                      <Shield size={11} color="var(--color-text-muted)" />
-                      <span>{ren.degreFiabilite || 'Source B2'}</span>
-                    </div>
-                  </td>
-
-                  <td style={{ padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                      <span>{ren.coteA || 'Non coté'}</span>
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                      Coté le {ren.dateCotation} • Délai : {ren.delaiPrescritJours || 15}j
-                    </div>
-                  </td>
-
-                  <td style={{ padding: '14px 16px' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                      {ren.effetProduit === 'ENQUETE_OUVERTE_AVEC_PV'
-                        ? 'Enquête avec PV dressé'
-                        : ren.effetProduit === 'CLASSE_SANS_SUITE'
-                        ? 'Classé sans suite'
-                        : 'Enquête en cours'}
-                    </span>
-                  </td>
-
-                  <td style={{ padding: '14px 16px' }}>
-                    {ren.montantRecouvreUSD && ren.montantRecouvreUSD > 0 ? (
-                      <div>
-                        <div style={{ fontWeight: 800, color: 'var(--color-text-primary)', fontSize: '13px' }}>
-                          ${ren.montantRecouvreUSD.toLocaleString()} USD
-                        </div>
+              filtered
+                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                .map((ren) => (
+                  <tr
+                    key={ren.id}
+                    onClick={() => onOpenDossier(ren.dossiersLies?.[0] || 'dossier-0842', 'vue-ensemble')}
+                    style={{
+                      borderBottom: '1px solid var(--color-border)',
+                      transition: 'background var(--transition-fast)',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-muted)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <td style={{ padding: '14px 16px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                        Reçu le {ren.dateReception}
                       </div>
-                    ) : (
-                      <span style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
-                        En instruction
+                    </td>
+
+                    <td style={{ padding: '14px 16px', maxWidth: '240px' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--color-text-primary)', fontSize: '12px' }}>
+                        {ren.origine}
+                      </div>
+                     
+                    </td>
+
+                    <td style={{ padding: '14px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                        <span>{ren.coteA || 'Non coté'}</span>
+                      </div>
+                 
+                    </td>
+
+                    <td style={{ padding: '14px 16px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                        {getRenseignementStatut(ren)}
                       </span>
-                    )}
-                  </td>
-                </tr>
-              ))
+                    </td>
+
+                    
+                  </tr>
+                ))
             )}
           </tbody>
         </table>
+
+        {/* Pagination discrète */}
+        <TablePagination
+          currentPage={currentPage}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          itemLabel="renseignements"
+        />
       </div>
     </div>
   );

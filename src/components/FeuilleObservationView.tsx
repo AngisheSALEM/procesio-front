@@ -53,8 +53,8 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
     : null;
 
   const defaultAuteur = currentUser
-    ? `${currentUser.grade} ${currentUser.prenom} ${currentUser.nom}`
-    : (feuille?.inspecteurs?.[0] || 'Inspecteur Marc Kabamba');
+    ? `${currentUser.prenom} ${currentUser.nom}`
+    : (feuille?.inspecteurs?.[0]?.replace(/^(Inspecteur|Contrôleur|Directeur|Chef de Bureau)\s+/i, '') || 'Marc Kabamba');
 
   // Modale de création feuille d'observation
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -224,9 +224,9 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
           reference: pvForm.reference,
           date: pvForm.date,
           infractions: [pvForm.infractions],
-          droitsEludesUSD: 45000,
-          droitsEludesCDF: 125000000,
-          amendeUSD: 90000,
+          droitsEludesUSD: 0,
+          droitsEludesCDF: 0,
+          amendeUSD: 0,
           inspecteurs: [pvForm.inspecteurs],
           statutTransmission: 'TRANSMIS_GLEC',
         },
@@ -465,25 +465,33 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
               Document PDF notifié
             </label>
-            <div
+            <label
               style={{
+                position: 'relative',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                padding: '8px 12px',
+                padding: '9px 12px',
                 backgroundColor: 'var(--color-bg)',
                 border: '1px solid var(--color-border)',
                 borderRadius: 'var(--radius-btn)',
+                cursor: 'pointer',
+                transition: 'border-color var(--transition-fast)',
               }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-text-secondary)')}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}
             >
               <Upload size={14} color="var(--color-text-muted)" />
+              <span style={{ fontSize: '12px', color: createForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {createForm.pdfFile ? `${createForm.pdfFile.name} (${createForm.pdfFile.size})` : 'Cliquer pour choisir un document PDF...'}
+              </span>
               <input
                 type="file"
                 accept=".pdf"
                 onChange={handleFileChange}
-                style={{ fontSize: '12px', color: 'var(--color-text-secondary)', flex: 1 }}
+                style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
               />
-            </div>
+            </label>
             {createForm.pdfFile && (
               <div style={{ fontSize: '11px', color: 'var(--color-accent)', marginTop: '4px' }}>
                 Document prêt : {createForm.pdfFile.name} ({createForm.pdfFile.size})
@@ -513,7 +521,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
   // =========================================================================
   if (!feuille) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
+      <div key="feuille-cards-list" className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
         {/* Toast Notification */}
         {notification && (
           <div
@@ -728,7 +736,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
   const isPvLance = Boolean(hasPv || feuille.decisionFinale === 'PV_INFRACTION_GLEC' || feuille.pvInfractionGlec);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
+    <div key={`feuille-detail-${feuille.id}`} className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
       {/* Toast Notification */}
       {notification && (
         <div
@@ -789,10 +797,10 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
           backgroundColor: 'var(--color-surface)',
           borderRadius: 'var(--radius-card)',
           border: '1px solid var(--color-border)',
-          padding: '24px',
+          padding: '16px 20px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '20px',
+          gap: '12px',
         }}
       >
         {/* En-tête de la Page Info */}
@@ -802,8 +810,8 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             alignItems: 'flex-start',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
-            gap: '16px',
-            paddingBottom: '16px',
+            gap: '12px',
+            paddingBottom: '10px',
           }}
         >
           <div>
@@ -811,11 +819,11 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             <p
               style={{
                 color: 'var(--color-text-primary)',
-                marginTop: '6px',
-                marginBottom: '4px',
+                marginTop: '2px',
+                marginBottom: '2px',
               }}
             >
-              <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
                 Destinataire :
               </span>{' '}
               <span style={{ fontSize: '14px', fontWeight: 700 }}>
@@ -824,7 +832,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             </p>
 
             {/* Type de cible & Pour le compte de : SANS BORDER, SANS BACKGROUND COLOR, SANS ICÔNE */}
-            <div style={{ fontSize: '12px', marginTop: '4px', color: 'var(--color-text-secondary)' }}>
+            <div style={{ fontSize: '12px', marginTop: '2px', color: 'var(--color-text-secondary)' }}>
               <span style={{ color: 'var(--color-text-muted)' }}>Type de cible : </span>
               <span style={{ color: 'var(--color-text-primary)' }}>
                 {feuille.typeCible || 'Entreprise commerciale'}
@@ -838,7 +846,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
 
             {/* Adresse : SANS BORDER, SANS BACKGROUND COLOR, SANS ICÔNE */}
             {(feuille.adresse || dossierNom) && (
-              <div style={{ fontSize: '12px', marginTop: '4px', color: 'var(--color-text-secondary)' }}>
+              <div style={{ fontSize: '12px', marginTop: '2px', color: 'var(--color-text-secondary)' }}>
                 <span style={{ color: 'var(--color-text-muted)' }}>Adresse : </span>
                 <span style={{ color: 'var(--color-text-primary)' }}>
                   {feuille.adresse || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi'}
@@ -847,7 +855,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             )}
 
             {/* Inspecteur vérificateur : SANS ICÔNE */}
-            <div style={{ fontSize: '12px', marginTop: '4px' }}>
+            <div style={{ fontSize: '12px', marginTop: '2px' }}>
               <span style={{ color: 'var(--color-text-muted)' }}>Inspecteur vérificateur : </span>
               <span style={{ fontSize: '14px', fontWeight: 700 }}>
                 {feuille.inspecteurs?.join(', ') || defaultAuteur}
@@ -874,13 +882,13 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
         </div>
 
         {/* Corps simplifié de la Page Info */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {/* 1. Objet du contrôle */}
           <div>
             <div style={{ fontSize: '11px', color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>
               Objet du contrôle
             </div>
-            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '4px', lineHeight: 1.5 }}>
+            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '2px', lineHeight: 1.4 }}>
               {feuille.objetControle}
             </p>
           </div>
@@ -890,14 +898,11 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
-              padding: '12px 14px',
+              padding: '2px 0',
               backgroundColor: 'transparent',
-              borderRadius: '6px',
               border: "none",
             }}
           >
-
             <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
               {isPvLance ? 'Audition contradictoire passée le : ' : 'Date d’audition prévue : '}
               <strong className="font-sf" style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>
@@ -908,7 +913,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
 
           {/* 3. Document PDF notifié */}
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '4px' }}>
               Feuille d’observation notifiée 
             </div>
             <div
@@ -916,45 +921,41 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 backgroundColor: 'var(--color-bg)',
                 borderRadius: '6px',
-                
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-               
                 <div>
                   <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', fontWeight: 500 }}>
                     {feuille.pdfSourceNom || "AUCUNE FEUILLE D'OBSERVATION "}
                   </div>
-                  
                 </div>
               </div>
 
               <button
                 type="button"
                 className="btn-secondary"
-                style={{ fontSize: '11px', padding: '6px 12px' }}
+                style={{ fontSize: '11px', padding: '5px 10px' }}
                 onClick={() => showToast('Téléchargement du document notifié...')}
               >
                 <Download size={13} />
-                
               </button>
             </div>
           </div>
 
           {/* 4. Constats résumés (Présentation aérée sans cards superflues) */}
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '8px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '4px' }}>
               Constats formulés ({feuille.observations?.length || 0})
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {feuille.observations?.map((obs) => (
                 <div
                   key={obs.code}
                   style={{
-                    padding: '14px 16px',
+                    padding: '8px 12px',
                     backgroundColor: 'var(--color-bg)',
                     borderRadius: '6px',
                     border: 'none',
@@ -964,9 +965,8 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                     <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                       Constat {obs.code} : {obs.titre}
                     </span>
-                  
                   </div>
-                  <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '6px', lineHeight: 1.5 }}>
+                  <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '3px', lineHeight: 1.4 }}>
                     {obs.faitsConstates}
                   </p>
                 </div>
@@ -1289,25 +1289,33 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                 <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                   Document PDF des observations notifiées
                 </label>
-                <div
+                <label
                   style={{
+                    position: 'relative',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    padding: '8px 12px',
+                    padding: '9px 12px',
                     backgroundColor: 'var(--color-bg)',
                     border: '1px solid var(--color-border)',
                     borderRadius: 'var(--radius-btn)',
+                    cursor: 'pointer',
+                    transition: 'border-color var(--transition-fast)',
                   }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-text-secondary)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}
                 >
                   <Upload size={14} color="var(--color-text-muted)" />
+                  <span style={{ fontSize: '12px', color: createForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {createForm.pdfFile ? `${createForm.pdfFile.name} (${createForm.pdfFile.size})` : 'Cliquer pour choisir un document PDF...'}
+                  </span>
                   <input
                     type="file"
                     accept=".pdf"
                     onChange={handleFileChange}
-                    style={{ fontSize: '12px', color: 'var(--color-text-secondary)', flex: 1 }}
+                    style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
                   />
-                </div>
+                </label>
                 {createForm.pdfFile && (
                   <div style={{ fontSize: '11px', color: 'var(--color-success)', marginTop: '4px' }}>
                     Document prêt : {createForm.pdfFile.name} ({createForm.pdfFile.size})
@@ -1391,31 +1399,10 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
 
             {/* Modal Form */}
             <form onSubmit={handlePvSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* Champ 1 : Référence du PV */}
-              <div>
-                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  Référence officielle du Procès-Verbal
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={pvForm.reference}
-                  onChange={(e) => setPvForm({ ...pvForm, reference: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '12px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-btn)',
-                    color: 'var(--color-text-primary)',
-                    outline: 'none',
-                  }}
-                />
-              </div>
 
+             
               {/* Champ 2 : Date d'établissement */}
-              <div>
+              {/* <div>
                 <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                   Date d’établissement
                 </label>
@@ -1435,7 +1422,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                     outline: 'none',
                   }}
                 />
-              </div>
+              </div> */}
 
               {/* Champ 3 : Inspecteurs verbalisateurs */}
               <div>
@@ -1860,8 +1847,9 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                       color: 'var(--color-text-primary)',
                     }}
                   />
-                  <div
+                  <label
                     style={{
+                      position: 'relative',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
@@ -1869,9 +1857,16 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                       border: '1px dashed var(--color-border)',
                       borderRadius: '6px',
                       backgroundColor: 'var(--color-bg)',
+                      cursor: 'pointer',
+                      transition: 'border-color var(--transition-fast)',
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-text-secondary)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}
                   >
                     <Upload size={14} color="var(--color-text-muted)" />
+                    <span style={{ fontSize: '12px', color: revirementForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {revirementForm.pdfFile ? `${revirementForm.pdfFile.name} (${revirementForm.pdfFile.size})` : 'Cliquer pour joindre un justificatif...'}
+                    </span>
                     <input
                       type="file"
                       accept=".pdf,.png,.jpg,.jpeg"
@@ -1885,9 +1880,9 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                           }));
                         }
                       }}
-                      style={{ fontSize: '12px', color: 'var(--color-text-secondary)', flex: 1 }}
+                      style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
                     />
-                  </div>
+                  </label>
                 </div>
               </div>
 

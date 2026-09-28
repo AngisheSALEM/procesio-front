@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ArrowRight } from 'lucide-react';
 import type {
   DossierEnquete,
@@ -8,6 +8,7 @@ import type {
   RenseignementItem
 } from '../../types';
 import type { DossierTabId } from '../DossierHeader';
+import { ProgressionRenseignementsPvChart } from './ProgressionRenseignementsPvChart';
 
 interface SupervisionOverviewTabProps {
   onNavigateSubView: (tab: 'dossiers' | 'demandes' | 'feuilles' | 'classements' | 'pv' | 'renseignements') => void;
@@ -29,10 +30,10 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
   pvs,
 }) => {
   // Aggregate KPIs dynamically
-  const allDemandesList = Object.values(demandes).flat();
-  const allFeuillesList = Object.values(feuilles).flat();
-  const allObservationsList = allFeuillesList.flatMap((f) => f.observations || []);
-  const allPvsList = Object.values(pvs).flat();
+  const allDemandesList = useMemo(() => Object.values(demandes).flat(), [demandes]);
+  const allFeuillesList = useMemo(() => Object.values(feuilles).flat(), [feuilles]);
+  const allObservationsList = useMemo(() => allFeuillesList.flatMap((f) => f.observations || []), [allFeuillesList]);
+  const allPvsList = useMemo(() => Object.values(pvs).flat(), [pvs]);
 
   // 1. Demandes de communication
   const totalDemandes = allDemandesList.length;
@@ -52,38 +53,135 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
   const totalRenseignements = renseignements.length;
   const convertisEnEnquetes = renseignements.filter((r) => r.effetProduit === 'ENQUETE_OUVERTE_AVEC_PV' || r.effetProduit === 'ENQUETE_EN_COURS').length;
 
-  // 6. Gestion du renseignement : savoir qui a été coté & évolution
-  const renseignementsCotes = renseignements.filter((r) => Boolean(r.coteA));
-  const cotesParInspecteur: Record<string, number> = {};
-  renseignements.forEach((r) => {
-    if (r.coteA) {
-      const name = r.coteA.split('(')[0].trim();
-      cotesParInspecteur[name] = (cotesParInspecteur[name] || 0) + 1;
-    }
-  });
+  // 4 derniers dossiers
+  const recentDossiers = useMemo(() => {
+    return [...dossiers]
+      .sort((a, b) => (b.horodatageCreation || b.dateCreation || '').localeCompare(a.horodatageCreation || a.dateCreation || ''))
+      .slice(0, 4);
+  }, [dossiers]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* 6 Core Axis Cards - Strictly monochrome text & surfaces */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-         
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Section KPI : Disposition type Dashboard moderne (1 Grande carte à gauche + 3 Cartes empilées à droite) */}
+      <div className="supervision-kpi-layout">
+        {/* Grande Carte Principale : Renseignements */}
+        <div
+          onClick={() => onNavigateSubView('renseignements')}
+          className="card-interactive"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            borderRadius: 'var(--radius-card)',
+            padding: '24px',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            border: '1px solid var(--color-border-subtle)',
+            transition: 'background var(--transition-fast)',
+            minHeight: '260px',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-surface)';
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+                Renseignements
+              </span>
+              <ArrowRight size={14} color="var(--color-text-muted)" />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '18px', flexWrap: 'wrap', gap: '16px' }}>
+              <div>
+                <div style={{ fontSize: '38px', fontWeight: 800, color: 'var(--color-text-primary)', lineHeight: 1 }}>
+                  {totalRenseignements}
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '6px' }}>
+                  {convertisEnEnquetes} convertis en enquêtes ({Math.round((convertisEnEnquetes / (totalRenseignements || 1)) * 100)}%)
+                </div>
+              </div>
+
+              {/* Sparkline discrète fidèle à la maquette */}
+              <div style={{ width: '130px', height: '36px', opacity: 0.85 }}>
+                <svg width="100%" height="100%" viewBox="0 0 130 36" fill="none">
+                  <path
+                    d="M 2 28 Q 20 20, 35 24 T 70 14 T 100 18 T 124 6"
+                    fill="none"
+                    stroke="var(--color-text-secondary)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                  <circle cx="124" cy="6" r="3" fill="var(--color-text-primary)" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* Section inférieure discrète avec sous-métriques (dont classement sans suite) */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+              gap: '16px',
+              paddingTop: '16px',
+              borderTop: '1px solid var(--color-border)',
+              marginTop: '20px',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
+                Enquêtes ouvertes
+              </div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '2px' }}>
+                {convertisEnEnquetes}
+              </div>
+            </div>
+
+            {/* Classements sans suite intégrés discrètement */}
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
+                Classés sans suite
+              </div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '2px' }}>
+                {countClassesSansSuite}
+                <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--color-text-muted)', marginLeft: '4px' }}>
+                  dossiers
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
+                En qualification
+              </div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '2px' }}>
+                {Math.max(0, totalRenseignements - convertisEnEnquetes)}
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="kpi-grid-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-          {/* Card 1: Demande de communication */}
+        {/* 3 Cartes empilées à droite */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', justifyContent: 'space-between' }}>
+          {/* Carte 1 : Demandes de communication */}
           <div
             onClick={() => onNavigateSubView('demandes')}
+            className="card-interactive"
             style={{
               backgroundColor: 'var(--color-surface)',
               borderRadius: 'var(--radius-card)',
-              padding: '20px',
+              padding: '16px 20px',
               cursor: 'pointer',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between',
+              justifyContent: 'center',
               transition: 'background var(--transition-fast)',
               border: '1px solid var(--color-border-subtle)',
+              flex: 1,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)';
@@ -92,45 +190,37 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
               e.currentTarget.style.backgroundColor = 'var(--color-surface)';
             }}
           >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  
-                  <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                    Demandes de communication
-                  </span>
-                </div>
-                <ArrowRight size={14} color="var(--color-text-muted)" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+                Demandes de communication
+              </span>
+              <ArrowRight size={14} color="var(--color-text-muted)" />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: '8px' }}>
+              <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
+                {totalDemandes}
               </div>
-
-              <div style={{ marginTop: '16px' }}>
-                <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
-                  {totalDemandes}
-                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-muted)', marginLeft: '6px' }}>
-                    réquisitions
-                  </span>
-                </div>
-              
-              
+              <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
+                réquisitions émises
               </div>
             </div>
-
-
           </div>
 
-          {/* Card 2: Feuille d'observation */}
+          {/* Carte 2 : Feuilles d’observation */}
           <div
             onClick={() => onNavigateSubView('feuilles')}
+            className="card-interactive"
             style={{
               backgroundColor: 'var(--color-surface)',
               borderRadius: 'var(--radius-card)',
-              padding: '20px',
+              padding: '16px 20px',
               cursor: 'pointer',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between',
+              justifyContent: 'center',
               transition: 'background var(--transition-fast)',
               border: '1px solid var(--color-border-subtle)',
+              flex: 1,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)';
@@ -139,92 +229,37 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
               e.currentTarget.style.backgroundColor = 'var(--color-surface)';
             }}
           >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                 
-                  <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                    Feuilles d’observation
-                  </span>
-                </div>
-                <ArrowRight size={14} color="var(--color-text-muted)" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+                Feuilles d’observation
+              </span>
+              <ArrowRight size={14} color="var(--color-text-muted)" />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: '8px' }}>
+              <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
+                {totalFeuilles}
               </div>
-
-              <div style={{ marginTop: '16px' }}>
-                <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
-                  {totalFeuilles}
-                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-muted)', marginLeft: '6px' }}>
-                    feuilles ({totalConstats} constats)
-                  </span>
-                </div>
-               
-              
+              <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
+                {totalConstats} constats rédigés
               </div>
             </div>
-
-        
           </div>
 
-          {/* Card 3: Classement sans suite */}
-          <div
-            onClick={() => onNavigateSubView('classements')}
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: 'var(--radius-card)',
-              padding: '20px',
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              transition: 'background var(--transition-fast)',
-              border: '1px solid var(--color-border-subtle)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-surface)';
-            }}
-          >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                 
-                  <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                    Classement sans suite
-                  </span>
-                </div>
-                <ArrowRight size={14} color="var(--color-text-muted)" />
-              </div>
-
-              <div style={{ marginTop: '16px' }}>
-                <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
-                  {countClassesSansSuite}
-                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-muted)', marginLeft: '6px' }}>
-                    dossiers ({Math.round((countClassesSansSuite / (dossiers.length || 1)) * 100)}% du portefeuille)
-                  </span>
-                </div>
-               
-            
-              </div>
-            </div>
-
-     
-          </div>
-
-          {/* Card 4: Dossiers qui ont conduit à 1 PV */}
+          {/* Carte 3 : Dossiers ayant conduit à 1 PV */}
           <div
             onClick={() => onNavigateSubView('pv')}
+            className="card-interactive"
             style={{
               backgroundColor: 'var(--color-surface)',
               borderRadius: 'var(--radius-card)',
-              padding: '20px',
+              padding: '16px 20px',
               cursor: 'pointer',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between',
+              justifyContent: 'center',
               transition: 'background var(--transition-fast)',
               border: '1px solid var(--color-border-subtle)',
+              flex: 1,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)';
@@ -233,138 +268,44 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
               e.currentTarget.style.backgroundColor = 'var(--color-surface)';
             }}
           >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-
-                  <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                    Dossiers ayant conduit à 1 PV
-                  </span>
-                </div>
-                <ArrowRight size={14} color="var(--color-text-muted)" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
+                Dossiers ayant conduit à un PV
+              </span>
+              <ArrowRight size={14} color="var(--color-text-muted)" />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: '8px' }}>
+              <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
+                {dossiersAvecPv.length}
               </div>
-
-              <div style={{ marginTop: '16px' }}>
-                <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
-                  {dossiersAvecPv.length}
-                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-muted)', marginLeft: '6px' }}>
-                    dossiers ({allPvsList.length} PV dressés)
-                  </span>
-                </div>
-            
+              <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
+                {allPvsList.length} PV dressés
               </div>
             </div>
-
-      
-          </div>
-
-          {/* Card 5: Statistiques de renseignement et les effets qu'ils ont produit */}
-          <div
-            onClick={() => onNavigateSubView('renseignements')}
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: 'var(--radius-card)',
-              padding: '20px',
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              transition: 'background var(--transition-fast)',
-              border: '1px solid var(--color-border-subtle)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-surface)';
-            }}
-          >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                    Renseignements & Effets Produits
-                  </span>
-                </div>
-                <ArrowRight size={14} color="var(--color-text-muted)" />
-              </div>
-
-              <div style={{ marginTop: '16px' }}>
-                <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
-                  {totalRenseignements}
-                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-muted)', marginLeft: '6px' }}>
-                    reçus / {convertisEnEnquetes} en enquêtes
-                  </span>
-                </div>
-
-              </div>
-            </div>
-
-   
-          </div>
-
-          {/* Card 6: Gestion de renseignement : savoir qui a été coté & évolution des dossiers */}
-          <div
-            onClick={() => onNavigateSubView('renseignements')}
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: 'var(--radius-card)',
-              padding: '20px',
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              transition: 'background var(--transition-fast)',
-              border: '1px solid var(--color-border-subtle)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-surface)';
-            }}
-          >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-
-                  <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                    Cotations & Évolution des Dossiers
-                  </span>
-                </div>
-                <ArrowRight size={14} color="var(--color-text-muted)" />
-              </div>
-
-              <div style={{ marginTop: '16px' }}>
-                <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
-                  {renseignementsCotes.length} / {totalRenseignements}
-                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-muted)', marginLeft: '6px' }}>
-                    cotés aux inspecteurs
-                  </span>
-                </div>
-              
-               
-              </div>
-            </div>
-
-      
           </div>
         </div>
       </div>
 
-      {/* Conversion Funnel & Operational Health Grid */}
-     
+      {/* Graphique statistique : Évolution des actes procéduraux */}
+      <ProgressionRenseignementsPvChart
+        renseignements={renseignements}
+        dossiers={dossiers}
+        pvs={pvs}
+        demandes={demandes}
+        feuilles={feuilles}
+      />
 
-      {/* Quick Access to Recent Active Files */}
-      <div style={{ backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-card)', padding: '20px', border: '1px solid var(--color-border-subtle)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+      {/* Tableau des 4 derniers dossiers sous supervision */}
+      <div style={{ backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-card)', border: '1px solid var(--color-border-subtle)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--color-border)' }}>
           <div>
-            <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-              Dossiers Actifs Sous Supervision Directe du Commandement
+            <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
+              Dossiers Récents Sous Supervision
             </h4>
-           
+
           </div>
           <button
+            type="button"
             onClick={() => onNavigateSubView('dossiers')}
             style={{
               background: 'none',
@@ -373,7 +314,12 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
               fontSize: '12px',
               fontWeight: 600,
               cursor: 'pointer',
+              padding: '4px 8px',
+              borderRadius: 'var(--radius-btn)',
+              transition: 'background var(--transition-fast)',
             }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
           >
             Voir tous les dossiers ({dossiers.length}) →
           </button>
@@ -393,7 +339,7 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
                   letterSpacing: '0.6px',
                 }}
               >
-                <th style={{ padding: '12px 16px' }}>Référence Dossier</th>
+                
                 <th style={{ padding: '12px 16px' }}>Opérateur Contrôlé</th>
                 <th style={{ padding: '12px 16px' }}>Inspecteur Coté</th>
                 <th style={{ padding: '12px 16px' }}>Statut Procédural</th>
@@ -401,7 +347,7 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
               </tr>
             </thead>
             <tbody>
-              {dossiers.map((d) => (
+              {recentDossiers.map((d) => (
                 <tr
                   key={d.id}
                   onClick={() => onOpenDossier(d.id, 'vue-ensemble')}
@@ -412,9 +358,7 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
                     transition: 'background var(--transition-fast)',
                   }}
                 >
-                  <td style={{ padding: '12px 16px', fontWeight: 400, color: 'var(--color-text-muted)', fontSize: '12px' }}>
-                    {d.reference}
-                  </td>
+                  
                   <td style={{ padding: '12px 16px', color: 'var(--color-text-primary)', fontWeight: 700 }}>
                     {d.entiteControlee.nom}
                   </td>
@@ -435,7 +379,7 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
                   <td style={{ padding: '12px 16px' }}>
                     {d.hasPv ? (
                       <span style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>
-                        PV Dressé (${(d.droitsEludesUSD || 0).toLocaleString()} USD)
+                        PV Dressé 
                       </span>
                     ) : d.decisionCloture === 'CLASSE_SANS_SUITE' ? (
                       <span style={{ color: 'var(--color-text-muted)' }}>
@@ -449,6 +393,38 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Pied de tableau discret */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 16px',
+            borderTop: '1px solid var(--color-border)',
+            fontSize: '12px',
+            color: 'var(--color-text-muted)',
+            backgroundColor: 'var(--color-surface)',
+          }}
+        >
+          <span></span>
+          <button
+            type="button"
+            onClick={() => onNavigateSubView('dossiers')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-text-secondary)',
+              fontSize: '12px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              textUnderlineOffset: '2px',
+            }}
+          >
+            Afficher la liste complète ({dossiers.length})
+          </button>
         </div>
       </div>
     </div>

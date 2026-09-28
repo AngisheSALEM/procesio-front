@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Menu } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { DossierHeader, type DossierTabId } from './components/DossierHeader';
@@ -32,6 +32,7 @@ import {
   mockPvsParDossier,
   mockRenseignements
 } from './data/mockData';
+import { isAssignedToUser } from './utils/userUtils';
 
 // Storage keys for persistent state on refresh
 const STORAGE_THEME = 'procezo_theme';
@@ -143,10 +144,15 @@ export function App() {
   // Documents et PV du dossier
   const [documentsParDossier, setDocumentsParDossier] = useState<Record<string, DocumentItem[]>>(mockDocumentsParDossier);
 
-  // 5. Selected Dossier persistence
+  // 5. Selected Dossier persistence (garantit qu'un enquêteur n'accède qu'à un dossier qui lui est assigné)
   const [selectedDossierId, setSelectedDossierId] = useState<string>(() => {
     const saved = localStorage.getItem(STORAGE_SELECTED_DOSSIER);
-    return saved && mockDossiers.some((d) => d.id === saved) ? saved : mockDossiers[0].id;
+    const initialUser = mockUsers[userRole];
+    const allowed = mockDossiers.filter((d) => isAssignedToUser(d.responsable, d.equipe, initialUser));
+    if (saved && allowed.some((d) => d.id === saved)) {
+      return saved;
+    }
+    return allowed[0]?.id || mockDossiers[0].id;
   });
 
   // 6. Navigation route persistence: prioritize URL hash, then localStorage
@@ -154,11 +160,14 @@ export function App() {
     const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0];
     if (hash.startsWith('dossier/')) {
       const dId = hash.replace('dossier/', '');
-      if (mockDossiers.some((d) => d.id === dId)) {
+      const user = mockUsers[role];
+      const target = mockDossiers.find((d) => d.id === dId);
+      if (target && isAssignedToUser(target.responsable, target.equipe, user)) {
         setSelectedDossierId(dId);
         localStorage.setItem(STORAGE_SELECTED_DOSSIER, dId);
+        return 'dossier-detail';
       }
-      return 'dossier-detail';
+      return role === 'admin' ? 'rapports-stats' : 'mon-travail';
     }
     const validRoutes = [
       'dossiers-enquete',
@@ -240,6 +249,18 @@ export function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
+  const currentUser = mockUsers[userRole];
+
+  // Dossiers visibles selon le rôle : l'administrateur voit tous les dossiers, l'enquêteur ne voit que ceux qui lui sont assignés
+  const visibleDossiers = useMemo(() => {
+    return dossiers.filter((d) => isAssignedToUser(d.responsable, d.equipe, currentUser));
+  }, [dossiers, currentUser]);
+
+  // Renseignements visibles selon le rôle : l'administrateur voit tous les renseignements, l'enquêteur ne voit que ceux qui lui sont assignés
+  const visibleRenseignements = useMemo(() => {
+    return renseignements.filter((r) => isAssignedToUser(r.coteA, null, currentUser));
+  }, [renseignements, currentUser]);
+
   const handleLogin = (role: UserRole) => {
     setUserRole(role);
     setIsAuthenticated(true);
@@ -249,6 +270,16 @@ export function App() {
     const defaultRoute = role === 'admin' ? 'rapports-stats' : 'mon-travail';
     setActiveNav(defaultRoute);
     window.location.hash = `#/${defaultRoute}`;
+
+    // S'assurer que le dossier sélectionné par défaut appartient bien à l'utilisateur
+    if (role === 'enqueteur') {
+      const enqUser = mockUsers.enqueteur;
+      const firstAllowed = dossiers.find((d) => isAssignedToUser(d.responsable, d.equipe, enqUser));
+      if (firstAllowed) {
+        setSelectedDossierId(firstAllowed.id);
+        localStorage.setItem(STORAGE_SELECTED_DOSSIER, firstAllowed.id);
+      }
+    }
   };
 
   const handleLogout = () => {
@@ -262,6 +293,13 @@ export function App() {
   };
 
   const handleOpenDossier = (dossierId: string, initialTab?: DossierTabId) => {
+    // Si l'utilisateur est enquêteur, vérifier qu'il a bien l'autorisation d'accéder au dossier
+    if (currentUser.role === 'enqueteur') {
+      const isAllowed = visibleDossiers.some((d) => d.id === dossierId);
+      if (!isAllowed) {
+        return;
+      }
+    }
     setSelectedDossierId(dossierId);
     localStorage.setItem(STORAGE_SELECTED_DOSSIER, dossierId);
     if (initialTab) {
@@ -277,10 +315,11 @@ export function App() {
     window.location.hash = '#/mon-travail';
   };
 
-  const currentUser = mockUsers[userRole];
-
-  // Resolve current dossier and its associated data
-  const currentDossier = dossiers.find((d) => d.id === selectedDossierId) || dossiers[0] || mockDossiers[0];
+  // Résolution du dossier actif : strictement restreint aux dossiers autorisés
+  const currentDossier = useMemo(() => {
+    const list = currentUser.role === 'admin' ? dossiers : visibleDossiers;
+    return list.find((d) => d.id === selectedDossierId) || list[0] || dossiers[0] || mockDossiers[0];
+  }, [dossiers, visibleDossiers, selectedDossierId, currentUser.role]);
   const currentDemandes = demandesParDossier[currentDossier.id] || [];
   const currentFeuilles = feuillesParDossier[currentDossier.id] || [];
   const currentPvs = pvsParDossier[currentDossier.id] || [];
@@ -701,10 +740,10 @@ export function App() {
         > 
           {/* Route: Dossier Detail (Page de détail d'un dossier accédée depuis le tableau) */}
           {(activeNav === 'dossier-detail' || activeNav === 'dossiers-enquete') && (
-            <div> <br />
+            <div key={`dossier-wrapper-${currentDossier.id}`} className="view-transition"> <br />
               <DossierHeader
                 dossier={currentDossier}
-                allDossiers={dossiers}
+                allDossiers={visibleDossiers}
                 demandes={currentDemandes}
                 feuilles={currentFeuilles}
                 pvs={currentPvs}
@@ -717,7 +756,7 @@ export function App() {
                 onBack={handleBackToDashboard}
               />
 
-              <div className="view-container">
+              <div key={activeDossierTab} className="view-container view-transition">
                 {activeDossierTab === 'vue-ensemble' && (
                   <VueEnsembleTab
                     key={currentDossier.id}
@@ -792,9 +831,9 @@ export function App() {
 
           {/* Route: Mon travail (Tableau minimaliste des dossiers de l'agent) */}
           {activeNav === 'mon-travail' && (
-            <div className="view-container">
+            <div key="mon-travail" className="view-container view-transition">
               <MonTravailView
-                dossiers={dossiers}
+                dossiers={visibleDossiers}
                 onOpenDossier={handleOpenDossier}
                 onCreateDossier={handleCreateDossier}
                 user={currentUser}
@@ -804,15 +843,15 @@ export function App() {
 
           {/* Route: Renseignements */}
           {activeNav === 'renseignements' && (
-            <div className="view-container">
+            <div key="renseignements" className="view-container view-transition">
               <RenseignementsView
-                renseignements={renseignements}
+                renseignements={visibleRenseignements}
                 currentUser={currentUser}
                 onOpenDossier={handleOpenDossier}
                 onCreateDossier={handleCreateDossier}
                 onAddRenseignement={handleAddRenseignement}
                 onUpdateRenseignement={handleUpdateRenseignement}
-                dossiers={dossiers}
+                dossiers={visibleDossiers}
                 demandesParDossier={demandesParDossier}
                 feuillesParDossier={feuillesParDossier}
                 pvsParDossier={pvsParDossier}
@@ -822,14 +861,14 @@ export function App() {
 
           {/* Route: Documents et modèles */}
           {activeNav === 'documents-modeles' && (
-            <div className="view-container">
+            <div key="documents-modeles" className="view-container view-transition">
               <DocumentsModelesView />
             </div>
           )}
 
           {/* Route: Rapports et statistiques (Admin) */}
           {activeNav === 'rapports-stats' && (
-            <div className="view-container">
+            <div key="rapports-stats" className="view-container view-transition">
               <RapportsStatsView
                 onOpenDossier={(dId, tab) => handleOpenDossier(dId || 'dossier-0842', tab)}
                 dossiers={dossiers}
@@ -843,14 +882,14 @@ export function App() {
 
           {/* Route: Lab Tableaux UX / Components */}
           {activeNav === 'components' && (
-            <div className="view-container">
+            <div key="components" className="view-container view-transition">
               <ComponentsView onOpenDossier={handleOpenDossier} />
             </div>
           )}
 
           {/* Route: Paramètres (Theme switch and profile) */}
           {activeNav === 'parametres' && (
-            <div className="view-container">
+            <div key="parametres" className="view-container view-transition">
               <ParametresView
                 user={currentUser}
                 theme={theme}

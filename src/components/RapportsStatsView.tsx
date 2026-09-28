@@ -151,7 +151,7 @@ export const RapportsStatsView: React.FC<RapportsStatsViewProps> = ({
  
 
       {/* Active Tab View Rendering */}
-      <div>
+      <div key={activeTab} className="view-transition">
         {activeTab === 'overview' && (
           <SupervisionOverviewTab
             onNavigateSubView={(viewId) => setActiveTab(viewId)}
