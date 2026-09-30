@@ -13,10 +13,7 @@ import type {
   RenseignementItem,
   UserAccount,
   Priorite,
-  DossierEnquete,
-  DemandeCommunication,
-  FeuilleObservation,
-  PvDetail
+  DossierEnquete
 } from '../types';
 import {
   mockRenseignements,
@@ -277,9 +274,30 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
     showToast(`Renseignement ${newItem.reference} enregistré et affecté.`);
   };
 
-  // Ouverture du modal de création de dossier pré-rempli
+  // Vérifie si l'utilisateur courant est formellement l'inspecteur désigné (coteA)
+  const checkIsAssignedInspector = (ren: RenseignementItem | null): boolean => {
+    if (!ren) return false;
+    const coteA = (ren.coteA || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+    if (!coteA) return false;
+    const prenom = (currentUser.prenom || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+    const nom = (currentUser.nom || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+    return Boolean(prenom && nom && coteA.includes(prenom) && coteA.includes(nom));
+  };
+
+  // Ouverture du modal de création de dossier pré-rempli (uniquement pour l'inspecteur affecté)
   const handleOpenCreateDossierModal = () => {
-    if (!selectedRenseignement) return;
+    if (!selectedRenseignement || !checkIsAssignedInspector(selectedRenseignement)) return;
 
     // Détection éventuelle du nom de l'entreprise dans l'objet
     let defaultNom = 'ENTREPRISE CONTRÔLÉE SAS';
@@ -299,7 +317,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   // Soumission de la création de dossier depuis le renseignement
   const handleCreateDossierSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRenseignement || !dossierNom.trim()) return;
+    if (!selectedRenseignement || !dossierNom.trim() || !checkIsAssignedInspector(selectedRenseignement)) return;
 
     const generatedId = `dossier-${Date.now().toString().slice(-4)}`;
     const newDossierData = {
@@ -349,75 +367,15 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
     const hasDossier = selectedRenseignement.dossiersLies && selectedRenseignement.dossiersLies.length > 0;
     const pieces = selectedRenseignement.piecesDisponibles || [];
 
+    // Seul l'inspecteur formellement affecté (coteA) peut créer le dossier d'enquête
+    const isAssignedInspector = checkIsAssignedInspector(selectedRenseignement);
+
     const linkedDossier = dossiers.find((d) =>
       selectedRenseignement.dossiersLies && (
         selectedRenseignement.dossiersLies.includes(d.id) ||
         selectedRenseignement.dossiersLies.includes(d.reference)
       )
     ) || null;
-
-    const rawDemandes = linkedDossier ? demandesParDossier[linkedDossier.id] : [];
-    const linkedDemandes: DemandeCommunication[] = Array.isArray(rawDemandes)
-      ? rawDemandes
-      : (rawDemandes ? [rawDemandes] : []);
-
-    const rawFeuilles = linkedDossier ? feuillesParDossier[linkedDossier.id] : [];
-    const linkedFeuilles: FeuilleObservation[] = Array.isArray(rawFeuilles)
-      ? rawFeuilles
-      : (rawFeuilles ? [rawFeuilles] : []);
-
-    const rawPvs = linkedDossier ? pvsParDossier[linkedDossier.id] : [];
-    const linkedPvs: PvDetail[] = Array.isArray(rawPvs)
-      ? rawPvs
-      : (rawPvs ? [rawPvs] : []);
-
-    // Statut demande de communication
-    let demandeStatusText = 'Non lancée';
-    let demandeStatusDetail = 'Aucune réquisition de communication émise';
-    if (linkedDemandes.length > 0) {
-      const d = linkedDemandes[0];
-      if (d.evaluationReponse === 'SATISFAISANTE') {
-        demandeStatusText = 'Réponse satisfaisante';
-        demandeStatusDetail = `Justificatifs conformes (${d.reference}) — Clôture sans suite`;
-      } else if (d.evaluationReponse === 'NON_SATISFAISANTE') {
-        demandeStatusText = 'Réponse non satisfaisante';
-        demandeStatusDetail = `Défaut de justificatifs (${d.reference}) — Feuille d’observation requise`;
-      } else if (d.statut === 'REPONSE_COMPLETE') {
-        demandeStatusText = 'Réponse reçue';
-        demandeStatusDetail = `Réponse enregistrée (${d.reference}) — En cours d’évaluation`;
-      } else {
-        demandeStatusText = 'Émise & Notifiée';
-        demandeStatusDetail = `Réquisition notifiée (${d.reference}) — Réponse attendue`;
-      }
-    }
-
-    // Statut feuille d'observation
-    let feuilleStatusText = 'Non initiée';
-    let feuilleStatusDetail = 'Aucune feuille d’observation contradictoire';
-    if (linkedFeuilles.length > 0) {
-      const f = linkedFeuilles[0];
-      if (f.decisionFinale === 'CLASSE_SANS_SUITE') {
-        feuilleStatusText = 'Satisfaite & Clôturée';
-        feuilleStatusDetail = `Constats levés (${f.reference}) — Dossier classé sans suite`;
-      } else if (f.decisionFinale === 'PV_INFRACTION_GLEC') {
-        feuilleStatusText = 'Contradictoire clos — PV dressé';
-        feuilleStatusDetail = `Infractions retenues (${f.reference})`;
-      } else {
-        feuilleStatusText = 'Notifiée — En cours';
-        feuilleStatusDetail = `Feuille notifiée (${f.reference}) — Audition contradictoire`;
-      }
-    }
-
-    // Statut procès-verbal
-    let pvStatusText = 'Aucun PV dressé';
-    let pvStatusDetail = 'Aucune infraction répressive actée';
-    if (linkedPvs.length > 0) {
-      pvStatusText = 'Dressé & Transmis';
-      pvStatusDetail = `PV n° ${linkedPvs[0].reference} transmis au contentieux`;
-    } else if (linkedDossier && linkedDossier.hasPv) {
-      pvStatusText = 'Dressé & Transmis';
-      pvStatusDetail = 'Procès-verbal d’infraction transmis au contentieux';
-    }
 
     return (
       <div key={`renseignement-detail-${selectedRenseignement.id}`} className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
@@ -537,7 +495,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                   <span>Consulter le dossier d’enquête rattaché</span>
                   <ExternalLink size={13} />
                 </button>
-              ) : (
+              ) : isAssignedInspector ? (
                 <button
                   type="button"
                   onClick={handleOpenCreateDossierModal}
@@ -556,9 +514,9 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                   }}
                 >
                   <FolderPlus size={15} />
-                  <span>Création du dossier</span>
+                  <span>Créer un dossier</span>
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -729,25 +687,6 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
               ))}
             </div>
           </div>
-
-          {/* CTA Bas de page si pas encore de dossier */}
-          {!hasDossier && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '16px 20px',
-                borderRadius: 'var(--radius-card)',
-                border: '1px solid var(--color-border)',
-                backgroundColor: 'var(--color-surface)',
-              }}
-            >
-         
-
-           
-            </div>
-          )}
         </div>
 
         {/* Modal de Création de Dossier depuis le Renseignement */}
@@ -1504,21 +1443,21 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                 >
                   Annuler
                 </button>
-                <button
-                  type="submit"
-                  style={{
-                    padding: '8px 18px',
-                    borderRadius: 'var(--radius-btn)',
-                    backgroundColor: 'var(--color-accent)',
-                    border: 'none',
-                    color: 'var(--color-on-accent)',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Enregistrer et affecter
-                </button>
+                    <button
+                      type="submit"
+                      style={{
+                        padding: '8px 18px',
+                        borderRadius: 'var(--radius-btn)',
+                        backgroundColor: 'var(--color-accent)',
+                        border: 'none',
+                        color: 'var(--color-on-accent)',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Enregistrer et affecter
+                    </button>
               </div>
             </form>
           </div>
