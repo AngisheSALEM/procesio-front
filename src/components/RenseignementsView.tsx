@@ -588,12 +588,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
             </div>
 
             <div style={{ backgroundColor: 'none', border: 'none', padding: '16px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-                Niveau de priorité & Délai
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '6px' }}>
-                {selectedRenseignement.priorite || 'NORMALE'}
-              </div>
+              
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
                 Délai d’instruction prescrit : {selectedRenseignement.delaiPrescritJours || 15} jours
               </div>
@@ -1468,29 +1463,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
               </div>
 
               {/* Niveau de priorité (Date prise automatiquement à la date du jour) */}
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '5px' }}>
-                  Niveau de priorité
-                </label>
-                <select
-                  value={formPriorite}
-                  onChange={(e) => setFormPriorite(e.target.value as any)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: 'var(--radius-btn)',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    color: 'var(--color-text-primary)',
-                    fontSize: '12px',
-                    outline: 'none',
-                  }}
-                >
-                  <option value="NORMALE">Normale (15 jours)</option>
-                  <option value="URGENTE">Urgente (7 jours)</option>
-                  <option value="SIGNALEE">Signalée (20 jours)</option>
-                </select>
-              </div>
+             
 
               {/* Affectation à qui (Agent désigné) */}
               <div>
