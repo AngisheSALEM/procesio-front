@@ -89,7 +89,6 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   const [formObjet, setFormObjet] = useState('');
   const [formPiecesDisponibles, setFormPiecesDisponibles] = useState('');
   const [formUploadedFiles, setFormUploadedFiles] = useState<{ name: string; size: string }[]>([]);
-  const [formPriorite, setFormPriorite] = useState<'NORMALE' | 'URGENTE' | 'SIGNALEE'>('NORMALE');
   const [formAffectation, setFormAffectation] = useState(inspecteursDisponibles[0]);
   const [formInstructions, setFormInstructions] = useState('');
 
@@ -233,9 +232,9 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
       coteA: formAffectation,
       dateCotation: todayDate,
       degreFiabilite: 'B2 — Source qualifiée, faits à vérifier',
-      priorite: formPriorite,
+
       instructionCotation: formInstructions.trim() || 'Enregistrer, qualifier et procéder aux investigations préalables.',
-      delaiPrescritJours: formPriorite === 'URGENTE' ? 7 : 15,
+  
       effetProduit: 'EN_EVALUATION',
       effetDescription: 'Renseignement qualifié et affecté à l’agent désigné. Instruction en cours.',
       cycleEvolution: [
