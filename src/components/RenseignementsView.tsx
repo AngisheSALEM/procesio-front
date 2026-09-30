@@ -1444,22 +1444,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                   </div>
                 )}
 
-                <input
-                  type="text"
-                  placeholder="Désignation ou inventaire complémentaire (optionnel)..."
-                  value={formPiecesDisponibles}
-                  onChange={(e) => setFormPiecesDisponibles(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: 'var(--radius-btn)',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    color: 'var(--color-text-primary)',
-                    fontSize: '12px',
-                    outline: 'none',
-                  }}
-                />
+             
               </div>
 
               {/* Niveau de priorité (Date prise automatiquement à la date du jour) */}
