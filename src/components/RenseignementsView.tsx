@@ -649,20 +649,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
             </div>
 
             {/* Suivi des actes du dossier lié */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingBottom: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px', fontSize: '12px' }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Demande de communication :</span>
-                <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{demandeStatusText} — {demandeStatusDetail}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px', fontSize: '12px' }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Feuille d'observation :</span>
-                <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{feuilleStatusText} — {feuilleStatusDetail}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px', fontSize: '12px' }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Procès-verbal :</span>
-                <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{pvStatusText} — {pvStatusDetail}</span>
-              </div>
-            </div>
+       
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {(selectedRenseignement.cycleEvolution || [
