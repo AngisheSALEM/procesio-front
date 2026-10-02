@@ -49,9 +49,6 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
   demandes = [],
   feuilles = [],
   pvs = [],
-  hasDemande = false,
-  hasFeuille = false,
-  hasPv = false,
   activeTab,
   onSelectTab,
   onSelectDossier,
@@ -90,16 +87,10 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Condition 1 : si pas de demande, tab non visible.
-  // Condition 2 : on ne peut pas avoir de feuille d'observation sans demande de communication.
-  // Condition 3 : la tab Documents & PV n'apparaît que lorsqu'un PV a été lancé de la feuille d'observation.
-  const canShowDemande = Boolean(hasDemande || demandes.length > 0);
-  const canShowFeuille = Boolean((hasDemande || demandes.length > 0) && (hasFeuille || feuilles.length > 0));
-  const canShowDocuments = Boolean(
-    (hasDemande || demandes.length > 0) &&
-    (hasFeuille || feuilles.length > 0) &&
-    (hasPv || pvs.length > 0)
-  );
+  // Les deux onglets de création restent accessibles sur un dossier vide.
+  const canShowDemande = true;
+  const canShowFeuille = true;
+  const canShowDocuments = true;
 
   // Redirection automatique si l'onglet actif n'est plus accessible
   React.useEffect(() => {
@@ -133,7 +124,7 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
     },
     {
       id: 'documents' as DossierTabId,
-      label: 'PV',
+      label: 'Documents',
       icon: <FolderOpen size={14} strokeWidth={1.8} />,
       visible: canShowDocuments,
     },
@@ -261,7 +252,7 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
               margin: 0,
             }}
           >
-            {dossier.entiteControlee.nom}
+            {dossier.entiteControlee.nom || dossier.objet || dossier.reference}
           </h1>
 
           {/* Badge statut sobre et monochromatique selon la règle 60-30-10 */}
@@ -279,6 +270,10 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
           >
             {dossier.decisionCloture === 'CLASSE_SANS_SUITE'
               ? 'Classé sans suite'
+              : dossier.statut === 'OUVERT'
+              ? 'Ouvert'
+              : dossier.statut === 'A_AFFECTER'
+              ? 'À affecter'
               : dossier.statut === 'EN_COURS'
               ? 'En cours'
               : dossier.statut === 'A_VALIDER'

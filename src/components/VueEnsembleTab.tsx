@@ -1,14 +1,32 @@
-import React, { useState } from 'react';
+import { requestStatusLabel, sheetStatusLabel } from '../utils/statusLabels';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Plus,
-  Upload,
-  X,
   ExternalLink,
-  CheckCircle
+  CheckCircle,
+  Edit2,
+  Users,
+  UserCheck,
+  Clock,
+  ArrowRight,
+  Shield,
+  X,
+  History,
 } from 'lucide-react';
-import type { DossierEnquete, DemandeCommunication, FeuilleObservation, UserAccount, PvDetail } from '../types';
+import type {
+  DossierEnquete,
+  DemandeCommunication,
+  FeuilleObservation,
+  UserAccount,
+  PvDetail,
+  CaseTimelineEntry,
+  CaseAssignmentEntry,
+  Priorite
+} from '../types';
 import { formatDate } from '../utils/dateUtils';
+import { fetchCaseTimeline, fetchCaseAssignments } from '../api/actions';
 import { ModalPortal } from './common/ModalPortal';
+import './VueEnsembleTab.css';
 
 interface VueEnsembleTabProps {
   dossier: DossierEnquete;
@@ -24,6 +42,11 @@ interface VueEnsembleTabProps {
   onSaveFeuille?: (feuille: FeuilleObservation) => void;
   onCloturerSansSuite?: (motif: string) => void;
   currentUser?: UserAccount;
+  onUpdateCase?: (caseId: string, data: any) => Promise<void>;
+  onAssignCase?: (caseId: string, newAssigneeId: number, reason: string, version: number) => Promise<void>;
+  onRefresh?: () => Promise<unknown>;
+  eligibleAgents?: UserAccount[];
+  allAgents?: UserAccount[];
 }
 
 export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
@@ -36,11 +59,16 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
   onGoToDemandes,
   onGoToObservations,
   onGoToPvs,
-  onSaveDemande,
-  onSaveFeuille,
   onCloturerSansSuite: _onCloturerSansSuite,
-  currentUser,
+  onUpdateCase,
+  onAssignCase,
+  onRefresh,
+  eligibleAgents = [],
+  allAgents = [],
 }) => {
+  const canEdit = dossier.capabilities?.includes('case.update') === true;
+  const canAssign = dossier.capabilities?.includes('case.assign') === true;
+
   const demandesList = (demandes && demandes.length > 0)
     ? demandes
     : (demande ? [demande] : []);
@@ -54,188 +82,254 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
   const pvsList = pvs || [];
   const dernierPv = pvsList.length > 0 ? pvsList[pvsList.length - 1] : null;
 
-  const defaultAuteur = currentUser
-    ? `${currentUser.grade} ${currentUser.prenom} ${currentUser.nom}`
-    : 'Inspecteur Marc Kabamba';
+  // Timeline and assignments state
+  const [timeline, setTimeline] = useState<CaseTimelineEntry[]>([]);
+  const [assignments, setAssignments] = useState<CaseAssignmentEntry[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
-  // Modales épurées (formulaire 5 champs)
-  const [showDemandeModal, setShowDemandeModal] = useState(false);
-  const [showFeuilleModal, setShowFeuilleModal] = useState(false);
+  // Modals state
+  const [showNextActionModal, setShowNextActionModal] = useState(false);
+  const [nextActionValue, setNextActionValue] = useState(dossier.prochaineAction || '');
 
-  // Formulaire Demande : strictement 5 champs
-  const [demandeForm, setDemandeForm] = useState({
-    auteur: dernierDemande?.auteur || defaultAuteur,
-    destinataire: dernierDemande?.destinataire?.nom || dossier.entiteControlee.nom,
-    echeance: dernierDemande?.echeanceReponse || '2026-10-15',
-    objet: dernierDemande?.objet || 'Communication des factures de fret maritime et relevés bancaires CIF',
-    pdfFile: null as { name: string; size: string } | null,
-  });
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editObjet, setEditObjet] = useState(dossier.objet || '');
+  const [editPerimetre, setEditPerimetre] = useState(dossier.perimetre || '');
+  const [editMotifOuverture, setEditMotifOuverture] = useState(dossier.motifOuverture || '');
+  const [editPriorite, setEditPriorite] = useState<Priorite>(dossier.priorite || 'NORMALE');
+  const [editEcheance, setEditEcheance] = useState(dossier.echeance || '');
+  const [editNom, setEditNom] = useState(dossier.entiteControlee.nom || '');
+  const [editRccm, setEditRccm] = useState(dossier.entiteControlee.rccm || '');
+  const [editNif, setEditNif] = useState(dossier.entiteControlee.nif || '');
+  const [editTypeEntite, setEditTypeEntite] = useState(dossier.entiteControlee.typeEntite || 'Société commerciale');
+  const [editRole, setEditRole] = useState(dossier.entiteControlee.roleDansDossier || 'Entreprise contrôlée');
+  const [editAdresse, setEditAdresse] = useState(dossier.entiteControlee.adresse || '');
+  const [editContact, setEditContact] = useState(dossier.entiteControlee.contact || '');
+  const [editTypeCible, setEditTypeCible] = useState(dossier.entiteControlee.typeCible || '');
+  const [editPourLeCompteDe, setEditPourLeCompteDe] = useState(dossier.entiteControlee.pourLeCompteDe || '');
 
-  // Formulaire Feuille : strictement 5 champs
-  const [feuilleForm, setFeuilleForm] = useState({
-    inspecteur: dernierFeuille?.inspecteurs?.[0] || defaultAuteur,
-    destinataire: dernierFeuille?.destinataire || dossier.entiteControlee.nom,
-    objet: dernierFeuille?.objetControle || 'Constatations relatives aux minorations de fret et valeur en douane',
-    auditionPrevue: dernierFeuille?.dateReunionCloturePrevue || '2026-10-22',
-    pdfFile: null as { name: string; size: string } | null,
-  });
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [selectedTeamIds, setSelectedTeamIds] = useState<number[]>(dossier.teamIds || []);
 
-  const handleDemandeSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const updated: DemandeCommunication = {
-      id: demande?.id || `demande-${Date.now()}`,
-      reference: demande?.reference || `DGDA/DRK/ENQ/DC/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
-      dossierId: dossier.id,
-      redacteur: demandeForm.auteur,
-      auteur: demandeForm.auteur,
-      dateEmission: demande?.dateEmission || new Date().toISOString().split('T')[0],
-      echeanceReponse: demandeForm.echeance,
-      objet: demandeForm.objet,
-      signataireHabilite: demande?.signataireHabilite || 'Directeur Provincial DGDA',
-      gradeSignataire: demande?.gradeSignataire || 'Commandement',
-      baseLegale: 'Code des douanes, Article 46',
-      modaliteRemise: 'Voie sécurisée',
-      commentairesInternes: '',
-      destinataire: {
-        nom: demandeForm.destinataire,
-        qualite: dossier.entiteControlee.typeEntite || 'Entreprise contrôlée',
-        adresse: dossier.entiteControlee.adresse || '',
-      },
-      statut: demande?.statut || 'EMISE',
-      elementsDemandes: demande?.elementsDemandes || [
-        {
-          id: 'EL-01',
-          libelle: 'Connaissements maritimes (Bill of Lading) signés',
-          periodeConcernee: 'Exercice 2025',
-          motifExigence: 'Contrôle du fret CIF réel acquitté',
-          statutRemise: 'EN_ATTENTE',
-        },
-        {
-          id: 'EL-02',
-          libelle: 'Factures d’assurance maritime et surestaries',
-          periodeConcernee: 'Exercice 2025',
-          motifExigence: 'Intégration dans la valeur imposable',
-          statutRemise: 'EN_ATTENTE',
-        },
-      ],
-      reponsesRecues: demande?.reponsesRecues || [],
-      pdfSourceNom: demandeForm.pdfFile ? demandeForm.pdfFile.name : (demande?.pdfSourceNom || 'Requisition_Fret_Officielle.pdf'),
-      pdfSourceTaille: demandeForm.pdfFile ? demandeForm.pdfFile.size : (demande?.pdfSourceTaille || '920 Ko'),
-    };
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [newAssigneeId, setNewAssigneeId] = useState<string>('');
+  const [assignReason, setAssignReason] = useState<string>('');
 
-    onSaveDemande?.(updated);
-    setShowDemandeModal(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  // Sync state with incoming dossier props
+  useEffect(() => {
+    setNextActionValue(dossier.prochaineAction || '');
+    setEditObjet(dossier.objet || '');
+    setEditPerimetre(dossier.perimetre || '');
+    setEditMotifOuverture(dossier.motifOuverture || '');
+    setEditPriorite(dossier.priorite || 'NORMALE');
+    setEditEcheance(dossier.echeance || '');
+    setEditNom(dossier.entiteControlee.nom || '');
+    setEditRccm(dossier.entiteControlee.rccm || '');
+    setEditNif(dossier.entiteControlee.nif || '');
+    setEditTypeEntite(dossier.entiteControlee.typeEntite || 'Société commerciale');
+    setEditRole(dossier.entiteControlee.roleDansDossier || 'Entreprise contrôlée');
+    setEditAdresse(dossier.entiteControlee.adresse || '');
+    setEditContact(dossier.entiteControlee.contact || '');
+    setEditTypeCible(dossier.entiteControlee.typeCible || '');
+    setEditPourLeCompteDe(dossier.entiteControlee.pourLeCompteDe || '');
+    setSelectedTeamIds(dossier.teamIds || []);
+  }, [dossier]);
+
+  // Load chronology and assignment history
+  const loadHistory = useCallback(async () => {
+    if (!dossier?.id) return;
+    setLoadingHistory(true);
+    setHistoryError(null);
+    try {
+      const [tRes, aRes] = await Promise.all([
+        fetchCaseTimeline(dossier.id).catch(() => []),
+        fetchCaseAssignments(dossier.id).catch(() => []),
+      ]);
+      setTimeline(tRes);
+      setAssignments(aRes);
+    } catch (err) {
+      setHistoryError(err instanceof Error ? err.message : 'Erreur de chargement de l’historique');
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [dossier?.id]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+
+  const resolveAgentName = (id: number | null | undefined): string => {
+    if (!id) return 'Non défini';
+    const found = allAgents.find((a) => Number(a.id) === id);
+    return found ? `${found.prenom} ${found.nom}`.trim() : `Agent #${id}`;
   };
 
-  const handleFeuilleSubmit = (e: React.FormEvent) => {
+  // Handlers
+  const handleSaveNextAction = async (e: React.FormEvent) => {
     e.preventDefault();
-    const updated: FeuilleObservation = {
-      id: feuille?.id || `fo-${Date.now()}`,
-      reference: feuille?.reference || `DGDA/DRK/FO/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
-      dossierId: dossier.id,
-      dateRedaction: feuille?.dateRedaction || new Date().toISOString().split('T')[0],
-      inspecteurs: [feuilleForm.inspecteur],
-      destinataire: feuilleForm.destinataire,
-      objetControle: feuilleForm.objet,
-      cadreLegal: 'Décision DG/DGDA/DG/2011/296 (Articles 44 à 49)',
-      dateReunionCloturePrevue: feuilleForm.auditionPrevue,
-      statutFeuille: feuille?.statutFeuille || 'NOTIFIEE',
-      observations: feuille?.observations || [
-        {
-          code: 'O1',
-          titre: 'Écart de facturation sur fret maritime et assurance CIF',
-          faitsConstates: 'Écart constaté entre la déclaration SYDONIA et les connaissements maritimes authentiques.',
-          justificatifsAssocies: ['Connaissement maritime', 'Facture armateur'],
-          referencesJuridiques: 'Code des douanes, Article 38',
-          questionsAssujetti: 'Justifier l’écart sur le montant du fret.',
-          statutConstat: 'OUVERT',
-          analyseMotivee: 'En attente des explications de l’opérateur.',
-        },
-      ],
-      pdfSourceNom: feuilleForm.pdfFile ? feuilleForm.pdfFile.name : (feuille?.pdfSourceNom || 'Feuille_Observation_Notifiee.pdf'),
-    };
-
-    onSaveFeuille?.(updated);
-    setShowFeuilleModal(false);
+    if (!nextActionValue.trim() || !onUpdateCase || !dossier.version) return;
+    setIsSaving(true);
+    setModalError(null);
+    try {
+      await onUpdateCase(dossier.id, {
+        version: dossier.version,
+        next_action: nextActionValue.trim(),
+      });
+      setShowNextActionModal(false);
+      await loadHistory();
+      if (onRefresh) await onRefresh();
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : 'Erreur lors de la modification');
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  const handleSaveDossier = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onUpdateCase || !dossier.version) return;
+    setIsSaving(true);
+    setModalError(null);
+    try {
+      await onUpdateCase(dossier.id, {
+        version: dossier.version,
+        object: editObjet,
+        perimeter: editPerimetre,
+        opening_reason: editMotifOuverture,
+        priority: editPriorite === 'URGENTE' ? 'urgent' : editPriorite === 'SIGNALEE' ? 'flagged' : 'normal',
+        deadline: editEcheance || null,
+        controlled_entity: {
+          nom: editNom,
+          rccm: editRccm,
+          nif: editNif,
+          typeEntite: editTypeEntite,
+          roleDansDossier: editRole,
+          adresse: editAdresse,
+          contact: editContact,
+          typeCible: editTypeCible,
+          pourLeCompteDe: editPourLeCompteDe,
+        },
+      });
+      setShowEditModal(false);
+      await loadHistory();
+      if (onRefresh) await onRefresh();
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : 'Erreur lors de la modification');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveTeam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onUpdateCase || !dossier.version) return;
+    setIsSaving(true);
+    setModalError(null);
+    try {
+      await onUpdateCase(dossier.id, {
+        version: dossier.version,
+        team: selectedTeamIds,
+      });
+      setShowTeamModal(false);
+      await loadHistory();
+      if (onRefresh) await onRefresh();
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : 'Erreur lors de la mise à jour de l’équipe');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveReassignment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onAssignCase || !dossier.version) return;
+    if (!newAssigneeId) {
+      setModalError('Veuillez sélectionner le nouvel enquêteur responsable.');
+      return;
+    }
+    if (!assignReason.trim()) {
+      setModalError('Le motif de réaffectation est obligatoire et doit être circonstancié.');
+      return;
+    }
+    setIsSaving(true);
+    setModalError(null);
+    try {
+      await onAssignCase(dossier.id, Number(newAssigneeId), assignReason.trim(), dossier.version);
+      setShowAssignModal(false);
+      setAssignReason('');
+      setNewAssigneeId('');
+      await loadHistory();
+      if (onRefresh) await onRefresh();
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : 'Erreur lors de la réaffectation');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Reassignment items map for easy correlation
+  const assignmentsByVersion = new Map<number, CaseAssignmentEntry>();
+  assignments.forEach((a) => assignmentsByVersion.set(a.version, a));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
-      {/* =========================================================================
-          1. BLOC OPÉRATEUR ÉCONOMIQUE CONTRÔLÉ (ÉPURÉ AU MAXIMUM)
-          Strictement : Nom (en gras), Adresse, Contacts. Zéro icône parasite.
-          ========================================================================= */}
-      <div
-        style={{
-          backgroundColor: 'var(--color-surface)',
-          borderRadius: 'var(--radius-card)',
-          border: '1px solid var(--color-border)',
-          padding: '24px',
-        }}
-      >
-
-         <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>
-          Object du dossier
-        </div>
-
-        {/* object du dossier la seule chose en grand */}
-        <h1
-          style={{
-            fontSize: '22px',
-            fontWeight: 700,
-            color: 'var(--color-text-primary)',
-            marginTop: '6px',
-            marginBottom: '8px',
-          }}
-        >
-          {dossier.objet}
-        </h1>
-        <br />
-        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>
-          Opérateur 
-        </div>
-          
-
-
-        {/* Nom de l'opérateur : SEULE CHOSE EN GRAS */}
-        <span
-          style={{
-            fontSize: '12px',
-            fontWeight: 600,
-            color: 'var(--color-text-primary)',
-            marginTop: '6px',
-            marginBottom: '8px',
-          }}
-        >
-          {dossier.entiteControlee.nom}
-        </span>
-          
-        {/* Type de cible & Pour le compte de : SANS BORDER, SANS BG, SANS ICÔNE */}
-        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-          <span style={{ color: 'var(--color-text-muted)' }}>Type de cible : </span>
-          <span style={{ color: 'var(--color-text-primary)' }}>
-            {dossier.entiteControlee.typeCible || dossier.entiteControlee.typeEntite || 'Entreprise commerciale'}
-          </span>
-          {dossier.entiteControlee.pourLeCompteDe && (
-            <span style={{ marginLeft: '6px', color: 'var(--color-text-muted)' }}>
-              (Agissant pour le compte de : <span style={{ color: 'var(--color-text-primary)' }}>{dossier.entiteControlee.pourLeCompteDe}</span>)
-            </span>
-          )}
-        </div>
-
-        {/* Adresse & Contact sans icônes ni bordures */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '6px' }}>
+    <div className="case-overview">
+      <section className="case-overview-summary" aria-label="Synthèse du dossier">
+        <div className="case-overview-heading">
           <div>
-            <span style={{ color: 'var(--color-text-muted)' }}>Adresse : </span>
-            <span style={{ color: 'var(--color-text-primary)' }}>{dossier.entiteControlee.adresse}</span>
+            <p className="case-overview-reference">{dossier.reference}</p>
+            <span className="case-overview-label">Objet de l’enquête</span>
+            <h1>{dossier.objet || 'Objet non renseigné'}</h1>
           </div>
-          {dossier.entiteControlee.contact && (
-            <div style={{ color: 'var(--color-text-muted)', fontSize: '11px' }}>
-              Contact : {dossier.entiteControlee.contact}
-            </div>
+          {canEdit && (
+            <button type="button" className="btn-secondary" onClick={() => { setModalError(null); setShowEditModal(true); }}>
+              <Edit2 size={14} /> Modifier le dossier
+            </button>
           )}
         </div>
-      </div>
+        <div className="case-overview-next">
+          <div>
+            <span className="case-overview-label">Prochaine action</span>
+            <p>{dossier.prochaineAction || 'Aucune action planifiée'}</p>
+          </div>
+          <div className="case-overview-deadline">
+            <span className="case-overview-label">Échéance du dossier</span>
+            <p>{dossier.echeance ? formatDate(dossier.echeance) : 'Non définie'}</p>
+          </div>
+          {canEdit && (
+            <button type="button" className="btn-ghost" onClick={() => { setModalError(null); setNextActionValue(dossier.prochaineAction || ''); setShowNextActionModal(true); }}>
+              <Edit2 size={13} /> Modifier l’action
+            </button>
+          )}
+        </div>
+        <dl className="case-overview-facts">
+          <div><dt>Responsable</dt><dd>{dossier.responsable || 'Non désigné'}</dd></div>
+          <div><dt>Unité</dt><dd>{dossier.unite || 'Non renseignée'}</dd></div>
+          <div><dt>Priorité</dt><dd>{dossier.priorite === 'URGENTE' ? 'Urgente' : dossier.priorite === 'SIGNALEE' ? 'Signalée' : 'Normale'}</dd></div>
+        </dl>
+        <details className="case-overview-details">
+          <summary>Informations du dossier et équipe</summary>
+          <div className="case-overview-details-content">
+            {dossier.perimetre && <p><span>Périmètre : </span>{dossier.perimetre}</p>}
+            {dossier.motifOuverture && <p><span>Motif d’ouverture : </span>{dossier.motifOuverture}</p>}
+            <p><span>Opérateur : </span>{dossier.entiteControlee.nom || 'Non renseigné'}</p>
+            <dl className="case-overview-facts">
+              {dossier.entiteControlee.nif && <div><dt>NIF</dt><dd>{dossier.entiteControlee.nif}</dd></div>}
+              {dossier.entiteControlee.rccm && <div><dt>RCCM</dt><dd>{dossier.entiteControlee.rccm}</dd></div>}
+              {dossier.entiteControlee.typeCible && <div><dt>Type</dt><dd>{dossier.entiteControlee.typeCible}</dd></div>}
+              {dossier.entiteControlee.adresse && <div><dt>Adresse</dt><dd>{dossier.entiteControlee.adresse}</dd></div>}
+              {dossier.entiteControlee.contact && <div><dt>Contact</dt><dd>{dossier.entiteControlee.contact}</dd></div>}
+            </dl>
+            <p><span>Équipe ({dossier.equipe.length}) : </span>{dossier.equipe.join(', ') || 'Aucun membre assigné'}</p>
+            {canAssign && <div className="case-overview-team-actions">
+              <button type="button" className="btn-secondary" onClick={() => { setModalError(null); setSelectedTeamIds(dossier.teamIds || []); setShowTeamModal(true); }}><Users size={14} /> Gérer l’équipe</button>
+              <button type="button" className="btn-secondary" onClick={() => { setModalError(null); setNewAssigneeId(''); setAssignReason(''); setShowAssignModal(true); }}><UserCheck size={14} /> Réaffecter le dossier</button>
+            </div>}
+          </div>
+        </details>
+      </section>
 
       {/* =========================================================================
           STATUT DE CLASSEMENT SANS SUITE (SI LE DOSSIER EST SATISFAIT / CLÔTURÉ)
@@ -256,34 +350,56 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <CheckCircle size={16} color="var(--color-text-primary)" />
               <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                Dossier classé sans suite — Conformité validée
+                Classement sans suite — Décision interne validée
               </span>
             </div>
             {dossier.dateCloture && (
               <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                Clôturé le {formatDate(dossier.dateCloture)}
+                Validé le {formatDate(dossier.dateCloture)}
               </span>
             )}
           </div>
           {dossier.motifClassement && (
             <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: 1.5, marginTop: '2px' }}>
-              <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>Motif de satisfaction : </span>
+              <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>Motif du classement : </span>
               {dossier.motifClassement}
             </div>
           )}
         </div>
       )}
 
-      {/*================================ BLOC D'OBJET DE L ENQUETE ================*/}
-
-
-     
-     
+      <section className="case-overview-procedures" aria-label="Avancement de la procédure">
+        <h2>Avancement de la procédure</h2>
+        <div className="case-overview-procedure">
+          <div><h3>Demandes de communication <span>({demandesList.length})</span></h3>
+            <p>{dernierDemande ? requestStatusLabel(dernierDemande.statut) : 'Aucune demande'}</p>
+          </div>
+          {dernierDemande && <div><span className="case-overview-label">Échéance de réponse</span><p>{formatDate(dernierDemande.echeanceReponse)}</p></div>}
+          <button type="button" className={dernierDemande ? 'btn-secondary' : 'btn-primary'} onClick={onGoToDemandes}>
+            {dernierDemande ? <ExternalLink size={14} /> : <Plus size={14} />}{dernierDemande ? 'Consulter' : 'Créer une demande'}
+          </button>
+        </div>
+        <div className="case-overview-procedure">
+          <div><h3>Feuilles d’observation <span>({feuillesList.length})</span></h3>
+            <p>{dernierFeuille ? sheetStatusLabel(dernierFeuille.statutFeuille) : 'Aucune feuille'}</p>
+          </div>
+          {dernierFeuille && <div><span className="case-overview-label">Audition prévue</span><p>{formatDate(dernierFeuille.dateReunionCloturePrevue)}</p></div>}
+          <button type="button" className="btn-secondary" onClick={onGoToObservations}>{dernierFeuille ? 'Consulter' : 'Créer une feuille'}<ExternalLink size={14} /></button>
+        </div>
+        {dernierPv && <div className="case-overview-procedure">
+          <div><h3>Procès-verbaux <span>({pvsList.length})</span></h3><p>{dernierPv.statutPv === 'TRANSMIS_CONTENTIEUX' ? 'Transmis GLEC' : 'Dressé'}</p></div>
+          <div><span className="case-overview-label">Droits éludés</span><p>{dernierPv.droitsEludesUSD.toLocaleString('fr-FR')} USD</p></div>
+          {onGoToPvs && <button type="button" className="btn-secondary" onClick={onGoToPvs}>Consulter<ExternalLink size={14} /></button>}
+        </div>}
+      </section>
 
       {/* =========================================================================
-          2. CARD DERNIÈRE DEMANDE DE COMMUNICATION
-          Objet, Échéance, Statut + Bouton Nouveau (si pas de demande) ou Mettre à jour
+          5. SECTION CHRONOLOGIE & HISTORIQUE PROCÉDURAL DU DOSSIER
+          Raccorde les actions de « Mon travail », la file « À valider », les chronologies et historiques.
+          Chaque action doit ouvrir le bon objet.
           ========================================================================= */}
+<details className="case-overview-details case-overview-history">
+        <summary>Historique du dossier</summary>
       <div
         style={{
           backgroundColor: 'var(--color-surface)',
@@ -295,289 +411,182 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
           gap: '16px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-              Demande de communication {demandesList.length > 1 ? `(${demandesList.length})` : ''}
-            </span>
-            {dernierDemande && (
-              <span
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                  backgroundColor: 'var(--color-bg)',
-                  border: '1px solid var(--color-border)',
-                  color: 'var(--color-text-secondary)',
-                }}
-              >
-                {dernierDemande.statut === 'REPONSE_COMPLETE' || dernierDemande.reponsePdfNom ? 'Réponse reçue' : 'En attente'}
-              </span>
-            )}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <History size={16} color="var(--color-text-muted)" />
+              <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>
+                Chronologie du dossier
+              </h3>
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+              Historique des affectations motivées, actes d'instruction et évolutions de version du dossier
+            </div>
           </div>
 
-          {/* Bouton en haut à droite */}
-          {!dernierDemande ? (
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => {
-                setDemandeForm({
-                  auteur: defaultAuteur,
-                  destinataire: dossier.entiteControlee.nom,
-                  echeance: '2026-10-15',
-                  objet: '',
-                  pdfFile: null,
-                });
-                setShowDemandeModal(true);
-              }}
-              style={{ fontSize: '12px', padding: '6px 14px' }}
-            >
-              <Plus size={14} />
-              <span>Nouvelle demande de communication</span>
-            </button>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {/* <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => {
-                  setDemandeForm({
-                    auteur: dernierDemande.auteur || defaultAuteur,
-                    destinataire: dernierDemande.destinataire.nom,
-                    echeance: dernierDemande.echeanceReponse,
-                    objet: dernierDemande.objet || '',
-                    pdfFile: null,
-                  });
-                  setShowDemandeModal(true);
-                }}
-                style={{ fontSize: '12px', padding: '6px 12px' }}
-              >
-                <span>Mettre à jour</span>
-              </button> */}
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={onGoToDemandes}
-                style={{ fontSize: '12px', padding: '6px 10px' }}
-              >
-                <ExternalLink size={13} />
-                <span>{demandesList.length > 1 ? `Voir les demandes (${demandesList.length})` : "Ouvrir l'instruction"}</span>
-              </button>
-            </div>
-          )}
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={loadHistory}
+            disabled={loadingHistory}
+            style={{ fontSize: '12px', padding: '4px 10px' }}
+          >
+            {loadingHistory ? 'Actualisation...' : 'Rafraîchir'}
+          </button>
         </div>
 
-        {/* Contenu de la Card Demande */}
-        {!dernierDemande ? (
-          <div style={{ padding: '16px 0', color: 'var(--color-text-muted)', fontSize: '13px' }}>
-            Aucune demande de communication pour le moment.
+        {historyError && (
+          <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)', padding: '8px 12px', backgroundColor: 'var(--color-bg)', borderRadius: '6px' }}>
+            {historyError}
+          </div>
+        )}
+
+        {/* Liste chronologique */}
+        {timeline.length === 0 && assignments.length === 0 && !loadingHistory ? (
+          <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '13px' }}>
+            Aucun événement consigné pour ce dossier pour le moment.
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
-            {/* {demandesList.length > 1 && (
-              <div style={{ fontSize: '11px', color: 'var(--color-accent)', fontWeight: 600 }}>
-                Dernière demande émise : <span className="font-sf">{dernierDemande.reference}</span>
-              </div>
-            )} */}
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-                Objet de la demande
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '2px', lineHeight: 1.4 }}>
-                {dernierDemande.objet}
-              </div>
-            </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
+            {/* On fusionne et trie par date décroissante */}
+            {timeline.slice(0, 20).map((event) => {
+              const assignment = event.version ? assignmentsByVersion.get(event.version) : undefined;
+              const isAssignment = event.kind === 'assigned' || !!assignment;
+              const isInspection = ['mission_created', 'sheet_created', 'sheet_prepared', 'defense_created', 'observation_assessed'].includes(event.kind);
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-              
-              <span>
-                Échéance légale :{' '}
-                <strong className="font-sf" style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>
-                  {formatDate(dernierDemande.echeanceReponse)}
-                </strong>
-              </span>
-            </div>
+              return (
+                <div
+                  key={event.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px',
+                    padding: '12px 14px',
+                    backgroundColor: isAssignment ? 'rgba(59, 130, 246, 0.04)' : 'var(--color-bg)',
+                    borderRadius: '8px',
+                    border: '1px solid var(--color-border)',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      backgroundColor: isAssignment ? 'rgba(59, 130, 246, 0.15)' : 'var(--color-surface-elevated)',
+                      color: isAssignment ? 'var(--color-accent)' : 'var(--color-text-primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      flexShrink: 0,
+                      marginTop: '2px',
+                    }}
+                  >
+                    {isAssignment ? <UserCheck size={14} /> : isInspection ? <Shield size={14} /> : <Clock size={14} />}
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                          {event.kind === 'created'
+                            ? 'Ouverture initiale du dossier'
+                            : event.kind === 'assigned'
+                            ? 'Réaffectation motivée'
+                            : event.kind === 'updated'
+                            ? 'Mise à jour des informations'
+                            : isInspection
+                            ? 'Acte d’inspection contradictoire'
+                            : event.kind}
+                        </span>
+                        {event.version && (
+                          <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '8px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-muted)' }}>
+                            v{event.version}
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-sf" style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                        {formatDate(event.created_at)}
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '3px' }}>
+                      Opéré par : <strong style={{ color: 'var(--color-text-primary)' }}>{resolveAgentName(event.actor)}</strong>
+                    </div>
+
+                    {/* Détails spécifiques si réaffectation */}
+                    {assignment && (
+                      <div
+                        style={{
+                          marginTop: '6px',
+                          padding: '8px 12px',
+                          backgroundColor: 'var(--color-surface)',
+                          borderRadius: '6px',
+                          border: '1px solid var(--color-border)',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-text-primary)' }}>
+                          <span>{resolveAgentName(assignment.previous_assignee)}</span>
+                          <ArrowRight size={12} color="var(--color-text-muted)" />
+                          <strong style={{ color: 'var(--color-accent)' }}>{resolveAgentName(assignment.new_assignee)}</strong>
+                        </div>
+                        <div style={{ marginTop: '4px', color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
+                          <span style={{ fontWeight: 600, color: 'var(--color-text-muted)' }}>Motif notifié : </span>
+                          « {assignment.reason} »
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Prochaine action si enregistrée */}
+                    {event.next_action && !assignment && (
+                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                        Prochaine action fixée : <span style={{ color: 'var(--color-text-primary)' }}>{event.next_action}</span>
+                      </div>
+                    )}
+
+                    {/* Boutons d'action : Chaque action doit ouvrir le bon objet */}
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                      {isInspection && (
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          onClick={onGoToObservations}
+                          style={{ fontSize: '11px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <ExternalLink size={11} />
+                          <span>Ouvrir la feuille d'observation</span>
+                        </button>
+                      )}
+                      {dernierDemande && (
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          onClick={onGoToDemandes}
+                          style={{ fontSize: '11px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <ExternalLink size={11} />
+                          <span>Voir la demande</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* =========================================================================
-          3. CARD DERNIÈRE FEUILLE D'OBSERVATION
-          Règle formelle : S'il n'y a pas de feuille d'observation, la div N'EXISTE PAS.
-          ========================================================================= */}
-      {demandesList.length > 0 && dernierFeuille && (
-        <div
-          style={{
-            backgroundColor: 'var(--color-surface)',
-            borderRadius: 'var(--radius-card)',
-            border: '1px solid var(--color-border)',
-            padding: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                Feuille d'observation {feuillesList.length > 1 ? `(${feuillesList.length})` : ''}
-              </span>
-              <span
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                  backgroundColor: 'var(--color-bg)',
-                  border: '1px solid var(--color-border)',
-                  color: 'var(--color-text-secondary)',
-                }}
-              >
-                {dernierFeuille.statutFeuille === 'CLOTUREE' ? 'Feuille clôturée' : 'Contradictoire en cours'}
-              </span>
-            </div>
-
-            {/* Bouton en haut à droite : Mettre à jour */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {/* <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => {
-                  setFeuilleForm({
-                    inspecteur: dernierFeuille.inspecteurs?.[0] || defaultAuteur,
-                    destinataire: dernierFeuille.destinataire,
-                    objet: dernierFeuille.objetControle,
-                    auditionPrevue: dernierFeuille.dateReunionCloturePrevue || '2026-10-22',
-                    pdfFile: null,
-                  });
-                  setShowFeuilleModal(true);
-                }}
-                style={{ fontSize: '12px', padding: '6px 12px' }}
-              >
-                <span>Mettre à jour</span>
-              </button> */}
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={onGoToObservations}
-                style={{ fontSize: '12px', padding: '6px 10px' }}
-              >
-                <ExternalLink size={13} />
-                <span>{feuillesList.length > 1 ? `Voir les feuilles (${feuillesList.length})` : "Ouvrir l'instruction"}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Contenu simplifié de la feuille */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-                Objet du contrôle
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '2px', lineHeight: 1.4 }}>
-                {dernierFeuille.objetControle}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-              
-              <span>
-                Audition contradictoire prévue le :{' '}
-                <strong className="font-sf" style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>
-                  {formatDate(dernierFeuille.dateReunionCloturePrevue)}
-                </strong>
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
+      </details>
 
       {/* =========================================================================
-          4. CARD DERNIER PROCÈS-VERBAL (PV)
-          Règle formelle : S'il n'y a pas de PV dressé, la div N'EXISTE PAS.
+          MODALES : MODIFICATION DOSSIER, PROCHAINE ACTION, ÉQUIPE, RÉAFFECTATION
           ========================================================================= */}
-      {dernierPv && (
-        <div
-          style={{
-            backgroundColor: 'var(--color-surface)',
-            borderRadius: 'var(--radius-card)',
-            border: '1px solid var(--color-border)',
-            padding: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                Procès-verbal (PV) {pvsList.length > 1 ? `(${pvsList.length})` : ''}
-              </span>
-              <span
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                  backgroundColor: 'var(--color-bg)',
-                  border: '1px solid var(--color-border)',
-                  color: 'var(--color-text-secondary)',
-                }}
-              >
-                {dernierPv.statutPv === 'TRANSMIS_CONTENTIEUX' ? 'Transmis GLEC' : 'Dressé'}
-              </span>
-            </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {onGoToPvs && (
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={onGoToPvs}
-                  style={{ fontSize: '12px', padding: '6px 10px' }}
-                >
-                  <ExternalLink size={13} />
-                  <span>{pvsList.length > 1 ? `Voir tous les PV (${pvsList.length})` : 'Consulter le PV'}</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-              <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                Verbalisé le : <strong className="font-sf" style={{ color: 'var(--color-text-primary)' }}>{formatDate(dernierPv.datePv)}</strong>
-              </div>
-            </div>
-
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-                Infraction constatée
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '2px', lineHeight: 1.4 }}>
-                {dernierPv.infractions[0] || 'Minoration de la valeur en douane taxable'}
-                {dernierPv.infractions.length > 1 && ` (+${dernierPv.infractions.length - 1} autre${dernierPv.infractions.length > 2 ? 's' : ''})`}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px', flexWrap: 'wrap' }}>
-              <div>
-                Droits éludés : <strong className="font-sf" style={{ color: 'var(--color-text-primary)' }}>{dernierPv.droitsEludesUSD.toLocaleString('fr-FR')} USD</strong>
-              </div>
-              <div>
-                Amende légale : <strong className="font-sf" style={{ color: 'var(--color-text-primary)' }}>{dernierPv.amendeUSD.toLocaleString('fr-FR')} USD</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
-          MODALE FORMULAIRE : DEMANDE DE COMMUNICATION (5 CHAMPS STRICTS)
-          ========================================================================= */}
-      {showDemandeModal && (
+      {/* Modale 1 : Modifier la Prochaine Action */}
+      {showNextActionModal && (
         <ModalPortal>
           <div
             className="modal-backdrop-responsive"
@@ -593,210 +602,75 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
               padding: '20px',
             }}
           >
-          <div
-            className="modal-card-responsive"
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: 'var(--radius-card)',
-              border: '1px solid var(--color-border)',
-              width: '100%',
-              maxWidth: '560px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
             <div
+              className="modal-card-responsive"
               style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-surface)',
+                borderRadius: 'var(--radius-card)',
+                border: '1px solid var(--color-border)',
+                width: '100%',
+                maxWidth: '480px',
+                padding: '24px',
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
+                flexDirection: 'column',
+                gap: '16px',
               }}
             >
-              <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
-                {demande ? 'Mettre à jour la Demande de Communication' : 'Créer une Demande de Communication'}
-              </h2>
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => setShowDemandeModal(false)}
-                style={{ padding: '4px' }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleDemandeSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* 1. Auteur */}
-              <div>
-                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  Auteur de la demande
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={demandeForm.auteur}
-                  onChange={(e) => setDemandeForm({ ...demandeForm, auteur: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '12px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-btn)',
-                    color: 'var(--color-text-primary)',
-                    outline: 'none',
-                  }}
-                />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
+                  Modifier la prochaine action
+                </h3>
+                <button type="button" onClick={() => setShowNextActionModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}>
+                  <X size={16} />
+                </button>
               </div>
 
-              {/* 2. Destinataire */}
-              <div>
-                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  Destinataire (Entreprise / Établissement)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={demandeForm.destinataire}
-                  onChange={(e) => setDemandeForm({ ...demandeForm, destinataire: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '12px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-btn)',
-                    color: 'var(--color-text-primary)',
-                    outline: 'none',
-                  }}
-                />
-              </div>
-
-              {/* 3. Échéance */}
-              <div>
-                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  Échéance légale de réponse
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={demandeForm.echeance}
-                  onChange={(e) => setDemandeForm({ ...demandeForm, echeance: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '12px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-btn)',
-                    color: 'var(--color-text-primary)',
-                    outline: 'none',
-                  }}
-                />
-              </div>
-
-              {/* 4. Objet de la demande */}
-              <div>
-                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  Objet de la demande
-                </label>
-                <textarea
-                  rows={3}
-                  required
-                  value={demandeForm.objet}
-                  onChange={(e) => setDemandeForm({ ...demandeForm, objet: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '12px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-btn)',
-                    color: 'var(--color-text-primary)',
-                    outline: 'none',
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                  }}
-                />
-              </div>
-
-              {/* 5. Document PDF */}
-              <div>
-                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  {demande ? 'Mettre à jour le fichier PDF joint' : 'Document PDF joint'}
-                </label>
-                <label
-                  style={{
-                    position: 'relative',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '9px 12px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-btn)',
-                    cursor: 'pointer',
-                    transition: 'border-color var(--transition-fast)',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-text-secondary)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}
-                >
-                  <Upload size={14} color="var(--color-text-muted)" />
-                  <span style={{ fontSize: '12px', color: demandeForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {demandeForm.pdfFile ? `${demandeForm.pdfFile.name} (${demandeForm.pdfFile.size})` : 'Cliquer pour choisir un document PDF...'}
-                  </span>
+              <form onSubmit={handleSaveNextAction} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '5px' }}>
+                    Prochaine action opérationnelle *
+                  </label>
                   <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        setDemandeForm((prev) => ({
-                          ...prev,
-                          pdfFile: { name: file.name, size: `${Math.round(file.size / 1024)} Ko` },
-                        }));
-                      }
+                    type="text"
+                    required
+                    maxLength={240}
+                    value={nextActionValue}
+                    onChange={(e) => setNextActionValue(e.target.value)}
+                    placeholder="Ex : Convoquer l’assujetti pour l’audition contradictoire"
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-btn)',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '13px',
+                      outline: 'none',
                     }}
-                    style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
                   />
-                </label>
-                {demandeForm.pdfFile ? (
-                  <div style={{ fontSize: '11px', color: 'var(--color-success)', marginTop: '4px' }}>
-                    Nouveau fichier : {demandeForm.pdfFile.name}
-                  </div>
-                ) : demande?.pdfSourceNom ? (
                   <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                    Fichier actuel : {demande.pdfSourceNom}
+                    Max 240 caractères. Sera notifié dans le journal et la chronologie du dossier.
                   </div>
-                ) : null}
-              </div>
+                </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() => setShowDemandeModal(false)}
-                >
-                  Annuler
-                </button>
-                <button type="submit" className="btn-primary">
-                  {demande ? 'Enregistrer les modifications' : 'Créer la demande'}
-                </button>
-              </div>
-            </form>
+                {modalError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{modalError}</div>}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                  <button type="button" className="btn-secondary" onClick={() => setShowNextActionModal(false)}>
+                    Annuler
+                  </button>
+                  <button type="submit" className="btn-primary" disabled={isSaving || !nextActionValue.trim()}>
+                    {isSaving ? 'Enregistrement...' : 'Valider'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
         </ModalPortal>
       )}
 
-      {/* =========================================================================
-          MODALE FORMULAIRE : FEUILLE D'OBSERVATION (5 CHAMPS STRICTS)
-          ========================================================================= */}
-      {showFeuilleModal && (
+      {/* Modale 2 : Modifier le dossier (Métadonnées & Entité) */}
+      {showEditModal && (
         <ModalPortal>
           <div
             className="modal-backdrop-responsive"
@@ -812,203 +686,487 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
               padding: '20px',
             }}
           >
+            <div
+              className="modal-card-responsive"
+              style={{
+                backgroundColor: 'var(--color-surface)',
+                borderRadius: 'var(--radius-card)',
+                border: '1px solid var(--color-border)',
+                width: '100%',
+                maxWidth: '560px',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
+                    Modifier les informations du dossier
+                  </h3>
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                    Réf. {dossier.reference} — Version actuelle : v{dossier.version}
+                  </div>
+                </div>
+                <button type="button" onClick={() => setShowEditModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}>
+                  <X size={16} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveDossier} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '5px' }}>
+                    Objet de l’enquête *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editObjet}
+                    onChange={(e) => setEditObjet(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-btn)',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '13px',
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '5px' }}>
+                      Priorité
+                    </label>
+                    <select
+                      value={editPriorite}
+                      onChange={(e) => setEditPriorite(e.target.value as Priorite)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: 'var(--radius-btn)',
+                        backgroundColor: 'var(--color-bg)',
+                        border: '1px solid var(--color-border)',
+                        color: 'var(--color-text-primary)',
+                        fontSize: '12px',
+                      }}
+                    >
+                      <option value="NORMALE">Normale</option>
+                      <option value="URGENTE">Urgente</option>
+                      <option value="SIGNALEE">Signalée</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '5px' }}>
+                      Échéance
+                    </label>
+                    <input
+                      type="date"
+                      value={editEcheance}
+                      onChange={(e) => setEditEcheance(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: 'var(--radius-btn)',
+                        backgroundColor: 'var(--color-bg)',
+                        border: '1px solid var(--color-border)',
+                        color: 'var(--color-text-primary)',
+                        fontSize: '12px',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '5px' }}>
+                    Périmètre d'investigation
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editPerimetre}
+                    onChange={(e) => setEditPerimetre(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-btn)',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '12px',
+                      resize: 'vertical',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '5px' }}>
+                    Motif d’ouverture
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editMotifOuverture}
+                    onChange={(e) => setEditMotifOuverture(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-btn)',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '12px',
+                      resize: 'vertical',
+                    }}
+                  />
+                </div>
+
+                {/* Bloc Opérateur */}
+                <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '10px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    Opérateur économique
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '3px' }}>
+                      Raison sociale / Nom *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editNom}
+                      onChange={(e) => setEditNom(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: 'var(--radius-btn)',
+                        backgroundColor: 'var(--color-bg)',
+                        border: '1px solid var(--color-border)',
+                        color: 'var(--color-text-primary)',
+                        fontSize: '12px',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '8px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '3px' }}>NIF</label>
+                      <input
+                        type="text"
+                        value={editNif}
+                        onChange={(e) => setEditNif(e.target.value)}
+                        style={{ width: '100%', padding: '6px 10px', borderRadius: 'var(--radius-btn)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', fontSize: '12px' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '3px' }}>RCCM</label>
+                      <input
+                        type="text"
+                        value={editRccm}
+                        onChange={(e) => setEditRccm(e.target.value)}
+                        style={{ width: '100%', padding: '6px 10px', borderRadius: 'var(--radius-btn)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', fontSize: '12px' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '8px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '3px' }}>Adresse</label>
+                      <input
+                        type="text"
+                        value={editAdresse}
+                        onChange={(e) => setEditAdresse(e.target.value)}
+                        style={{ width: '100%', padding: '6px 10px', borderRadius: 'var(--radius-btn)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', fontSize: '12px' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '3px' }}>Contact</label>
+                      <input
+                        type="text"
+                        value={editContact}
+                        onChange={(e) => setEditContact(e.target.value)}
+                        style={{ width: '100%', padding: '6px 10px', borderRadius: 'var(--radius-btn)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', fontSize: '12px' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {modalError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{modalError}</div>}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                  <button type="button" className="btn-secondary" onClick={() => setShowEditModal(false)}>
+                    Annuler
+                  </button>
+                  <button type="submit" className="btn-primary" disabled={isSaving}>
+                    {isSaving ? 'Enregistrement...' : 'Enregistrer les modifications'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* Modale 3 : Modifier l'équipe */}
+      {showTeamModal && (
+        <ModalPortal>
           <div
-            className="modal-card-responsive"
+            className="modal-backdrop-responsive"
             style={{
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: 'var(--radius-card)',
-              border: '1px solid var(--color-border)',
-              width: '100%',
-              maxWidth: '560px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.65)',
+              backdropFilter: 'blur(4px)',
               display: 'flex',
-              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 99999,
+              padding: '20px',
             }}
           >
             <div
+              className="modal-card-responsive"
               style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-surface)',
+                borderRadius: 'var(--radius-card)',
+                border: '1px solid var(--color-border)',
+                width: '100%',
+                maxWidth: '480px',
+                padding: '24px',
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
+                flexDirection: 'column',
+                gap: '16px',
               }}
             >
-              <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
-                {feuille ? 'Mettre à jour la Feuille d\'Observation' : 'Créer une Feuille d\'Observation'}
-              </h2>
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => setShowFeuilleModal(false)}
-                style={{ padding: '4px' }}
-              >
-                <X size={16} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
+                    Composition de l’équipe d’enquête
+                  </h3>
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                    Sélectionnez les enquêteurs habilités de l’unité ({dossier.unite})
+                  </div>
+                </div>
+                <button type="button" onClick={() => setShowTeamModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}>
+                  <X size={16} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveTeam} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
+                  {eligibleAgents.length === 0 ? (
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', padding: '12px', textAlign: 'center' }}>
+                      Aucun autre enquêteur éligible trouvé pour cette unité.
+                    </div>
+                  ) : (
+                    eligibleAgents.map((agent) => {
+                      const agentId = Number(agent.id);
+                      const isAssignee = dossier.assigneeId === agentId;
+                      const isChecked = selectedTeamIds.includes(agentId) || isAssignee;
+
+                      return (
+                        <label
+                          key={agent.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px 12px',
+                            borderRadius: 'var(--radius-btn)',
+                            backgroundColor: isChecked ? 'var(--color-surface-elevated)' : 'var(--color-bg)',
+                            border: '1px solid var(--color-border)',
+                            cursor: isAssignee ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <input
+                              type="checkbox"
+                              disabled={isAssignee}
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (isAssignee) return;
+                                if (e.target.checked) {
+                                  setSelectedTeamIds([...selectedTeamIds, agentId]);
+                                } else {
+                                  setSelectedTeamIds(selectedTeamIds.filter((id) => id !== agentId));
+                                }
+                              }}
+                            />
+                            <div>
+                              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                                {agent.prenom} {agent.nom}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                                {agent.matricule || agent.email}
+                              </div>
+                            </div>
+                          </div>
+                          {isAssignee && (
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--color-accent)' }}>
+                              Responsable (obligatoire)
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                  Total membres sélectionnés : {selectedTeamIds.length} (Max : 30).
+                </div>
+
+                {modalError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{modalError}</div>}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                  <button type="button" className="btn-secondary" onClick={() => setShowTeamModal(false)}>
+                    Annuler
+                  </button>
+                  <button type="submit" className="btn-primary" disabled={isSaving}>
+                    {isSaving ? 'Enregistrement...' : 'Valider l’équipe'}
+                  </button>
+                </div>
+              </form>
             </div>
-
-            <form onSubmit={handleFeuilleSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* 1. Inspecteur */}
-              <div>
-                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  Nom de l'inspecteur vérificateur
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={feuilleForm.inspecteur}
-                  onChange={(e) => setFeuilleForm({ ...feuilleForm, inspecteur: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '12px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-btn)',
-                    color: 'var(--color-text-primary)',
-                    outline: 'none',
-                  }}
-                />
-              </div>
-
-              {/* 2. Destinataire */}
-              <div>
-                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  Destinataire ou entreprise cible
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={feuilleForm.destinataire}
-                  onChange={(e) => setFeuilleForm({ ...feuilleForm, destinataire: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '12px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-btn)',
-                    color: 'var(--color-text-primary)',
-                    outline: 'none',
-                  }}
-                />
-              </div>
-
-              {/* 3. Objet du contrôle */}
-              <div>
-                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  Objet du contrôle
-                </label>
-                <textarea
-                  rows={3}
-                  required
-                  value={feuilleForm.objet}
-                  onChange={(e) => setFeuilleForm({ ...feuilleForm, objet: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '12px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-btn)',
-                    color: 'var(--color-text-primary)',
-                    outline: 'none',
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                  }}
-                />
-              </div>
-
-              {/* 4. Audition contradictoire prévue */}
-              <div>
-                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  Audition contradictoire prévue (Date)
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={feuilleForm.auditionPrevue}
-                  onChange={(e) => setFeuilleForm({ ...feuilleForm, auditionPrevue: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '12px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-btn)',
-                    color: 'var(--color-text-primary)',
-                    outline: 'none',
-                  }}
-                />
-              </div>
-
-              {/* 5. Document PDF */}
-              <div>
-                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  {feuille ? 'Mettre à jour le fichier PDF notifié' : 'Document PDF des observations'}
-                </label>
-                <label
-                  style={{
-                    position: 'relative',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '9px 12px',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-btn)',
-                    cursor: 'pointer',
-                    transition: 'border-color var(--transition-fast)',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-text-secondary)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}
-                >
-                  <Upload size={14} color="var(--color-text-muted)" />
-                  <span style={{ fontSize: '12px', color: feuilleForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {feuilleForm.pdfFile ? `${feuilleForm.pdfFile.name} (${feuilleForm.pdfFile.size})` : 'Cliquer pour choisir un document PDF...'}
-                  </span>
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        setFeuilleForm((prev) => ({
-                          ...prev,
-                          pdfFile: { name: file.name, size: `${Math.round(file.size / 1024)} Ko` },
-                        }));
-                      }
-                    }}
-                    style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
-                  />
-                </label>
-                {feuilleForm.pdfFile ? (
-                  <div style={{ fontSize: '11px', color: 'var(--color-success)', marginTop: '4px' }}>
-                    Nouveau fichier : {feuilleForm.pdfFile.name}
-                  </div>
-                ) : feuille?.pdfSourceNom ? (
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                    Fichier actuel : {feuille.pdfSourceNom}
-                  </div>
-                ) : null}
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() => setShowFeuilleModal(false)}
-                >
-                  Annuler
-                </button>
-                <button type="submit" className="btn-primary">
-                  {feuille ? 'Enregistrer les modifications' : 'Créer la feuille d’observation'}
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
+        </ModalPortal>
+      )}
+
+      {/* Modale 4 : Réaffectation motivée du dossier */}
+      {showAssignModal && (
+        <ModalPortal>
+          <div
+            className="modal-backdrop-responsive"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.65)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 99999,
+              padding: '20px',
+            }}
+          >
+            <div
+              className="modal-card-responsive"
+              style={{
+                backgroundColor: 'var(--color-surface)',
+                borderRadius: 'var(--radius-card)',
+                border: '1px solid var(--color-border)',
+                width: '100%',
+                maxWidth: '520px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
+                    Réaffectation motivée du dossier
+                  </h3>
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                    Changement formel du responsable de l’enquête avec motif inaltérable
+                  </div>
+                </div>
+                <button type="button" onClick={() => setShowAssignModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}>
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div
+                style={{
+                  padding: '10px 14px',
+                  backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                  borderRadius: 'var(--radius-btn)',
+                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  fontSize: '12px',
+                  color: 'var(--color-text-secondary)',
+                }}
+              >
+                Responsable actuel : <strong style={{ color: 'var(--color-text-primary)' }}>{dossier.responsable}</strong>
+              </div>
+
+              <form onSubmit={handleSaveReassignment} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '5px' }}>
+                    Nouvel enquêteur responsable *
+                  </label>
+                  <select
+                    required
+                    value={newAssigneeId}
+                    onChange={(e) => setNewAssigneeId(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-btn)',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '12px',
+                    }}
+                  >
+                    <option value="">Sélectionner un enquêteur actif de l’unité...</option>
+                    {eligibleAgents
+                      .filter((agent) => Number(agent.id) !== dossier.assigneeId)
+                      .map((agent) => (
+                        <option key={agent.id} value={agent.id}>
+                          {agent.prenom} {agent.nom} ({agent.matricule || agent.email})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '5px' }}>
+                    Motif circonstancié de la réaffectation *
+                  </label>
+                  <textarea
+                    required
+                    rows={3}
+                    maxLength={500}
+                    value={assignReason}
+                    onChange={(e) => setAssignReason(e.target.value)}
+                    placeholder="Précisez le motif opérationnel : congé, rééquilibrage de charge, spécialité technique, indisponibilité temporaire..."
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-btn)',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '12px',
+                      resize: 'vertical',
+                    }}
+                  />
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                    Ce motif est obligatoire et sera définitivement consigné dans le registre des affectations.
+                  </div>
+                </div>
+
+                {modalError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{modalError}</div>}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                  <button type="button" className="btn-secondary" onClick={() => setShowAssignModal(false)}>
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={isSaving || !newAssigneeId || !assignReason.trim()}
+                  >
+                    {isSaving ? 'Enregistrement...' : 'Confirmer la réaffectation'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         </ModalPortal>
       )}
     </div>

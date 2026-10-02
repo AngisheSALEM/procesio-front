@@ -1,18 +1,46 @@
 import React from 'react';
 import { Sun, Moon, User, Bell, Check, Shield, Briefcase } from 'lucide-react';
 import type { UserAccount } from '../types';
+import { apiPatch } from '../api/client';
 
 interface ParametresViewProps {
   user: UserAccount;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
+  onRefreshProfile?: () => Promise<unknown>;
 }
 
 export const ParametresView: React.FC<ParametresViewProps> = ({
   user,
   theme,
   onToggleTheme,
+  onRefreshProfile,
 }) => {
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [grade, setGrade] = React.useState(user.grade);
+  const [matricule, setMatricule] = React.useState(user.matricule);
+  const [saving, setSaving] = React.useState(false);
+  const [feedback, setFeedback] = React.useState<{ error?: string; success?: string }>({});
+
+  React.useEffect(() => {
+    setGrade(user.grade);
+    setMatricule(user.matricule);
+  }, [user.grade, user.matricule]);
+
+  const handleSaveProfile = async () => {
+    setSaving(true);
+    setFeedback({});
+    try {
+      await apiPatch('/me/', { grade, matricule });
+      if (onRefreshProfile) await onRefreshProfile();
+      setFeedback({ success: 'Profil métier mis à jour avec succès.' });
+      setIsEditing(false);
+    } catch (err) {
+      setFeedback({ error: err instanceof Error ? err.message : 'Erreur lors de la mise à jour.' });
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '900px' }}>
       {/* Title */}
@@ -141,12 +169,41 @@ export const ParametresView: React.FC<ParametresViewProps> = ({
           padding: '24px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-          <User size={18} color="var(--color-accent)" />
-          <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-            Profil de l'agent connecté
-          </h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <User size={18} color="var(--color-accent)" />
+            <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+              Profil de l'agent connecté
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setIsEditing(!isEditing); setFeedback({}); }}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-btn)',
+              border: '1px solid var(--color-border)',
+              backgroundColor: isEditing ? 'var(--color-surface-muted)' : 'var(--color-surface-elevated)',
+              color: 'var(--color-text-primary)',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            {isEditing ? 'Annuler' : 'Modifier grade / matricule'}
+          </button>
         </div>
+
+        {feedback.success && (
+          <div style={{ padding: '8px 12px', marginBottom: '12px', borderRadius: 'var(--radius-btn)', backgroundColor: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', fontSize: '12px', fontWeight: 500 }}>
+            {feedback.success}
+          </div>
+        )}
+        {feedback.error && (
+          <div style={{ padding: '8px 12px', marginBottom: '12px', borderRadius: 'var(--radius-btn)', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', fontSize: '12px', fontWeight: 500 }}>
+            {feedback.error}
+          </div>
+        )}
 
         <div className="kpi-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
           <div>
@@ -162,18 +219,56 @@ export const ParametresView: React.FC<ParametresViewProps> = ({
             <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'block' }}>
               Matricule DGDA
             </label>
-            <div className=" " style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-accent)', marginTop: '4px' }}>
-              {user.matricule}
-            </div>
+            {isEditing ? (
+              <input
+                type="text"
+                value={matricule}
+                onChange={(e) => setMatricule(e.target.value)}
+                placeholder="ex. DGDA-DIR-089"
+                style={{
+                  width: '100%',
+                  marginTop: '4px',
+                  padding: '6px 10px',
+                  borderRadius: 'var(--radius-btn)',
+                  border: '1px solid var(--color-border)',
+                  backgroundColor: 'var(--color-bg)',
+                  color: 'var(--color-text-primary)',
+                  fontSize: '13px',
+                }}
+              />
+            ) : (
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-accent)', marginTop: '4px' }}>
+                {user.matricule || 'Non renseigné'}
+              </div>
+            )}
           </div>
 
           <div>
             <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'block' }}>
               Grade & Fonction
             </label>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', marginTop: '4px' }}>
-              {user.grade}
-            </div>
+            {isEditing ? (
+              <input
+                type="text"
+                value={grade}
+                onChange={(e) => setGrade(e.target.value)}
+                placeholder="ex. Inspecteur Principal"
+                style={{
+                  width: '100%',
+                  marginTop: '4px',
+                  padding: '6px 10px',
+                  borderRadius: 'var(--radius-btn)',
+                  border: '1px solid var(--color-border)',
+                  backgroundColor: 'var(--color-bg)',
+                  color: 'var(--color-text-primary)',
+                  fontSize: '13px',
+                }}
+              />
+            ) : (
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', marginTop: '4px' }}>
+                {user.grade || 'Non renseigné'}
+              </div>
+            )}
           </div>
 
           <div>
@@ -204,10 +299,47 @@ export const ParametresView: React.FC<ParametresViewProps> = ({
               ) : (
                 <Briefcase size={14} color="var(--color-accent)" />
               )}
-              <span>{user.role === 'director' ? "directeur / Responsable d'unité" : 'Enquêteur / Vérificateur'}</span>
+              <span>{user.role === 'director' ? "Directeur / Responsable d'unité" : 'Enquêteur / Vérificateur'}</span>
             </div>
           </div>
         </div>
+
+        {isEditing && (
+          <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={() => { setIsEditing(false); setGrade(user.grade); setMatricule(user.matricule); setFeedback({}); }}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 'var(--radius-btn)',
+                border: '1px solid var(--color-border)',
+                backgroundColor: 'transparent',
+                color: 'var(--color-text-muted)',
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={handleSaveProfile}
+              style={{
+                padding: '6px 16px',
+                borderRadius: 'var(--radius-btn)',
+                border: 'none',
+                backgroundColor: 'var(--color-accent)',
+                color: '#fff',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: saving ? 'wait' : 'pointer',
+              }}
+            >
+              {saving ? 'Enregistrement...' : 'Enregistrer le profil métier'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Notifications Preferences */}

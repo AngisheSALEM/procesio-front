@@ -10,26 +10,45 @@ import {
   RotateCcw
 } from 'lucide-react';
 import type { DemandeCommunication, FeuilleObservation, UserAccount } from '../types';
+import { requestStatusLabel } from '../utils/statusLabels';
 import { formatDate } from '../utils/dateUtils';
 import { ModalPortal } from './common/ModalPortal';
+import type { ApiAssessment, ApiDocument, ApiRequest, ApiResponse, ApiUser } from '../api/client';
+import { downloadFile } from '../api/client';
+import { RequestWorkflowPanel } from './RequestWorkflowPanel';
+import { RequestResponsesPanel } from './RequestResponsesPanel';
+import { DocumentPicker } from './common/DocumentPicker';
+
+const fileSizeLabel = (file: File) => `${Math.round(file.size / 1024)} Ko`;
 
 interface DemandeCommunicationViewProps {
+  apiRequests?: ApiRequest[];
+  responses?: Record<string, ApiResponse[]>;
+  assessments?: Record<string, ApiAssessment[]>;
+  documents?: ApiDocument[];
+  users?: ApiUser[];
+  onRefresh?: () => Promise<unknown>;
+  canEdit?: boolean;
+  dossierId?: string;
   demandes?: DemandeCommunication[];
   initialDemande?: DemandeCommunication | null;
   currentUser?: UserAccount;
   dossierNom?: string;
   onGoToFeuilleObservation?: () => void;
-  onUpdateDemande?: (demande: DemandeCommunication) => void;
-  onAddDemande?: (demande: DemandeCommunication) => void;
-  onCancelDemande?: (demandeId: string) => void;
-  onCreateFeuille?: (feuille: FeuilleObservation) => void;
-  onCloturerSansSuite?: (motif: string) => void;
+  onUpdateDemande?: (demande: DemandeCommunication, file?: File) => Promise<void>;
+  onAddDemande?: (demande: DemandeCommunication, file?: File) => Promise<void>;
+  onCancelDemande?: (demandeId: string) => Promise<void>;
+  onCreateFeuille?: (feuille: FeuilleObservation, file?: File) => Promise<void>;
+  onCloturerSansSuite?: (motif: string) => Promise<void>;
   onRevirementJugement?: (motif: string, docNom?: string) => void;
   hasFeuille?: boolean;
   hasPv?: boolean;
 }
 
 export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> = ({
+  apiRequests = [], responses = {}, assessments = {}, documents = [], users = [], onRefresh,
+  canEdit = false,
+  dossierId,
   demandes,
   initialDemande,
   currentUser,
@@ -37,10 +56,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
   onGoToFeuilleObservation,
   onUpdateDemande,
   onAddDemande,
-  onCancelDemande,
   onCreateFeuille,
-  onCloturerSansSuite,
-  onRevirementJugement,
   hasFeuille = false,
   hasPv = false,
 }) => {
@@ -50,10 +66,14 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
 
   // null = vue cartes (liste), string = id de la demande affichée en détail
   const [selectedDemandeId, setSelectedDemandeId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const demande = selectedDemandeId
     ? (demandesList.find((d) => d.id === selectedDemandeId) || null)
     : null;
+
+  const apiDemande = apiRequests.find((item) => item.id === selectedDemandeId);
 
   const defaultAuteur = currentUser
     ? `${currentUser.prenom} ${currentUser.nom}`
@@ -67,32 +87,39 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
 
   // Formulaire de satisfaction & classement sans suite
   const [showSatisfactionModal, setShowSatisfactionModal] = useState(false);
+  const [evaluation, setEvaluation] = useState<'SATISFAISANTE' | 'NON_SATISFAISANTE'>('SATISFAISANTE');
   const [satisfactionForm, setSatisfactionForm] = useState({
     inspecteur: defaultAuteur,
     dateDecision: new Date().toISOString().split('T')[0],
-    motif: 'Les pièces comptables et justificatifs transmis justifient la conformité intégrale des opérations. Absence d’irrégularité douanière ou fiscale constatée.',
+    motif: '',
     decision: 'CLASSE_SANS_SUITE' as const,
-    recommandations: 'Archivage du dossier au rang des affaires régulières avec visa de conformité de la hiérarchie.',
+    recommandations: '',
   });
 
-  const handleSatisfactionSubmit = (e: React.FormEvent) => {
+  const handleSatisfactionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!satisfactionForm.motif.trim()) {
       alert('Veuillez renseigner le motif de satisfaction.');
       return;
     }
-    if (demande) {
+    if (demande && onUpdateDemande) {
       const updated: DemandeCommunication = {
         ...demande,
-        statut: 'REPONSE_COMPLETE',
-        evaluationReponse: 'SATISFAISANTE',
+        evaluationReponse: evaluation,
         motifSatisfaction: satisfactionForm.motif,
       };
-      onUpdateDemande?.(updated);
+      setIsSaving(true);
+      setActionError(null);
+      try {
+        await onUpdateDemande(updated);
+        setShowSatisfactionModal(false);
+        showToast('Appréciation enregistrée. Une décision distincte est nécessaire pour classer le dossier.');
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : 'Appréciation impossible.');
+      } finally {
+        setIsSaving(false);
+      }
     }
-    onCloturerSansSuite?.(satisfactionForm.motif);
-    setShowSatisfactionModal(false);
-    showToast('Demande marquée satisfaite — Dossier classé sans suite avec succès.');
   };
 
   // Modale de revirement sur le jugement
@@ -102,34 +129,12 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
     dateRevirement: new Date().toISOString().split('T')[0],
     motif: '',
     documentNom: '',
-    pdfFile: null as { name: string; size: string } | null,
+    pdfFile: null as File | null,
   });
 
   const handleRevirementSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!revirementForm.motif.trim()) {
-      alert('Veuillez renseigner le motif du revirement de situation.');
-      return;
-    }
-    const docName = revirementForm.pdfFile?.name || revirementForm.documentNom || 'Nouvelle pièce probante';
-    if (demande) {
-      const updated: DemandeCommunication = {
-        ...demande,
-        evaluationReponse: undefined,
-        motifSatisfaction: undefined,
-        revirementJugement: {
-          date: revirementForm.dateRevirement,
-          motif: revirementForm.motif,
-          documentNom: docName,
-          documentTaille: revirementForm.pdfFile?.size || '540 Ko',
-          inspecteur: revirementForm.inspecteur,
-        },
-      };
-      onUpdateDemande?.(updated);
-    }
-    onRevirementJugement?.(revirementForm.motif, docName);
-    setShowRevirementModal(false);
-    showToast('Revirement de situation acté. Vous pouvez réévaluer la demande.');
+    setActionError('La révision d’une appréciation n’est pas disponible dans ce parcours.');
   };
 
   // Formulaire d'enregistrement de la réponse de l'opérateur (STRICTEMENT 5 CHAMPS)
@@ -137,34 +142,38 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
   const [reponseForm, setReponseForm] = useState({
     dateReception: new Date().toISOString().split('T')[0],
     reference: '',
-    auteur: initialDemande?.destinataire?.nom || 'Direction Générale',
+    auteur: initialDemande?.destinataire?.nom || '',
     commentaire: '',
-    pdfFile: null as { name: string; size: string } | null,
+    pdfFile: null as File | null,
   });
+  const [responseDocumentId, setResponseDocumentId] = useState('');
+  const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
 
   // État du formulaire épuré : champs avec qualification de cible et adresse
   const [createForm, setCreateForm] = useState({
     auteur: defaultAuteur,
-    destinataire: demande?.destinataire?.nom || 'CONGO MINING & CHEMICAL LOGISTICS SAS',
+    destinataire: demande?.destinataire?.nom || dossierNom || '',
     typeCible: 'Entreprise commerciale',
     pourLeCompteDe: '',
-    adresse: demande?.destinataire?.adresse || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
-    echeance: demande?.echeanceReponse || '2026-10-15',
-    objet: demande?.objet || 'Communication des manifestes de fret maritime et factures CIF Kasumbalesa',
-    pdfFile: null as { name: string; size: string } | null,
+    adresse: demande?.destinataire?.adresse || '',
+    echeance: demande?.echeanceReponse || '',
+    objet: demande?.objet || '',
+    elementDemande: '',
+    pdfFile: null as File | null,
   });
 
   // Formulaire Feuille d'observation
   const [feuilleForm, setFeuilleForm] = useState({
     inspecteur: defaultAuteur,
-    destinataire: demande?.destinataire?.nom || 'CONGO MINING & CHEMICAL LOGISTICS SAS',
+    destinataire: demande?.destinataire?.nom || dossierNom || '',
     typeCible: 'Entreprise commerciale',
     pourLeCompteDe: '',
-    adresse: demande?.destinataire?.adresse || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
-    objet: `Constatations contradictoires suite au défaut de communication : ${demande?.objet || ''}`,
+    adresse: demande?.destinataire?.adresse || '',
+    objet: '',
     auditionPrevue: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
-    pdfFile: null as { name: string; size: string } | null,
+    pdfFile: null as File | null,
   });
+  const [faitsObservation, setFaitsObservation] = useState('');
 
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -173,21 +182,20 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createForm.destinataire.trim() || !createForm.objet.trim()) {
-      alert('Veuillez remplir le destinataire et l’objet de la demande.');
+    if (!createForm.destinataire.trim() || !createForm.objet.trim() || !createForm.elementDemande.trim() || !dossierId || isSaving) {
+      setActionError('Renseignez le destinataire, l’objet et au moins un élément demandé.');
       return;
     }
 
     const newId = `demande-${Date.now()}`;
     const newDemande: DemandeCommunication = {
       id: newId,
-      reference: `DGDA/DRK/ENQ/DC/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
-      dossierId: demande?.dossierId || '',
+      reference: '',
+      dossierId,
       auteur: createForm.auteur,
       redacteur: createForm.auteur,
-      dateEmission: new Date().toISOString().split('T')[0],
       echeanceReponse: createForm.echeance,
       objet: createForm.objet,
       destinataire: {
@@ -197,33 +205,37 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
         pourLeCompteDe: createForm.pourLeCompteDe.trim() || undefined,
         adresse: createForm.adresse.trim(),
       },
-      statut: 'EMISE',
-      signataireHabilite: 'Salem Mukendi (Directeur Provincial)',
-      gradeSignataire: 'Commandement de Division',
-      baseLegale: 'Droit de communication et contrôle douanier (Code des douanes, Article 46)',
+      statut: 'BROUILLON',
+      signataireHabilite: '',
+      gradeSignataire: '',
+      baseLegale: '',
       elementsDemandes: [
         {
           id: `EL-${Date.now()}`,
-          libelle: createForm.objet,
-          periodeConcernee: 'Exercice sous contrôle',
-          motifExigence: 'Vérification de la valeur en douane',
+          libelle: createForm.elementDemande.trim(),
+          periodeConcernee: '',
+          motifExigence: '',
           statutRemise: 'EN_ATTENTE',
         },
       ],
       reponsesRecues: [],
-      modaliteRemise: 'Transmission électronique et dépôt physique',
-      commentairesInternes: 'Demande officielle notifiée',
-      pdfSourceNom: createForm.pdfFile ? createForm.pdfFile.name : 'Requisition_Officielle_Art46.pdf',
+      modaliteRemise: '',
+      commentairesInternes: '',
+      pdfSourceNom: createForm.pdfFile?.name,
     };
-
-    if (onAddDemande) {
-      onAddDemande(newDemande);
-    } else {
-      onUpdateDemande?.(newDemande);
+    setIsSaving(true);
+    setActionError(null);
+    try {
+      if (onAddDemande) await onAddDemande(newDemande, createForm.pdfFile || undefined);
+      else if (onUpdateDemande) await onUpdateDemande(newDemande, createForm.pdfFile || undefined);
+      else throw new Error('Enregistrement indisponible.');
+      setShowCreateModal(false);
+      showToast('Brouillon de demande enregistré.');
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Enregistrement impossible.');
+    } finally {
+      setIsSaving(false);
     }
-    setSelectedDemandeId(newId);
-    setShowCreateModal(false);
-    showToast('Nouvelle demande de communication créée avec succès.');
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -231,10 +243,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
     if (file) {
       setCreateForm((prev) => ({
         ...prev,
-        pdfFile: {
-          name: file.name,
-          size: `${Math.round(file.size / 1024)} Ko`,
-        },
+        pdfFile: file,
       }));
     }
   };
@@ -244,18 +253,15 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
     if (file) {
       setFeuilleForm((prev) => ({
         ...prev,
-        pdfFile: {
-          name: file.name,
-          size: `${Math.round(file.size / 1024)} Ko`,
-        },
+        pdfFile: file,
       }));
     }
   };
 
-  const handleFeuilleSubmit = (e: React.FormEvent) => {
+  const handleFeuilleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!feuilleForm.destinataire.trim() || !feuilleForm.objet.trim()) {
-      alert('Veuillez renseigner le destinataire et l’objet du contrôle.');
+    if (!feuilleForm.destinataire.trim() || !feuilleForm.objet.trim() || !faitsObservation.trim() || !dossierId || isSaving) {
+      setActionError('Renseignez le destinataire, l’objet et les faits observés.');
       return;
     }
 
@@ -264,8 +270,8 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
 
     const newFeuille: FeuilleObservation = {
       id: `fo-${Date.now()}`,
-      reference: `DGDA/DRK/FO/${now.getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
-      dossierId: demande?.dossierId || '',
+      reference: '',
+      dossierId,
       dateRedaction: dateStr,
       inspecteurs: [feuilleForm.inspecteur],
       destinataire: feuilleForm.destinataire,
@@ -273,53 +279,65 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
       pourLeCompteDe: feuilleForm.pourLeCompteDe.trim() || undefined,
       adresse: feuilleForm.adresse.trim(),
       objetControle: feuilleForm.objet,
-      cadreLegal: 'Décision DG/DGDA/DG/2011/296 (Articles 44 à 49) portant réglementation des contrôles a posteriori en RDC',
-      statutFeuille: 'NOTIFIEE',
+      cadreLegal: '',
+      statutFeuille: 'BROUILLON',
       dateReunionCloturePrevue: feuilleForm.auditionPrevue,
       observations: [
         {
           code: 'O1',
-          titre: 'Défaut de justification et pièces non satisfaisantes',
-          faitsConstates: `L’opérateur n’a pas transmis les justificatifs probants requis au titre de la réquisition ${demande?.reference || ''}. Constat d’obstacle aux vérifications douanières et carence de pièces requises.`,
-          justificatifsAssocies: ['Réquisition directoristrative', 'Avis de mise en demeure'],
-          referencesJuridiques: 'Code des douanes, Article 46 et Article 49',
-          questionsAssujetti: 'Fournir sous 14 jours les pièces justificatives manquantes ou explications écrites contradictoires.',
+          titre: feuilleForm.objet.trim(),
+          faitsConstates: faitsObservation.trim(),
+          justificatifsAssocies: [],
+          referencesJuridiques: '',
+          questionsAssujetti: '',
           statutConstat: 'OUVERT',
-          analyseMotivee: 'Réponse jugée non satisfaisante. Ouverture formelle de la feuille d’observation contradictoire.',
+          analyseMotivee: '',
         },
       ],
-      pdfSourceNom: feuilleForm.pdfFile ? feuilleForm.pdfFile.name : 'Feuille_Observation_Notifiee.pdf',
+      pdfSourceNom: feuilleForm.pdfFile?.name,
     };
-
-    onCreateFeuille?.(newFeuille);
-    setShowFeuilleModal(false);
-    showToast('Feuille d’observation créée avec succès. L’onglet "Feuille d’observation" est désormais accessible.');
+    setIsSaving(true);
+    setActionError(null);
+    try {
+      if (!onCreateFeuille) throw new Error('Création de feuille indisponible.');
+      await onCreateFeuille(newFeuille, feuilleForm.pdfFile || undefined);
+      setShowFeuilleModal(false);
+      setFaitsObservation('');
+      showToast('Projet de feuille d’observation enregistré.');
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Enregistrement impossible.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleReponseFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setResponseDocumentId('');
       setReponseForm((prev) => ({
         ...prev,
-        pdfFile: {
-          name: file.name,
-          size: `${Math.round(file.size / 1024)} Ko`,
-        },
+        pdfFile: file,
       }));
     }
   };
 
-  const handleReponseSubmit = (e: React.FormEvent) => {
+  const handleReponseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!demande) return;
+    if (!demande || (!reponseForm.pdfFile && !responseDocumentId) || !onUpdateDemande || selectedElementIds.length === 0 || isSaving) {
+      setActionError('Sélectionnez le PDF et les éléments réellement fournis.');
+      return;
+    }
 
-    const fileName = reponseForm.pdfFile ? reponseForm.pdfFile.name : 'Reponse_Operateur_Art46.pdf';
-    const fileSize = reponseForm.pdfFile ? reponseForm.pdfFile.size : '820 Ko';
-    const refCourrier = reponseForm.reference.trim() || `REP-${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`;
+    const stored = documents.find((item) => item.id === responseDocumentId);
+    const fileName = reponseForm.pdfFile?.name || stored?.original_name || '';
+    const fileSize = `${Math.round((reponseForm.pdfFile?.size || stored?.size || 0) / 1024)} Ko`;
+    const refCourrier = reponseForm.reference.trim();
 
     const updated: DemandeCommunication = {
       ...demande,
-      statut: 'REPONSE_COMPLETE',
+      statut: 'REPONSE_PARTIELLE',
+      reponseDocumentId: responseDocumentId || undefined,
       reponsePdfNom: fileName,
       reponsePdfDate: reponseForm.dateReception,
       reponsePdfTaille: fileSize,
@@ -331,34 +349,29 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           dateReception: reponseForm.dateReception,
           referenceCourrier: refCourrier,
           auteur: reponseForm.auteur,
-          elementsFournisIds: demande.elementsDemandes?.map((el) => el.id) || [],
+          elementsFournisIds: selectedElementIds,
           elementsManquantsIds: [],
           piecesJointes: [fileName],
-          analyseEnqueteur: reponseForm.commentaire || 'Pièces justificatives produites par l’opérateur',
-          appreciation: 'SATISFAISANTE',
+          analyseEnqueteur: reponseForm.commentaire,
           prochaineAction: 'Examiner les pièces produites',
         },
         ...(demande.reponsesRecues || []),
       ],
     };
 
-    onUpdateDemande?.(updated);
-    setShowReponseModal(false);
-    showToast('Réponse à la demande de communication enregistrée.');
-  };
-
-  const handleAnnulerDemande = () => {
-    if (window.confirm('Confirmez-vous l’annulation de cette demande de communication ?')) {
-      if (demande && onCancelDemande) {
-        onCancelDemande(demande.id);
-      } else if (demande) {
-        const updated: DemandeCommunication = {
-          ...demande,
-          statut: 'ANNULEE',
-        };
-        onUpdateDemande?.(updated);
-      }
-      showToast('Demande de communication annulée.');
+    setIsSaving(true);
+    setActionError(null);
+    try {
+      await onUpdateDemande(updated, reponseForm.pdfFile || undefined);
+      setShowReponseModal(false);
+      setSelectedElementIds([]);
+      setResponseDocumentId('');
+      setReponseForm((prev) => ({ ...prev, pdfFile: null }));
+      showToast('Réponse enregistrée. Les pièces restent soumises à vérification.');
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Enregistrement de la réponse impossible.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -415,6 +428,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
         </div>
 
         <form onSubmit={handleCreateSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {actionError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{actionError}</div>}
           <div>
             <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
               Auteur de la demande
@@ -508,6 +522,14 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           </div>
 
           <div>
+                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Élément ou pièce demandé(e) *
+                </label>
+                <input type="text" required value={createForm.elementDemande} onChange={(e) => setCreateForm((prev) => ({ ...prev, elementDemande: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 12px', fontSize: '12px', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-btn)', color: 'var(--color-text-primary)' }} />
+              </div>
+
+                        <div>
             <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
               Document PDF joint
             </label>
@@ -529,7 +551,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             >
               <Upload size={14} color="var(--color-text-muted)" />
               <span style={{ fontSize: '12px', color: createForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {createForm.pdfFile ? `${createForm.pdfFile.name} (${createForm.pdfFile.size})` : 'Cliquer pour choisir un document PDF...'}
+                {createForm.pdfFile ? `${createForm.pdfFile.name} (${fileSizeLabel(createForm.pdfFile)})` : 'Cliquer pour choisir un document PDF...'}
               </span>
               <input
                 type="file"
@@ -540,7 +562,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             </label>
             {createForm.pdfFile && (
               <div style={{ fontSize: '11px', color: 'var(--color-accent)', marginTop: '4px' }}>
-                Document prêt : {createForm.pdfFile.name} ({createForm.pdfFile.size})
+                Document prêt : {createForm.pdfFile.name} ({fileSizeLabel(createForm.pdfFile)})
               </div>
             )}
           </div>
@@ -553,7 +575,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             >
               Annuler
             </button>
-            <button type="submit" className="btn-primary">
+            <button type="submit" disabled={isSaving} className="btn-primary">
               Créer la demande
             </button>
           </div>
@@ -626,18 +648,19 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
 
           </div>
 
-          <button
+          {canEdit && (<button
             type="button"
             className="btn-primary"
             onClick={() => {
               setCreateForm({
                 auteur: defaultAuteur,
-                destinataire: dossierNom || 'CONGO MINING & CHEMICAL LOGISTICS SAS',
+                destinataire: dossierNom || '',
                 typeCible: 'Entreprise commerciale',
                 pourLeCompteDe: '',
-                adresse: '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
-                echeance: new Date(Date.now() + 21 * 86400000).toISOString().split('T')[0],
+                adresse: '',
+                echeance: '',
                 objet: '',
+                elementDemande: '',
                 pdfFile: null,
               });
               setShowCreateModal(true);
@@ -652,7 +675,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           >
             <Plus size={14} />
             <span>Nouvelle demande</span>
-          </button>
+          </button>)}
         </div>
 
         {/* Grille des cartes des demandes */}
@@ -672,13 +695,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
         ) : (
           <div className="cards-grid-auto">
             {demandesList.map((item) => {
-              const hasRep = Boolean(
-                item.reponsePdfNom ||
-                (item.reponsesRecues && item.reponsesRecues.length > 0 && (
-                  Boolean(item.reponsesRecues[0].piecesJointes?.length) ||
-                  Boolean(item.reponsesRecues[0].referenceCourrier)
-                ))
-              );
+
 
               return (
                 <div
@@ -726,7 +743,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {hasRep ? 'Réponse reçue' : 'En attente'}
+                        {requestStatusLabel(item.statut)}
                       </span>
                     </div>
 
@@ -784,18 +801,15 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
   // =========================================================================
   // 2. PAGE DÉTAIL D'UNE DEMANDE SÉLECTIONNÉE
   // =========================================================================
-  const hasReponse = Boolean(
-    Boolean(demande.reponsePdfNom) ||
-    (demande.reponsesRecues && demande.reponsesRecues.length > 0 && (
-      (demande.reponsesRecues[0].piecesJointes && demande.reponsesRecues[0].piecesJointes.length > 0) ||
-      Boolean(demande.reponsesRecues[0].referenceCourrier)
-    ))
-  );
+  const hasReponse = Boolean(demande.reponsePdfNom || demande.reponsesRecues?.length);
+  const canRecordResponse = canEdit && ['EMISE', 'REPONSE_PARTIELLE', 'REPONSE_COMPLETE'].includes(demande.statut);
+  const responseDocument = documents.find((item) => item.id === demande.reponsesRecues?.[0]?.piecesJointes?.[0]);
 
   const reponsePdfNom =
+    responseDocument?.original_name ||
     demande.reponsePdfNom ||
     demande.reponsesRecues?.[0]?.piecesJointes?.[0] ||
-    'Reponse_Operateur_Signee.pdf';
+    'Document non renseigné';
 
   const reponseDate =
     demande.reponsePdfDate ||
@@ -858,6 +872,9 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           <span>Retour à toutes les demandes</span>
         </button>
       </div>
+
+      {apiDemande && onRefresh && <RequestWorkflowPanel key={`circuit-${apiDemande.id}`} request={apiDemande} documents={documents} users={users} onRefresh={onRefresh} />}
+      {apiDemande && onRefresh && <RequestResponsesPanel key={`responses-${apiDemande.id}`} request={apiDemande} responses={responses[apiDemande.id] || []} assessments={assessments} documents={documents} canEdit={canEdit} onRefresh={onRefresh} />}
 
       {/* =========================================================================
           PAGE INFO ÉPURÉE : DEMANDE DE COMMUNICATION SÉLECTIONNÉE
@@ -953,7 +970,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 color: 'var(--color-text-secondary)',
               }}
             >
-              {hasReponse ? 'Réponse reçue' : 'En attente'}
+              {requestStatusLabel(demande.statut)}
             </span>
           </div>
         </div>
@@ -986,45 +1003,15 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
            
           </div>
 
-          {/* 3. Document PDF joint officiel */}
-          <div>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
-              Document officiel notifié
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                backgroundColor: 'var(--color-bg)',
-                borderRadius: '6px',
-                border: 'none',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div>
-                  <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', fontWeight: 500 }}>
-                    {demande.pdfSourceNom || 'Requisition_Officielle_Art46.pdf'}
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                    {demande.pdfSourceTaille || '940 Ko'} 
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="btn-secondary"
-                style={{ fontSize: '11px', padding: '6px 12px' }}
-                onClick={() => showToast('Téléchargement du document officiel...')}
-                title="Télécharger le document notifié"
-              >
-                <Download size={13} />
-              </button>
-            </div>
+          <div aria-label="Éléments demandés">
+            {demande.elementsDemandes.map((element) => (
+              <p key={element.id} style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                {element.libelle} — {{ FOURNI: 'Fourni', EN_ATTENTE: 'En attente', MANQUANT: 'Manquant', INCOMPLET: 'Incomplet' }[element.statutRemise]}
+                {element.appreciation && ` · ${{ pending: 'À apprécier', satisfactory: 'Satisfaisant', unsatisfactory: 'Non satisfaisant' }[element.appreciation]}`}
+                {element.motifAppreciation && ` : ${element.motifAppreciation}`}
+              </p>
+            ))}
           </div>
-
           {/* 4. Réponse à la demande de communication (PDF ou Pas de réponse) */}
           <div>
             <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
@@ -1059,21 +1046,32 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                   <button
                     type="button"
                     className="btn-secondary"
+                    disabled={isSaving || responseDocument?.state !== 'accepted'}
                     style={{ fontSize: '11px', padding: '6px 12px' }}
-                    onClick={() => showToast('Téléchargement de la réponse...')}
-                    title="Télécharger la réponse"
+                    title="Télécharger le courrier de réponse"
+                    aria-label="Télécharger le courrier de réponse"
+                    onClick={async () => {
+                      if (!responseDocument || isSaving) return;
+                      setIsSaving(true); setActionError(null);
+                      try { await downloadFile(`/documents/${responseDocument.id}/telecharger/`, responseDocument.original_name); }
+                      catch (cause) {
+                        setActionError(cause instanceof Error ? cause.message : 'Téléchargement impossible.');
+                        await onRefresh?.().catch(() => undefined);
+                      } finally { setIsSaving(false); }
+                    }}
                   >
                     <Download size={13} />
                   </button>
-                  <button
+                  {canEdit && (<button
                     type="button"
                     className="btn-ghost"
+                          disabled={isSaving || !canRecordResponse}
+                    title={canRecordResponse ? 'Ajouter un complément' : 'Disponible après émission de la demande'}
                     style={{ fontSize: '11px', padding: '6px 10px', color: 'var(--color-text-muted)' }}
                     onClick={() => setShowReponseModal(true)}
-                    title="Mettre à jour le fichier"
                   >
                     <Upload size={12} />
-                  </button>
+                  </button>)}
                 </div>
               </div>
             ) : (
@@ -1091,15 +1089,17 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 <span style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
                   Pas de réponse
                 </span>
-                <button
+                {canEdit && (<button
                   type="button"
                   className="btn-secondary"
+                        disabled={isSaving || !canRecordResponse}
+                  title={canRecordResponse ? 'Ajouter la réponse' : 'Disponible après émission de la demande'}
                   onClick={() => setShowReponseModal(true)}
                   style={{ fontSize: '11px', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
                   <Upload size={12} />
                   <span>Ajouter la réponse</span>
-                </button>
+                </button>)}
               </div>
             )}
           </div>
@@ -1122,35 +1122,39 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 <button
                   type="button"
                   className="btn-secondary"
-                  onClick={handleAnnulerDemande}
+                  disabled
+                  title="L’annulation n’est pas disponible dans ce parcours API"
                   style={{
                     fontSize: '12px',
                     color: 'var(--color-text-muted)',
                   }}
                 >
-                  <span>Annuler la demande de communication</span>
+                  <span>Annulation indisponible</span>
                 </button>
 
-                <button
+                {canEdit && (<button
                   type="button"
                   className="btn-primary"
+                        disabled={isSaving || !canRecordResponse}
+                  title={canRecordResponse ? 'Ajouter la réponse' : 'Disponible après émission de la demande'}
                   onClick={() => setShowReponseModal(true)}
                   style={{ fontSize: '12px' }}
                 >
                   <Upload size={14} />
                   <span>Ajouter la réponse</span>
-                </button>
+                </button>)}
               </div>
             ) : (
               /* DÈS QU'IL Y A UNE RÉPONSE UPLOADÉE */
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                {!demande.evaluationReponse && (
+                {canEdit && !apiDemande && !isSaving && !demande.evaluationReponse && (
                   <>
-                    {!hasPv && (
+                    {!hasPv && demande.elementsDemandes.every((element) => element.statutRemise === 'FOURNI') && (
                       <button
                         type="button"
                         className="btn-primary"
                         onClick={() => {
+                          setEvaluation('SATISFAISANTE');
                           setSatisfactionForm((prev) => ({
                             ...prev,
                             inspecteur: defaultAuteur,
@@ -1161,7 +1165,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                         style={{ fontSize: '12px' }}
                       >
                         <CheckCircle size={14} />
-                        <span>Marquer comme satisfait</span>
+                        <span>Apprécier tous les éléments : satisfaisants</span>
                       </button>
                     )}
 
@@ -1169,43 +1173,29 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                       type="button"
                       className="btn-secondary"
                       onClick={() => {
-                        const updated: DemandeCommunication = {
-                          ...demande,
-                          statut: 'TERMINEE',
-                          evaluationReponse: 'NON_SATISFAISANTE',
-                        };
-                        onUpdateDemande?.(updated);
-                        setFeuilleForm({
-                          inspecteur: defaultAuteur,
-                          destinataire: demande.destinataire?.nom || 'Entreprise contrôlée',
-                          typeCible: demande.destinataire?.typeCible || demande.destinataire?.qualite || 'Entreprise commerciale',
-                          pourLeCompteDe: demande.destinataire?.pourLeCompteDe || '',
-                          adresse: demande.destinataire?.adresse || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
-                          objet: `Constatations contradictoires suite au défaut de communication : ${demande.objet}`,
-                          auditionPrevue: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
-                          pdfFile: null,
-                        });
-                        setShowFeuilleModal(true);
+                        setEvaluation('NON_SATISFAISANTE');
+                        setSatisfactionForm((prev) => ({ ...prev, motif: '' }));
+                        setShowSatisfactionModal(true);
                       }}
                       style={{ fontSize: '12px' }}
                     >
-                      <span>Non satisfait</span>
+                      <span>Apprécier les éléments reçus : non satisfaisants</span>
                     </button>
                   </>
                 )}
 
-                {demande.evaluationReponse === 'NON_SATISFAISANTE' && !hasFeuille && (
+                {canEdit && demande.evaluationReponse === 'NON_SATISFAISANTE' && !hasFeuille && (
                   <button
                     type="button"
                     className="btn-secondary"
                     onClick={() => {
                       setFeuilleForm({
                         inspecteur: defaultAuteur,
-                        destinataire: demande.destinataire?.nom || 'Entreprise contrôlée',
+                        destinataire: demande.destinataire?.nom || '',
                         typeCible: demande.destinataire?.typeCible || demande.destinataire?.qualite || 'Entreprise commerciale',
                         pourLeCompteDe: demande.destinataire?.pourLeCompteDe || '',
-                        adresse: demande.destinataire?.adresse || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
-                        objet: `Constatations contradictoires suite au défaut de communication : ${demande.objet}`,
+                        adresse: demande.destinataire?.adresse || '',
+                        objet: '',
                         auditionPrevue: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
                         pdfFile: null,
                       });
@@ -1245,17 +1235,8 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                   <button
                     type="button"
                     className="btn-ghost"
-                    onClick={() => {
-                      setRevirementForm({
-                        inspecteur: defaultAuteur,
-                        dateRevirement: new Date().toISOString().split('T')[0],
-                        motif: '',
-                        documentNom: '',
-                        pdfFile: null,
-                      });
-                      setShowRevirementModal(true);
-                    }}
-                    title="Revenir sur l'évaluation initiale suite à de nouveaux éléments"
+                    disabled
+                    title="La révision nécessite un parcours de décision distinct"
                     style={{
                       fontSize: '11px',
                       padding: '5px 10px',
@@ -1268,7 +1249,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                     }}
                   >
                     <RotateCcw size={12} />
-                    <span>Revenir sur le jugement</span>
+                    <span>Révision indisponible</span>
                   </button>
                 )}
 
@@ -1287,7 +1268,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                       <CheckCircle size={14} color="var(--color-text-primary)" />
-                      <span>Demande satisfaite — Dossier classé sans suite</span>
+                      <span>Demande appréciée satisfaisante — Décision de classement distincte</span>
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px', lineHeight: 1.4 }}>
                       <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>Motif de satisfaction : </span>
@@ -1372,6 +1353,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
 
             {/* Modal Form */}
             <form onSubmit={handleCreateSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {actionError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{actionError}</div>}
               {/* Champ 1 : Auteur de la demande */}
               <div>
                 <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
@@ -1541,6 +1523,20 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 />
               </div>
 
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Élément ou pièce demandé(e) *
+                </label>
+                <input type="text" required value={createForm.elementDemande} onChange={(e) => setCreateForm((prev) => ({ ...prev, elementDemande: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 12px', fontSize: '12px', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-btn)', color: 'var(--color-text-primary)' }} />
+              </div>
+
+                            <div>
+                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Faits observés *</label>
+                <textarea required rows={3} value={faitsObservation} onChange={(e) => setFaitsObservation(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', fontSize: '12px', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-btn)', color: 'var(--color-text-primary)', resize: 'vertical', fontFamily: 'inherit' }} />
+              </div>
+
               {/* Champ 5 : Fichier PDF */}
               <div>
                 <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
@@ -1564,7 +1560,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 >
                   <Upload size={14} color="var(--color-text-muted)" />
                   <span style={{ fontSize: '12px', color: createForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {createForm.pdfFile ? `${createForm.pdfFile.name} (${createForm.pdfFile.size})` : 'Cliquer pour choisir un document PDF...'}
+                    {createForm.pdfFile ? `${createForm.pdfFile.name} (${fileSizeLabel(createForm.pdfFile)})` : 'Cliquer pour choisir un document PDF...'}
                   </span>
                   <input
                     type="file"
@@ -1575,7 +1571,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 </label>
                 {createForm.pdfFile && (
                   <div style={{ fontSize: '11px', color: 'var(--color-success)', marginTop: '4px' }}>
-                    Document prêt : {createForm.pdfFile.name} ({createForm.pdfFile.size})
+                    Document prêt : {createForm.pdfFile.name} ({fileSizeLabel(createForm.pdfFile)})
                   </div>
                 )}
               </div>
@@ -1589,7 +1585,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 >
                   Annuler
                 </button>
-                <button type="submit" className="btn-primary">
+                <button type="submit" disabled={isSaving} className="btn-primary">
                   Créer la demande
                 </button>
               </div>
@@ -1662,6 +1658,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
 
             {/* Modal Form */}
             <form onSubmit={handleFeuilleSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {actionError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{actionError}</div>}
               {/* Champ 1 : Inspecteur vérificateur */}
               <div>
                 <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
@@ -1832,7 +1829,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
               {/* Champ 5 : Fichier PDF */}
               <div>
                 <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  Document PDF des observations notifiées
+                  Document PDF associé au projet
                 </label>
                 <label
                   style={{
@@ -1852,7 +1849,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 >
                   <Upload size={14} color="var(--color-text-muted)" />
                   <span style={{ fontSize: '12px', color: feuilleForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {feuilleForm.pdfFile ? `${feuilleForm.pdfFile.name} (${feuilleForm.pdfFile.size})` : 'Cliquer pour choisir un document PDF...'}
+                    {feuilleForm.pdfFile ? `${feuilleForm.pdfFile.name} (${fileSizeLabel(feuilleForm.pdfFile)})` : 'Cliquer pour choisir un document PDF...'}
                   </span>
                   <input
                     type="file"
@@ -1863,7 +1860,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 </label>
                 {feuilleForm.pdfFile && (
                   <div style={{ fontSize: '11px', color: 'var(--color-success)', marginTop: '4px' }}>
-                    Document prêt : {feuilleForm.pdfFile.name} ({feuilleForm.pdfFile.size})
+                    Document prêt : {feuilleForm.pdfFile.name} ({fileSizeLabel(feuilleForm.pdfFile)})
                   </div>
                 )}
               </div>
@@ -1877,7 +1874,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 >
                   Annuler
                 </button>
-                <button type="submit" className="btn-primary">
+                <button type="submit" disabled={isSaving} className="btn-primary">
                   Créer la feuille d’observation
                 </button>
               </div>
@@ -1959,6 +1956,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             </div>
 
             <form onSubmit={handleReponseSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {actionError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{actionError}</div>}
               {/* Champ 1 : Fichier PDF */}
               <div>
                 <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
@@ -1988,11 +1986,14 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                       {reponseForm.pdfFile ? reponseForm.pdfFile.name : 'Sélectionner le PDF de la réponse'}
                     </span>
                     <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
-                      {reponseForm.pdfFile ? reponseForm.pdfFile.size : 'Format PDF certifié (max 25 Mo)'}
+                      {reponseForm.pdfFile ? fileSizeLabel(reponseForm.pdfFile) : 'Format PDF (max 10 Mo)'}
                     </span>
                   </div>
                 </div>
               </div>
+
+              <DocumentPicker documents={documents} value={responseDocumentId} label="Ou sélectionner un courrier déjà déposé" disabled={isSaving}
+                onChange={(id) => { setResponseDocumentId(id); setReponseForm((prev) => ({ ...prev, pdfFile: null })); }} />
 
               {/* Champ 2 : Date de réception */}
               <div>
@@ -2062,6 +2063,18 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 />
               </div>
 
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, marginBottom: '6px' }}>
+                  Éléments réellement fournis *
+                </div>
+                {demande.elementsDemandes.map((element) => (
+                  <label key={element.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--color-text-primary)', marginBottom: '5px' }}>
+                    <input type="checkbox" checked={selectedElementIds.includes(element.id)} onChange={(event) => setSelectedElementIds((ids) => event.target.checked ? [...ids, element.id] : ids.filter((id) => id !== element.id))} />
+                    {element.libelle}
+                  </label>
+                ))}
+              </div>
+
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
                 <button
                   type="button"
@@ -2071,7 +2084,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 >
                   Annuler
                 </button>
-                <button type="submit" className="btn-primary" style={{ fontSize: '12px' }}>
+                <button type="submit" disabled={isSaving} className="btn-primary" style={{ fontSize: '12px' }}>
                   <Upload size={13} />
                   <span>Enregistrer la réponse</span>
                 </button>
@@ -2130,10 +2143,10 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             >
               <div>
                 <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
-                  Satisfaction de la Demande & Classement sans Suite
+                  Appréciation de la réponse
                 </h2>
                 <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                  Définir le motif de conformité qui justifie le classement sans suite de l’enquête
+                  Motiver l’appréciation des pièces reçues
                 </div>
               </div>
               <button
@@ -2148,10 +2161,11 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
 
             {/* Modal Form */}
             <form onSubmit={handleSatisfactionSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {actionError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{actionError}</div>}
               {/* Champ 1 : Motif de satisfaction & Classement sans suite */}
               <div>
                 <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
-                  Motif de satisfaction & Justification du classement sans suite *
+                  Motif de l’appréciation *
                 </label>
                 <textarea
                   required
@@ -2172,7 +2186,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                   }}
                 />
                 <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                  Ce motif figurera officiellement dans le registre des dossiers classés sans suite.
+                  Une décision distincte sera nécessaire pour classer le dossier.
                 </div>
               </div>
 
@@ -2254,9 +2268,9 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 >
                   Annuler
                 </button>
-                <button type="submit" className="btn-primary" style={{ fontSize: '12px' }}>
+                <button type="submit" disabled={isSaving} className="btn-primary" style={{ fontSize: '12px' }}>
                   <CheckCircle size={14} />
-                  <span>Valider et classer sans suite</span>
+                  <span>Enregistrer l’appréciation</span>
                 </button>
               </div>
             </form>
@@ -2331,6 +2345,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
 
             {/* Modal Form */}
             <form onSubmit={handleRevirementSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {actionError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{actionError}</div>}
               {/* Champ 1 : Motif du revirement */}
               <div>
                 <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
@@ -2396,7 +2411,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                   >
                     <Upload size={14} color="var(--color-text-muted)" />
                     <span style={{ fontSize: '12px', color: revirementForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {revirementForm.pdfFile ? `${revirementForm.pdfFile.name} (${revirementForm.pdfFile.size})` : 'Cliquer pour joindre un justificatif...'}
+                      {revirementForm.pdfFile ? `${revirementForm.pdfFile.name} (${fileSizeLabel(revirementForm.pdfFile)})` : 'Cliquer pour joindre un justificatif...'}
                     </span>
                     <input
                       type="file"
@@ -2407,7 +2422,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                           setRevirementForm((prev) => ({
                             ...prev,
                             documentNom: prev.documentNom || file.name,
-                            pdfFile: { name: file.name, size: `${Math.round(file.size / 1024)} Ko` },
+                            pdfFile: file,
                           }));
                         }
                       }}
@@ -2472,7 +2487,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 >
                   Annuler
                 </button>
-                <button type="submit" className="btn-primary" style={{ fontSize: '12px' }}>
+                <button type="submit" disabled={isSaving} className="btn-primary" style={{ fontSize: '12px' }}>
                   <RotateCcw size={13} />
                   <span>Acter le revirement</span>
                 </button>

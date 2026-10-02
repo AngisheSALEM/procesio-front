@@ -1,29 +1,29 @@
 import React, { useState } from 'react';
-import { Shield, Briefcase, Lock, Mail, ArrowRight, UserCheck } from 'lucide-react';
-import type { UserRole } from '../types';
-import { mockUsers } from '../data/mockData';
+import { Lock, Mail, ArrowRight, UserCheck } from 'lucide-react';
 
 interface LoginPageProps {
-  onLogin: (role: UserRole) => void;
+  onLogin: (username: string, password: string) => Promise<void>;
+  error?: string;
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
-  const [selectedRole, setSelectedRole] = useState<UserRole>('enqueteur');
-  const [email, setEmail] = useState('enqueteur@dgda.cd');
-  const [password, setPassword] = useState('••••••••••••');
-  const [rememberMe, setRememberMe] = useState(true);
+export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, error }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
 
-  const handleSelectRole = (role: UserRole) => {
-    setSelectedRole(role);
-    setEmail(mockUsers[role].email);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin(selectedRole);
+    setSubmitting(true);
+    setFormError('');
+    try {
+      await onLogin(username.trim(), password);
+    } catch (failure) {
+      setFormError(failure instanceof Error ? failure.message : 'Connexion impossible.');
+    } finally {
+      setSubmitting(false);
+    }
   };
-
-  const activeUser = mockUsers[selectedRole];
 
   return (
     <div
@@ -103,93 +103,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           </div>
         </div>
 
-        {/* Persona / Role Selector Buttons */}
-        <div>
-          <label
-            style={{
-              display: 'block',
-              fontSize: '11px',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.8px',
-              color: 'var(--color-text-muted)',
-              marginBottom: '10px',
-            }}
-          >
-            Sélectionnez votre profil de connexion :
-          </label>
-          <div className="form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <button
-              type="button"
-              onClick={() => handleSelectRole('director')}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '14px 10px',
-                borderRadius: '16px',
-                border: selectedRole === 'director'
-                  ? '2px solid var(--color-accent)'
-                  : '1px solid var(--glass-border)',
-                backgroundColor: selectedRole === 'director'
-                  ? 'var(--glass-surface)'
-                  : 'transparent',
-                color: selectedRole === 'director'
-                  ? 'var(--color-accent)'
-                  : 'var(--color-text-secondary)',
-                cursor: 'pointer',
-                transition: 'all var(--transition-fast)',
-              }}
-            >
-              <Shield size={20} strokeWidth={selectedRole === 'director' ? 2.2 : 1.8} />
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                  directeur
-                </div>
-                <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                  Supervision & Décision
-                </div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSelectRole('enqueteur')}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '14px 10px',
-                borderRadius: '16px',
-                border: selectedRole === 'enqueteur'
-                  ? '2px solid var(--color-accent)'
-                  : '1px solid var(--glass-border)',
-                backgroundColor: selectedRole === 'enqueteur'
-                  ? 'var(--glass-surface)'
-                  : 'transparent',
-                color: selectedRole === 'enqueteur'
-                  ? 'var(--color-accent)'
-                  : 'var(--color-text-secondary)',
-                cursor: 'pointer',
-                transition: 'all var(--transition-fast)',
-              }}
-            >
-              <Briefcase size={20} strokeWidth={selectedRole === 'enqueteur' ? 2.2 : 1.8} />
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                  Enquêteur
-                </div>
-                <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                  Terrain & Instruction
-                </div>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* Selected Account Info Card */}
+        {/* Access information card */}
         <div
           style={{
             backgroundColor: 'var(--glass-surface)',
@@ -211,22 +125,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontWeight: 700,
               fontSize: '13px',
               color: 'var(--color-accent)',
             }}
           >
-            {activeUser.avatarInitials}
+            <UserCheck size={17} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-              {activeUser.prenom} {activeUser.nom}
+              Accès réservé aux agents habilités
             </div>
             <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-              {activeUser.grade} • {activeUser.unite}
+              Votre profil et votre unité sont définis par votre compte.
             </div>
           </div>
-          <UserCheck size={16} color="var(--color-accent)" />
         </div>
 
         {/* Login Form */}
@@ -241,7 +153,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 marginBottom: '6px',
               }}
             >
-              Identifiant / Email professionnel
+              Identifiant professionnel
             </label>
             <div
               style={{
@@ -256,9 +168,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             >
               <Mail size={16} color="var(--color-text-muted)" />
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                name="username"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
                 style={{
                   background: 'transparent',
@@ -284,9 +198,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               >
                 Mot de passe
               </label>
-              <span style={{ fontSize: '11px', color: 'var(--color-accent)', cursor: 'pointer' }}>
-                Mot de passe oublié ?
-              </span>
             </div>
             <div
               style={{
@@ -302,6 +213,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               <Lock size={16} color="var(--color-text-muted)" />
               <input
                 type="password"
+                name="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -318,21 +231,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input
-              type="checkbox"
-              id="remember"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              style={{ cursor: 'pointer' }}
-            />
-            <label htmlFor="remember" style={{ fontSize: '12px', color: 'var(--color-text-muted)', cursor: 'pointer' }}>
-              Rester connecté sur ce poste
-            </label>
-          </div>
+          {(formError || error) && <div role="alert" style={{ fontSize: '12px', padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: '12px', color: 'var(--color-text-primary)', backgroundColor: 'var(--color-surface)' }}>{formError || error}</div>}
 
           <button
             type="submit"
+            disabled={submitting}
             style={{
               marginTop: '8px',
               display: 'flex',
@@ -346,17 +249,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               color: 'var(--color-on-accent)',
               fontSize: '14px',
               fontWeight: 700,
-              cursor: 'pointer',
+              cursor: submitting ? 'wait' : 'pointer',
               transition: 'all var(--transition-fast)',
             }}
           >
-            <span>Se connecter en tant que {selectedRole === 'director' ? 'directeur' : 'Enquêteur'}</span>
+            <span>{submitting ? 'Connexion en cours…' : 'Se connecter'}</span>
             <ArrowRight size={16} strokeWidth={2.2} />
           </button>
         </form>
 
         <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--color-text-muted)' }}>
-          Système officiel sécurisé — Accès réservé aux agents habilités DGDA
+          Accès réservé aux agents habilités DGDA
         </div>
       </div>
     </div>

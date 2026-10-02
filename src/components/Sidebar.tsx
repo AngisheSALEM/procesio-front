@@ -6,7 +6,8 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
-  LogOut
+  LogOut,
+  FileCheck
 } from 'lucide-react';
 import type { UserAccount } from '../types';
 
@@ -23,6 +24,7 @@ interface SidebarProps {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onLogout: () => void;
+  loggingOut?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -32,6 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed,
   onToggleCollapse,
   onLogout,
+  loggingOut = false,
 }) => {
   const directorNavItems: NavItem[] = [
     {
@@ -39,7 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Supervision',
       icon: <LayoutDashboard size={25} strokeWidth={1.8} />,
     },
-        {
+    {
       id: 'renseignements',
       label: 'Renseignements',
       icon: <Radio size={25} strokeWidth={1.8} />,
@@ -49,7 +52,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Tous les Dossiers',
       icon: <Briefcase size={25} strokeWidth={1.8} />,
     },
-
+    {
+      id: 'documents-modeles',
+      label: 'Modèles & Référentiel',
+      icon: <FileCheck size={25} strokeWidth={1.8} />,
+    },
     {
       id: 'parametres',
       label: 'Paramètres',
@@ -63,21 +70,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: "Dossiers d'enquetes",
       icon: <Briefcase size={25} strokeWidth={1.8} />,
     },
-    // {
-    //   id: 'components',
-    //   label: 'Lab Tableaux UX',
-    //   icon: <Table size={25} strokeWidth={1.8} />,
-    // },
     {
       id: 'renseignements',
       label: 'Renseignements',
       icon: <Radio size={25} strokeWidth={1.8} />,
     },
-    // {
-    //   id: 'documents-modeles',
-    //   label: 'Modèles d’actes',
-    //   icon: <FileCheck size={25} strokeWidth={1.8} />,
-    // },
+    {
+      id: 'documents-modeles',
+      label: 'Modèles & Référentiel',
+      icon: <FileCheck size={25} strokeWidth={1.8} />,
+    },
     {
       id: 'parametres',
       label: 'Paramètres',
@@ -327,6 +329,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {!isCollapsed && (
             <button
               onClick={onLogout}
+            disabled={loggingOut}
               title="Se déconnecter"
               style={{
                 background: 'transparent',

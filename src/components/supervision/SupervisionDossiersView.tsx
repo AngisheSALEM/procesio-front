@@ -62,7 +62,7 @@ export const SupervisionDossiersView: React.FC<SupervisionDossiersViewProps> = (
       return d.hasPv || (pvs[d.id] && pvs[d.id].length > 0);
     }
     if (filterStatut === 'CLASSE_SANS_SUITE') {
-      return d.decisionCloture === 'CLASSE_SANS_SUITE' || d.statut === 'CLOTURE';
+      return d.decisionCloture === 'CLASSE_SANS_SUITE';
     }
     if (filterStatut === 'EN_COURS') {
       return d.statut === 'EN_COURS' || d.statut === 'EN_ATTENTE';
@@ -190,7 +190,7 @@ export const SupervisionDossiersView: React.FC<SupervisionDossiersViewProps> = (
           {[
             { id: 'TOUS', label: `Tous les dossiers (${dossiers.length})` },
             { id: 'AVEC_PV', label: `Dossiers avec PV (${dossiers.filter((d) => d.hasPv || (pvs[d.id] && pvs[d.id].length > 0)).length})` },
-            { id: 'CLASSE_SANS_SUITE', label: `Classés sans suite (${dossiers.filter((d) => d.decisionCloture === 'CLASSE_SANS_SUITE' || d.statut === 'CLOTURE').length})` },
+            { id: 'CLASSE_SANS_SUITE', label: `Classés sans suite (${dossiers.filter((d) => d.decisionCloture === 'CLASSE_SANS_SUITE').length})` },
             { id: 'EN_COURS', label: `En instruction (${dossiers.filter((d) => d.statut === 'EN_COURS' || d.statut === 'EN_ATTENTE').length})` },
             { id: 'CONTENTIEUX', label: `Relais Contentieux (${dossiers.filter((d) => d.statut === 'RELAIS_CONTENTIEUX' || d.statut === 'A_VALIDER').length})` },
           ].map((tab) => {
@@ -305,7 +305,7 @@ export const SupervisionDossiersView: React.FC<SupervisionDossiersViewProps> = (
                         <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
                           {d.hasPv || dPvs.length > 0
                             ? `PV Dressé `
-                            : d.decisionCloture === 'CLASSE_SANS_SUITE' || d.statut === 'CLOTURE'
+                            : d.decisionCloture === 'CLASSE_SANS_SUITE'
                             ? 'Classé sans suite'
                             : d.statut === 'EN_COURS'
                             ? 'En cours'

@@ -1,6 +1,7 @@
 export type UserRole = 'director' | 'enqueteur';
 
 export interface UserAccount {
+  capabilities?: string[];
   id: string;
   nom: string;
   prenom: string;
@@ -13,6 +14,7 @@ export interface UserAccount {
 }
 
 export type StatutDossier =
+  | 'OUVERT'
   | 'A_AFFECTER'
   | 'EN_COURS'
   | 'EN_ATTENTE'
@@ -92,6 +94,9 @@ export interface EcheanceDossier {
 }
 
 export interface DossierEnquete {
+  decisionCourante?: { id: string; kind: string; reason: string };
+  capabilities?: string[];
+  decisions?: Array<{ id: string; kind: string; state: string; reason: string; date: string }>;
   id: string;
   reference: string;
   objet: string;
@@ -119,12 +124,18 @@ export interface DossierEnquete {
   pvIds?: string[];
   hasFeuille?: boolean;
   hasDemande?: boolean;
+  version?: number;
+  assigneeId?: number;
+  unitId?: string;
+  teamIds?: number[];
   droitsEludesUSD?: number;
   droitsEludesCDF?: number;
   amendeUSD?: number;
 }
 
 export type StatutDemandeCommunication =
+  | 'VALIDEE'
+  | 'SIGNEE'
   | 'BROUILLON'
   | 'A_VALIDER'
   | 'EMISE'
@@ -134,6 +145,8 @@ export type StatutDemandeCommunication =
   | 'ANNULEE';
 
 export interface ElementDemande {
+  appreciation?: 'pending' | 'satisfactory' | 'unsatisfactory';
+  motifAppreciation?: string;
   id: string;
   libelle: string;
   periodeConcernee: string;
@@ -150,11 +163,12 @@ export interface ReponseRecue {
   elementsManquantsIds: string[];
   piecesJointes: string[];
   analyseEnqueteur: string;
-  appreciation: 'SATISFAISANTE' | 'INCOMPLETE_EXPLICATIVE' | 'NON_CONVAINCANTE' | 'CONTRADICTOIRE';
+  appreciation?: 'SATISFAISANTE' | 'INCOMPLETE_EXPLICATIVE' | 'NON_CONVAINCANTE' | 'CONTRADICTOIRE';
   prochaineAction: string;
 }
 
 export interface DemandeCommunication {
+  reponseDocumentId?: string;
   id: string;
   reference: string;
   dossierId: string;
@@ -228,6 +242,7 @@ export type StatutConstat =
   | 'MAINTENU_CONTENTIEUX';
 
 export interface ObservationItem {
+  id?: string;
   code: string; // Ex: O1, O2, O3
   titre: string;
   faitsConstates: string;
@@ -250,6 +265,7 @@ export interface ObservationItem {
 }
 
 export interface FeuilleObservation {
+  missionId?: string;
   id: string;
   reference: string;
   dossierId: string;
@@ -363,8 +379,8 @@ export interface DocumentItem {
   id: string;
   reference: string;
   titre: string;
-  type: 'PV_OPERATIONS' | 'PV_INFRACTION' | 'DEMANDE_COMMUNICATION' | 'FEUILLE_OBSERVATION' | 'BORDEREAU_GELEC';
-  format: 'PDF' | 'DOCX' | 'SCAN_SIGNE' | 'XLSX';
+  type: 'PV_OPERATIONS' | 'PV_INFRACTION' | 'DEMANDE_COMMUNICATION' | 'FEUILLE_OBSERVATION' | 'BORDEREAU_GELEC' | 'PIECE_JOINTE';
+  format: 'PDF' | 'DOCX' | 'SCAN_SIGNE' | 'XLSX' | 'PNG' | 'JPEG';
   statutValidation: 'BROUILLON' | 'VALIDE_INTERNE' | 'SIGNE_OFFICIEL' | 'TRANSMIS';
   dateCreation: string;
   auteur: string;
@@ -391,6 +407,9 @@ export interface EtapeEvolutionRenseignement {
 }
 
 export interface RenseignementItem {
+  unitId?: string;
+  classification?: number;
+  capabilities?: string[];
   id: string;
   reference: string;
   dateReception: string;
@@ -405,6 +424,7 @@ export interface RenseignementItem {
   // Cotation managériale (Savoir qui a été coté)
   cotePar?: string;
   coteA?: string;
+  assigneeId?: number;
   dateCotation?: string;
   degreFiabilite?: string;
   priorite?: 'NORMALE' | 'URGENTE' | 'SIGNALEE';
@@ -419,5 +439,64 @@ export interface RenseignementItem {
   montantRecouvreCDF?: number;
   // Suivi de l'évolution (Comment les dossiers ont évolué)
   cycleEvolution?: EtapeEvolutionRenseignement[];
+  version?: number;
 }
 
+export interface CaseTimelineEntry {
+  id: string;
+  kind: string;
+  actor: number;
+  actorName?: string;
+  next_action: string | null;
+  status: string | null;
+  version: number | null;
+  created_at: string;
+  resource_id?: string | null;
+}
+
+export interface CaseAssignmentEntry {
+  id: string;
+  previous_assignee: number | null;
+  previousAssigneeName?: string;
+  new_assignee: number;
+  newAssigneeName?: string;
+  author: number;
+  authorName?: string;
+  reason: string;
+  created_at: string;
+  version: number;
+}
+
+export interface DisseminationReturnItem {
+  id: string;
+  dissemination: string;
+  acknowledged: boolean;
+  received_at: string;
+  note: string;
+  recorded_at: string;
+}
+
+export interface DisseminationItem {
+  id: string;
+  intelligence: string;
+  recipient_unit: string;
+  recipient_unit_name?: string;
+  channel: string;
+  reference: string;
+  expected_action: string;
+  sent_at: string | null;
+  created_at: string;
+  returns?: DisseminationReturnItem[];
+}
+
+export interface ValidationItem {
+  id: string;
+  case: string;
+  caseReference?: string;
+  operatorName?: string;
+  status: string;
+  due_on: string | null;
+  overdue: boolean;
+  action_url: string;
+  kind: string;
+}

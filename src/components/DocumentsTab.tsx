@@ -1,289 +1,66 @@
-import React, { useState } from 'react';
-import {
-  Download,
-  Send,
-  CheckCircle2
-} from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Download, RotateCcw, Upload } from 'lucide-react';
+import { apiPost, downloadFile, uploadFile, type ApiDocument } from '../api/client';
+import { documentStateLabels } from '../api/documentStates';
+import './Workflow.css';
 
-export interface DocumentItem {
-  id: string;
-  reference: string;
-  titre: string;
-  type: 'PV_OPERATIONS' | 'PV_INFRACTION' | 'DEMANDE_COMMUNICATION' | 'FEUILLE_OBSERVATION' | 'BORDEREAU_GELEC';
-  format: 'PDF' | 'DOCX' | 'SCAN_SIGNE' | 'XLSX';
-  statutValidation: 'BROUILLON' | 'VALIDE_INTERNE' | 'SIGNE_OFFICIEL' | 'TRANSMIS';
-  dateCreation: string;
-  auteur: string;
-  signataire?: string;
-  relaisGelec: boolean;
-}
+export function DocumentsTab({ documents = [], caseId, onRefresh, canWrite = false }: {
+  documents?: ApiDocument[]; caseId: string; onRefresh: () => Promise<unknown>; canWrite?: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
+  const input = useRef<HTMLInputElement>(null);
 
-interface DocumentsTabProps {
-  documents?: DocumentItem[];
-}
+  async function run(operation: () => Promise<unknown>, refresh = true) {
+    if (busy) return;
+    setBusy(true); setError(''); setInfo('');
+    let completed = false;
+    try {
+      await operation(); completed = true;
+      if (refresh) await onRefresh();
+    } catch (cause) {
+      setError(`${completed && refresh ? 'Opération enregistrée, mais actualisation impossible : ' : ''}${cause instanceof Error ? cause.message : 'Opération impossible.'}`);
+      if (!completed && refresh) await onRefresh().catch(() => undefined);
+    } finally { setBusy(false); }
+  }
 
-export const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents: propDocuments }) => {
-  const defaultDocs: DocumentItem[] = [
-    {
-      id: 'DOC-01',
-      reference: 'DGDA/DRK/FO/2026/018',
-      titre: 'Feuille d’observation contradictoire provisoire (O1, O2, O3)',
-      type: 'FEUILLE_OBSERVATION',
-      format: 'PDF',
-      statutValidation: 'VALIDE_INTERNE',
-      dateCreation: '2026-08-28',
-      auteur: 'Insp. Principal Salem Mukendi',
-      signataire: 'Inspecteur Principal Salem Mukendi',
-      relaisGelec: true,
-    },
-    {
-      id: 'DOC-02',
-      reference: 'DGDA/DRK/ENQ/DC/2026/042',
-      titre: 'Demande de communication de pièces bancaires',
-      type: 'DEMANDE_COMMUNICATION',
-      format: 'SCAN_SIGNE',
-      statutValidation: 'SIGNE_OFFICIEL',
-      dateCreation: '2026-08-20',
-      auteur: 'Insp. Principal Salem Mukendi',
-      signataire: 'Jean-Paul Tshilombo (Directeur Provincial)',
-      relaisGelec: true,
-    },
-    {
-      id: 'DOC-03',
-      reference: 'DGDA/DRK/PV-OP/2026/091',
-      titre: 'Procès-verbal de constat d’opérations sur pièces',
-      type: 'PV_OPERATIONS',
-      format: 'PDF',
-      statutValidation: 'VALIDE_INTERNE',
-      dateCreation: '2026-09-05',
-      auteur: 'Insp. Adjoint Mireille Kabamba',
-      signataire: 'Mireille Kabamba & Salem Mukendi',
-      relaisGelec: true,
-    },
-    {
-      id: 'DOC-04',
-      reference: 'DGDA/DRK/PROJET-PV-INF/2026/014',
-      titre: 'Projet de Procès-verbal d’infraction douanière',
-      type: 'PV_INFRACTION',
-      format: 'DOCX',
-      statutValidation: 'BROUILLON',
-      dateCreation: '2026-09-20',
-      auteur: 'Insp. Principal Salem Mukendi',
-      relaisGelec: true,
-    },
-    {
-      id: 'DOC-05',
-      reference: 'DGDA/DRK/TAB-STAT/2026/008',
-      titre: 'Bordereau chiffré des droits compromis et pénalités calculées',
-      type: 'BORDEREAU_GELEC',
-      format: 'XLSX',
-      statutValidation: 'VALIDE_INTERNE',
-      dateCreation: '2026-09-22',
-      auteur: 'Contrôleur Éric Tshimanga',
-      relaisGelec: true,
-    },
-  ];
-
-  const [documents] = useState<DocumentItem[]>(propDocuments || defaultDocs);
-
-  const [relaisStatut, setRelaisStatut] = useState<'NON_TRANSMIS' | 'PROPOSE' | 'TRANSMIS' | 'RECEPTIONNE'>('PROPOSE');
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-      {/* Relais Contentieux GELEC Card */}
-      <div
-        style={{
-          backgroundColor: 'var(--color-surface)',
-          border: 'none',
-          borderRadius: 'var(--radius-card)',
-          padding: '18px 20px',
-          display:'none'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Send size={16} color="var(--color-accent)" />
-              <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                Préparation du bordereau de transmission vers GELEC
-              </h3>
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-              Transfert tracé vers la Direction du Contentieux Douanier (GELEC)
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span
-              style={{
-                fontSize: '12px',
-                color:
-                  relaisStatut === 'PROPOSE'
-                    ? 'var(--color-warning)'
-                    : 'var(--color-success)',
-                fontWeight: 600,
-              }}
-            >
-              Statut : {relaisStatut === 'PROPOSE' ? 'Proposé pour transmission' : 'Transmis et consigné'}
-            </span>
-
-            <button
-              onClick={() => {
-                setRelaisStatut('TRANSMIS');
-                alert('Bordereau de transmission GELEC généré et horodaté sous référence TR-GELEC-2026-0842.');
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '7px 12px',
-                borderRadius: 'var(--radius-btn)',
-                backgroundColor: 'var(--color-accent)',
-                color: 'var(--color-on-accent)',
-                border: 'none',
-                fontWeight: 600,
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              <Send size={13} strokeWidth={2} />
-              <span>Générer le bordereau GELEC</span>
-            </button>
-          </div>
-        </div>
-
-      
-      </div>
-
-      {/* Documents Table */}
-      <div
-        className="responsive-table-container"
-        style={{
-          backgroundColor: 'var(--color-surface)',
-          border: 'none',
-          borderRadius: 'var(--radius-card)',
-          overflowX: 'auto',
-        }}
-      >
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--color-border)' }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 700 }}>
-            Pièces procédurales et documents générés dans ce dossier
-          </h3>
-        </div>
-
-        <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
-          <thead>
-            <tr
-              style={{
-                backgroundColor: 'var(--color-surface-muted)',
-                borderBottom: '1px solid var(--color-border)',
-                color: 'var(--color-text-secondary)',
-                fontSize: '11px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-              }}
-            >
-              <th style={{ padding: '10px 16px' }}>Nature & Titre de l'acte</th>
-              <th style={{ padding: '10px 16px', width: '180px' }}>Référence</th>
-              <th style={{ padding: '10px 16px', width: '90px', textAlign: 'center' }}>Format</th>
-              <th style={{ padding: '10px 16px', width: '160px' }}>Validation</th>
-              <th style={{ padding: '10px 16px', width: '140px' }}>Signataire</th>
-              <th style={{ padding: '10px 16px', width: '100px', textAlign: 'right' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {documents.map((doc) => (
-              <tr key={doc.id} style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
-                <td style={{ padding: '12px 16px' }}>
-                  <div style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{doc.titre}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                    Créé par {doc.auteur} • le <span className="  ">{doc.dateCreation}</span>
-                  </div>
-                </td>
-                <td style={{ padding: '12px 16px', fontWeight: 600 }} className="  ">
-                  {doc.reference}
-                </td>
-                <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                  <span
-                    className="  "
-                    style={{
-                      fontSize: '11px',
-                      padding: '2px 6px',
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: 'var(--color-surface-elevated)',
-                      border: '1px solid var(--color-border)',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {doc.format}
-                  </span>
-                </td>
-                <td style={{ padding: '12px 16px' }}>
-                  {doc.statutValidation === 'SIGNE_OFFICIEL' && (
-                    <span
-                      style={{
-                        fontSize: '12px',
-                        color: 'var(--color-success)',
-                        fontWeight: 600,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                      }}
-                    >
-                      <CheckCircle2 size={13} /> Signé officiel
-                    </span>
-                  )}
-                  {doc.statutValidation === 'VALIDE_INTERNE' && (
-                    <span
-                      style={{
-                        fontSize: '12px',
-                        color: 'var(--color-info)',
-                        fontWeight: 600,
-                      }}
-                    >
-                      Validé enquête
-                    </span>
-                  )}
-                  {doc.statutValidation === 'BROUILLON' && (
-                    <span
-                      style={{
-                        fontSize: '12px',
-                        color: 'var(--color-text-secondary)',
-                      }}
-                    >
-                      Projet / Brouillon
-                    </span>
-                  )}
-                </td>
-                <td style={{ padding: '12px 16px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                  {doc.signataire || 'Non signé'}
-                </td>
-                <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                  <button
-                    onClick={() => alert(`Téléchargement de ${doc.reference}`)}
-                    style={{
-                      background: 'none',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: 'var(--radius-sm)',
-                      padding: '4px 8px',
-                      color: 'var(--color-accent)',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontSize: '11px',
-                    }}
-                  >
-                    <Download size={12} strokeWidth={2} />
-                    <span>Consulter</span>
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+  return <section className="workflow-card" aria-label="Documents du dossier" aria-busy={busy}>
+    <div className="workflow-header"><h3>Pièces du dossier</h3>
+      <button className="btn-secondary" disabled={busy} onClick={() => void run(onRefresh, false)}>Actualiser</button>
     </div>
-  );
-};
+    {canWrite && <div className="document-upload"><label className="workflow-field"><span>Ajouter une pièce</span>
+      <input ref={input} type="file" accept="application/pdf,image/png,image/jpeg" disabled={busy} aria-describedby="document-upload-hint" />
+      <small id="document-upload-hint">PDF ou image · 10 Mo maximum par fichier</small>
+    </label>
+    <button className="btn-primary" disabled={busy} onClick={() => {
+      const file = input.current?.files?.[0];
+      if (!file) { setError('Choisissez un fichier à déposer.'); return; }
+      void run(async () => {
+        const uploaded = await uploadFile(file, { case: caseId });
+        setInfo(uploaded.state === 'accepted' ? 'Pièce ajoutée et disponible.' : uploaded.state === 'rejected' ? 'Cette pièce ne peut pas être utilisée. Choisissez un autre fichier.' : 'Pièce ajoutée. Elle sera disponible une fois la vérification terminée.');
+        if (input.current) input.current.value = '';
+      });
+    }}><Upload size={14} /> {busy ? 'En cours…' : 'Ajouter'}</button></div>}
+    {error && <p role="alert" className="workflow-error">{error}</p>}
+    {info && <p role="status">{info}</p>}
+    <div className="responsive-table-container"><table className="workflow-table">
+      <thead><tr><th>Pièce</th><th>Disponibilité</th><th>Actions</th></tr></thead>
+      <tbody>{documents.length === 0 && <tr><td colSpan={3}>Aucune pièce ajoutée.</td></tr>}
+        {documents.map((item) => <tr key={item.id}>
+          <td>{item.original_name}<small>{Math.ceil(item.size / 1024)} Ko · {new Date(item.uploaded_at).toLocaleString('fr-FR')}</small></td>
+          <td>{documentStateLabels[item.state] || 'Indisponible'}{item.state === 'rejected' && <small>Ajoutez un autre fichier.</small>}{item.state === 'missing' && <small>Ajoutez à nouveau cette pièce.</small>}</td>
+          <td><div className="workflow-actions">
+            {canWrite && ['quarantine', 'missing'].includes(item.state) && <button className="btn-secondary" disabled={busy} onClick={() => void run(async () => {
+              const result = await apiPost<ApiDocument>(`/documents/${item.id}/reanalyser/`, {});
+              setInfo(result.state === 'accepted' ? 'La pièce est disponible.' : result.state === 'rejected' ? 'Cette pièce ne peut pas être utilisée. Choisissez un autre fichier.' : 'La pièce reste indisponible. Réessayez plus tard.');
+            })}><RotateCcw size={14} /> Vérifier à nouveau</button>}
+            <button className="btn-secondary" disabled={busy || item.state !== 'accepted'} title={item.state !== 'accepted' ? 'Cette pièce est encore indisponible.' : 'Télécharger la pièce'} onClick={() => void run(() => downloadFile(`/documents/${item.id}/telecharger/`, item.original_name))}>
+              <Download size={14} /> Télécharger
+            </button>
+          </div></td>
+        </tr>)}
+      </tbody>
+    </table></div>
+  </section>;
+}
