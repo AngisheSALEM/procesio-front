@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Briefcase,
   Radio,
-  BarChart3,
+  LayoutDashboard,
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
@@ -36,24 +36,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const directorNavItems: NavItem[] = [
     {
       id: 'rapports-stats',
-      label: 'Supervision & Stats',
-      icon: <BarChart3 size={18} strokeWidth={1.8} />,
+      label: 'Supervision',
+      icon: <LayoutDashboard size={25} strokeWidth={1.8} />,
     },
         {
       id: 'renseignements',
       label: 'Renseignements',
-      icon: <Radio size={18} strokeWidth={1.8} />,
+      icon: <Radio size={25} strokeWidth={1.8} />,
     },
     {
       id: 'mon-travail',
       label: 'Tous les Dossiers',
-      icon: <Briefcase size={18} strokeWidth={1.8} />,
+      icon: <Briefcase size={25} strokeWidth={1.8} />,
     },
 
     {
       id: 'parametres',
       label: 'Paramètres',
-      icon: <Settings size={18} strokeWidth={1.8} />,
+      icon: <Settings size={25} strokeWidth={1.8} />,
     },
   ];
 
@@ -61,27 +61,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       id: 'mon-travail',
       label: "Dossiers d'enquetes",
-      icon: <Briefcase size={18} strokeWidth={1.8} />,
+      icon: <Briefcase size={25} strokeWidth={1.8} />,
     },
     // {
     //   id: 'components',
     //   label: 'Lab Tableaux UX',
-    //   icon: <Table size={18} strokeWidth={1.8} />,
+    //   icon: <Table size={25} strokeWidth={1.8} />,
     // },
     {
       id: 'renseignements',
       label: 'Renseignements',
-      icon: <Radio size={18} strokeWidth={1.8} />,
+      icon: <Radio size={25} strokeWidth={1.8} />,
     },
     // {
     //   id: 'documents-modeles',
     //   label: 'Modèles d’actes',
-    //   icon: <FileCheck size={18} strokeWidth={1.8} />,
+    //   icon: <FileCheck size={25} strokeWidth={1.8} />,
     // },
     {
       id: 'parametres',
       label: 'Paramètres',
-      icon: <Settings size={18} strokeWidth={1.8} />,
+      icon: <Settings size={25} strokeWidth={1.8} />,
     },
   ];
 
