@@ -1023,8 +1023,8 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
           </div>
         </div>
 
-        {/* Bouton Nouvelle Demande de Renseignement (Admin) */}
-        {currentUser.role === 'admin' && (
+        {/* Bouton Nouvelle Demande de Renseignement (director) */}
+        {currentUser.role === 'director' && (
           <button
             type="button"
             onClick={() => setShowCreateRenseignementModal(true)}
@@ -1217,7 +1217,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
         />
       </div>
 
-      {/* Modal : Nouvelle Demande de Renseignement (Admin) */}
+      {/* Modal : Nouvelle Demande de Renseignement (director) */}
       {showCreateRenseignementModal && (
         <ModalPortal>
           <div
@@ -1287,7 +1287,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                   }}
                 >
                   <option value="Douane )">Douane </option>
-                  <option value="Rapport de service administratif">Rapport de service administratif</option>
+                  <option value="Rapport de service directoristratif">Rapport de service directoristratif</option>
                   <option value="Informations de l’opinion">Informations de l’opinion </option>
                 
                 </select>

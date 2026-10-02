@@ -33,7 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   onLogout,
 }) => {
-  const adminNavItems: NavItem[] = [
+  const directorNavItems: NavItem[] = [
     {
       id: 'rapports-stats',
       label: 'Supervision & Stats',
@@ -85,7 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ];
 
-  const items = user.role === 'admin' ? adminNavItems : enqueteurNavItems;
+  const items = user.role === 'director' ? directorNavItems : enqueteurNavItems;
 
   const handleItemClick = (itemId: string) => {
     onSelectNav(itemId);
@@ -318,7 +318,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     textOverflow: 'ellipsis',
                   }}
                 >
-                  {user.role === 'admin' ? 'Administrateur' : 'Enquêteur'}
+                  {user.role === 'director' ? 'directeur' : 'Enquêteur'}
                 </div>
               </div>
             )}

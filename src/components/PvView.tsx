@@ -707,7 +707,7 @@ export const PvView: React.FC<PvViewProps> = ({
               </span>
             </div>
 
-            {/* Référence administrative du PV */}
+            {/* Référence directoristrative du PV */}
             {/* <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '6px' }}>
               <span>Référence officielle : </span>
               <span className="font-sf" style={{ fontWeight: 400 }}>{pvData.reference}</span>

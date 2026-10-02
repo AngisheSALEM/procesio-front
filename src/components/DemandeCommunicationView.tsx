@@ -281,7 +281,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           code: 'O1',
           titre: 'Défaut de justification et pièces non satisfaisantes',
           faitsConstates: `L’opérateur n’a pas transmis les justificatifs probants requis au titre de la réquisition ${demande?.reference || ''}. Constat d’obstacle aux vérifications douanières et carence de pièces requises.`,
-          justificatifsAssocies: ['Réquisition administrative', 'Avis de mise en demeure'],
+          justificatifsAssocies: ['Réquisition directoristrative', 'Avis de mise en demeure'],
           referencesJuridiques: 'Code des douanes, Article 46 et Article 49',
           questionsAssujetti: 'Fournir sous 14 jours les pièces justificatives manquantes ou explications écrites contradictoires.',
           statutConstat: 'OUVERT',
@@ -886,7 +886,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           }}
         >
           <div>
-            {/* Référence administrative : JAMAIS en gras, JAMAIS en couleur accent */}
+            {/* Référence directoristrative : JAMAIS en gras, JAMAIS en couleur accent */}
             {/* <div
               className="font-sf"
               style={{

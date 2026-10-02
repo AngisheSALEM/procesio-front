@@ -58,7 +58,7 @@ export function App() {
   // 3. Role & User persistence: defaults to 'enqueteur' (Agent de terrain)
   const [userRole, setUserRole] = useState<UserRole>(() => {
     const savedRole = localStorage.getItem(STORAGE_ROLE);
-    return savedRole === 'enqueteur' || savedRole === 'admin' ? savedRole : 'enqueteur';
+    return savedRole === 'enqueteur' || savedRole === 'director' ? savedRole : 'enqueteur';
   });
 
   // 4. Dossiers state (with creation support)
@@ -177,7 +177,7 @@ export function App() {
         setSelectedDossierId(dId);
         return 'dossier-detail';
       }
-      return role === 'admin' ? 'rapports-stats' : 'mon-travail';
+      return role === 'director' ? 'rapports-stats' : 'mon-travail';
     }
     const validRoutes = [
       'dossiers-enquete',
@@ -196,7 +196,7 @@ export function App() {
     if (savedNav && validRoutes.includes(savedNav)) {
       return savedNav === 'dossiers-enquete' ? 'dossier-detail' : savedNav;
     }
-    return role === 'admin' ? 'rapports-stats' : 'mon-travail';
+    return role === 'director' ? 'rapports-stats' : 'mon-travail';
   }, []);
 
   const [activeNav, setActiveNav] = useState<string>(() => getNavFromHash(userRole, dossiers));
@@ -261,12 +261,12 @@ export function App() {
 
   const currentUser = mockUsers[userRole];
 
-  // Dossiers visibles selon le rôle : l'administrateur voit tous les dossiers, l'enquêteur ne voit que ceux qui lui sont assignés
+  // Dossiers visibles selon le rôle : l'directeur voit tous les dossiers, l'enquêteur ne voit que ceux qui lui sont assignés
   const visibleDossiers = useMemo(() => {
     return dossiers.filter((d) => isAssignedToUser(d.responsable, d.equipe, currentUser));
   }, [dossiers, currentUser]);
 
-  // Renseignements visibles selon le rôle : l'administrateur voit tous les renseignements, l'enquêteur ne voit que ceux qui lui sont assignés
+  // Renseignements visibles selon le rôle : l'directeur voit tous les renseignements, l'enquêteur ne voit que ceux qui lui sont assignés
   const visibleRenseignements = useMemo(() => {
     return renseignements.filter((r) => isAssignedToUser(r.coteA, null, currentUser));
   }, [renseignements, currentUser]);
@@ -277,7 +277,7 @@ export function App() {
     localStorage.setItem(STORAGE_AUTH, 'true');
     localStorage.setItem(STORAGE_ROLE, role);
 
-    const defaultRoute = role === 'admin' ? 'rapports-stats' : 'mon-travail';
+    const defaultRoute = role === 'director' ? 'rapports-stats' : 'mon-travail';
     setActiveNav(defaultRoute);
     window.location.hash = `#/${defaultRoute}`;
 
@@ -333,7 +333,7 @@ export function App() {
 
   // Résolution du dossier actif : strictement restreint aux dossiers autorisés
   const currentDossier = useMemo(() => {
-    const list = currentUser.role === 'admin' ? dossiers : visibleDossiers;
+    const list = currentUser.role === 'director' ? dossiers : visibleDossiers;
     return (
       list.find((d) => d.id === selectedDossierId || d.reference === selectedDossierId) ||
       dossiers.find((d) => d.id === selectedDossierId || d.reference === selectedDossierId) ||
@@ -899,7 +899,7 @@ export function App() {
             </div>
           )}
 
-          {/* Route: Rapports et statistiques (Admin) */}
+          {/* Route: Rapports et statistiques (director) */}
           {activeNav === 'rapports-stats' && (
             <div key="rapports-stats" className="view-container view-transition">
               <RapportsStatsView

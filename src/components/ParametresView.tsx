@@ -199,12 +199,12 @@ export const ParametresView: React.FC<ParametresViewProps> = ({
               Rôle attribué
             </label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-              {user.role === 'admin' ? (
+              {user.role === 'director' ? (
                 <Shield size={14} color="var(--color-accent)" />
               ) : (
                 <Briefcase size={14} color="var(--color-accent)" />
               )}
-              <span>{user.role === 'admin' ? "Administrateur / Responsable d'unité" : 'Enquêteur / Vérificateur'}</span>
+              <span>{user.role === 'director' ? "directeur / Responsable d'unité" : 'Enquêteur / Vérificateur'}</span>
             </div>
           </div>
         </div>

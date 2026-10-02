@@ -21,7 +21,7 @@ L'application privilégie un **design minimaliste et aéré** :
 L'œil de l'utilisateur doit savoir immédiatement où se poser :
 1. **La seule chose en gras sur un dossier/tableau est le nom de l'entreprise :**
    - Nom de l'entreprise / opérateur : `font-weight: 700` (Gras). C'est le repère d'ancrage visuel n°1.
-2. **Les références administratives (`DGDA/DRK/ENQ/DC/...`) ne sont JAMAIS en couleur ni en gras :**
+2. **Les références directoristratives (`DGDA/DRK/ENQ/DC/...`) ne sont JAMAIS en couleur ni en gras :**
    - Typographie : `font-weight: 400` (Graisse normale).
    - Couleur : `var(--color-text-muted)` (Couleur neutre atténuée / ardoise discrète).
    - Jamais de bleu ou d'accent criard sur une référence de procédure.
@@ -43,7 +43,7 @@ L'œil de l'utilisateur doit savoir immédiatement où se poser :
 
 ## 4. Règle des Formulaires Épurés (Minimum Viable Fields)
 
-Pour éviter la fatigue administrative et les formulaires à 15 champs, chaque formulaire est réduit au strict nécessaire opérationnel :
+Pour éviter la fatigue directoristrative et les formulaires à 15 champs, chaque formulaire est réduit au strict nécessaire opérationnel :
 
 ### A. Formulaire de Création d'une Demande de Communication
 Seuls **5 champs essentiels** sont autorisés :

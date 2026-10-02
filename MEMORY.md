@@ -20,9 +20,9 @@
 
 ### B. Architecture Bipersonna & Authentification (DGDA)
 - **Les 2 personas officiels :**
-  1. **Administrateur** : Chef d'unité / Directeur. Accès à la supervision des missions, gestion globale des dossiers, rapports & statistiques, et paramètres.
+  1. **directeur** : Chef d'unité / Directeur. Accès à la supervision des missions, gestion globale des dossiers, rapports & statistiques, et paramètres.
   2. **Enquêteur** : Inspecteur vérificateur de terrain. Accès à son travail direct, instruction détaillée des dossiers, renseignements, et canevas types.
-- **Page de Connexion (`LoginPage.tsx`) :** Portail d'authentification avec sélection rapide du profil Admin ou Enquêteur, et déconnexion sécurisée.
+- **Page de Connexion (`LoginPage.tsx`) :** Portail d'authentification avec sélection rapide du profil director ou Enquêteur, et déconnexion sécurisée.
 - **Identité de l'agent dans la barre de navigation (`Sidebar.tsx`) :** Le nom, matricule et fonction sont affichés en pied de navigation avec bouton de déconnexion (retirés du header).
 - **Thème visuel dans la page Paramètres (`ParametresView.tsx`) :** Le sélecteur clair/sombre a été déplacé du header vers les paramètres du compte.
 - **Barre de recherche flottante en pilule (`Header.tsx`) :** Plaquée en haut à droite, translucide et épurée.
@@ -31,7 +31,7 @@
 ### C. Composants Principaux
 | Composant | Rôle & Fonctionnalités |
 |---|---|
-| `LoginPage.tsx` | Écran de connexion officiel DGDA avec choix de persona (Admin ou Enquêteur). |
+| `LoginPage.tsx` | Écran de connexion officiel DGDA avec choix de persona (director ou Enquêteur). |
 | `Header.tsx` | En-tête épuré avec logo officiel DGDA et barre de recherche flottante en pilule. |
 | `Sidebar.tsx` | Navbar latérale flottante dépolie (frosted glass), repliable, avec identité de l'agent et déconnexion. |
 | `ParametresView.tsx` | Page de paramètres avec sélecteur de thème clair/sombre, profil agent et préférences d'alertes. |

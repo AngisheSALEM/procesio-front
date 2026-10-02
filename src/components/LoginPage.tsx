@@ -121,7 +121,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           <div className="form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <button
               type="button"
-              onClick={() => handleSelectRole('admin')}
+              onClick={() => handleSelectRole('director')}
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -129,23 +129,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 gap: '8px',
                 padding: '14px 10px',
                 borderRadius: '16px',
-                border: selectedRole === 'admin'
+                border: selectedRole === 'director'
                   ? '2px solid var(--color-accent)'
                   : '1px solid var(--glass-border)',
-                backgroundColor: selectedRole === 'admin'
+                backgroundColor: selectedRole === 'director'
                   ? 'var(--glass-surface)'
                   : 'transparent',
-                color: selectedRole === 'admin'
+                color: selectedRole === 'director'
                   ? 'var(--color-accent)'
                   : 'var(--color-text-secondary)',
                 cursor: 'pointer',
                 transition: 'all var(--transition-fast)',
               }}
             >
-              <Shield size={20} strokeWidth={selectedRole === 'admin' ? 2.2 : 1.8} />
+              <Shield size={20} strokeWidth={selectedRole === 'director' ? 2.2 : 1.8} />
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                  Administrateur
+                  directeur
                 </div>
                 <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
                   Supervision & Décision
@@ -350,7 +350,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               transition: 'all var(--transition-fast)',
             }}
           >
-            <span>Se connecter en tant que {selectedRole === 'admin' ? 'Administrateur' : 'Enquêteur'}</span>
+            <span>Se connecter en tant que {selectedRole === 'director' ? 'directeur' : 'Enquêteur'}</span>
             <ArrowRight size={16} strokeWidth={2.2} />
           </button>
         </form>
