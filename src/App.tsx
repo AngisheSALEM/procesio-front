@@ -268,7 +268,7 @@ export function App() {
             </div>
           )}
 
-          {/* Route: Rapports et statistiques (Admin) */}
+          {/* Route: Rapports et statistiques (director) */}
           {activeNav === 'rapports-stats' && (
             <div key="rapports-stats" className="view-container view-transition">
               <RapportsStatsView

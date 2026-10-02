@@ -11,14 +11,14 @@ import type {
   RenseignementItem
 } from '../types';
 
-export const mockUsers: Record<'admin' | 'enqueteur', UserAccount> = {
-  admin: {
-    id: 'usr-admin-01',
+export const mockUsers: Record<'director' | 'enqueteur', UserAccount> = {
+  director: {
+    id: 'usr-director-01',
     nom: 'Mukendi',
     prenom: 'Salem',
-    email: 'admin@dgda.cd',
+    email: 'director@dgda.cd',
     matricule: 'DGDA-DIR-089',
-    role: 'admin',
+    role: 'director',
     grade: 'Directeur Provincial / Chef de Division',
     unite: 'DRK Lubumbashi',
     avatarInitials: 'SM',
@@ -1699,7 +1699,7 @@ export const mockRenseignements: RenseignementItem[] = [
     cotePar: 'Salem Mukendi (Directeur Provincial DRK)',
     coteA: 'Contrôleur David Mwamba (Section Exonérations)',
     dateCotation: '2026-08-30',
-    degreFiabilite: 'B1 — Constat administratif de passage',
+    degreFiabilite: 'B1 — Constat directoristratif de passage',
     priorite: 'NORMALE',
     instructionCotation: 'Planifier descente in situ avec l’inspecteur en chef. Réquisitionner l’acte d’affectation sur site.',
     delaiPrescritJours: 15,

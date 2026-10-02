@@ -275,27 +275,23 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
    TRANSITIONS DE VUE — FADE & MICRO-SLIDE UP (Proposition 1)
    Animation fluide, native et optimisée GPU pour le changement de vues
    ========================================================================== */
-@keyframes viewFadeSlideIn {
+@keyframes viewFadeIn {
   from {
     opacity: 0;
-    transform: translateY(6px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
 .view-transition {
-  animation: viewFadeSlideIn 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  will-change: opacity, transform;
+  animation: viewFadeIn 150ms ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .view-transition {
     animation: none !important;
     opacity: 1 !important;
-    transform: none !important;
   }
 }
 
@@ -498,13 +494,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .modal-backdrop-responsive {
   position: fixed;
   inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
   background-color: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 99999;
   padding: 20px;
 }
 
@@ -518,6 +520,31 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+/* Supprimer l'affichage de la barre de scroll sur les formulaires scrollables tout en maintenant le défilement */
+.modal-card-responsive::-webkit-scrollbar,
+.modal-card-responsive form::-webkit-scrollbar,
+.modal-card-responsive *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.modal-card-responsive form,
+.modal-card-responsive * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+/* Verrouillage du scroll de la page de fond lorsqu'une modale est ouverte */
+body:has(.modal-backdrop-responsive) {
+  overflow: hidden !important;
+}
+body:has(.modal-backdrop-responsive) .app-scroll-area {
+  overflow: hidden !important;
 }
 
 /* Barre mobile (uniquement visible sur mobile <= 768px) */

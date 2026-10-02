@@ -13,12 +13,10 @@ import type {
   RenseignementItem,
   UserAccount,
   Priorite,
-  DossierEnquete,
-  DemandeCommunication,
-  FeuilleObservation,
-  PvDetail
+  DossierEnquete
 } from '../types';
 import { TablePagination } from './common/TablePagination';
+import { ModalPortal } from './common/ModalPortal';
 
 interface RenseignementsViewProps {
   renseignements?: RenseignementItem[];
@@ -76,7 +74,6 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   const [formObjet, setFormObjet] = useState('');
   const [formPiecesDisponibles, setFormPiecesDisponibles] = useState('');
   const [formUploadedFiles, setFormUploadedFiles] = useState<File[]>([]);
-  const [formPriorite, setFormPriorite] = useState<'NORMALE' | 'URGENTE' | 'SIGNALEE'>('NORMALE');
   const [formAffectation, setFormAffectation] = useState('');
   const [formInstructions, setFormInstructions] = useState('');
 
@@ -211,9 +208,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
       dossiersLies: [],
       coteA: (() => { const agent = agents.find((a) => a.id === formAffectation); return agent ? `${agent.prenom} ${agent.nom}` : ''; })(),
       degreFiabilite: '',
-      priorite: formPriorite,
       instructionCotation: formInstructions.trim(),
-      delaiPrescritJours: formPriorite === 'URGENTE' ? 7 : 15,
     };
 
     setIsSaving(true);
@@ -233,15 +228,39 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
     }
   };
 
-  // Ouverture du modal de création de dossier pré-rempli
+  // Vérifie si l'utilisateur courant est formellement l'inspecteur désigné (coteA)
+  const checkIsAssignedInspector = (ren: RenseignementItem | null): boolean => {
+    if (!ren) return false;
+    if (ren.assigneeId !== undefined) return String(ren.assigneeId) === currentUser.id;
+    const coteA = (ren.coteA || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+    if (!coteA) return false;
+    const prenom = (currentUser.prenom || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+    const nom = (currentUser.nom || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+    return Boolean(prenom && nom && coteA.includes(prenom) && coteA.includes(nom));
+  };
+
+  // Ouverture du modal de création de dossier pré-rempli (uniquement pour l'inspecteur affecté)
   const handleOpenCreateDossierModal = () => {
-    if (!selectedRenseignement) return;
+    if (!selectedRenseignement || !checkIsAssignedInspector(selectedRenseignement)) return;
     setActionError(null);
 
     setDossierNom('');
     setDossierObjet(selectedRenseignement.objet);
     setDossierResponsable(selectedRenseignement.coteA || `${currentUser.prenom} ${currentUser.nom}`);
-    const matchingAgent = agents.find((agent) => `${agent.prenom} ${agent.nom}` === selectedRenseignement.coteA);
+    const matchingAgent = agents.find((agent) => selectedRenseignement.assigneeId !== undefined
+      ? agent.id === String(selectedRenseignement.assigneeId)
+      : `${agent.prenom} ${agent.nom}` === selectedRenseignement.coteA);
     setDossierAssigneeId(matchingAgent?.id || '');
     setDossierPriorite((selectedRenseignement.priorite as Priorite) || 'NORMALE');
     setShowCreateDossierModal(true);
@@ -250,7 +269,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   // Soumission de la création de dossier depuis le renseignement
   const handleCreateDossierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRenseignement || !dossierNom.trim() || !dossierAssigneeId || isSaving) return;
+    if (!selectedRenseignement || !dossierNom.trim() || !dossierAssigneeId || isSaving || !checkIsAssignedInspector(selectedRenseignement)) return;
 
     const newDossierData = {
       assigneeId: Number(dossierAssigneeId),
@@ -296,75 +315,15 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
     const hasDossier = selectedRenseignement.dossiersLies && selectedRenseignement.dossiersLies.length > 0;
     const pieces = selectedRenseignement.piecesDisponibles || [];
 
+    // Seul l'inspecteur formellement affecté (coteA) peut créer le dossier d'enquête
+    const isAssignedInspector = checkIsAssignedInspector(selectedRenseignement);
+
     const linkedDossier = dossiers.find((d) =>
       selectedRenseignement.dossiersLies && (
         selectedRenseignement.dossiersLies.includes(d.id) ||
         selectedRenseignement.dossiersLies.includes(d.reference)
       )
     ) || null;
-
-    const rawDemandes = linkedDossier ? demandesParDossier[linkedDossier.id] : [];
-    const linkedDemandes: DemandeCommunication[] = Array.isArray(rawDemandes)
-      ? rawDemandes
-      : (rawDemandes ? [rawDemandes] : []);
-
-    const rawFeuilles = linkedDossier ? feuillesParDossier[linkedDossier.id] : [];
-    const linkedFeuilles: FeuilleObservation[] = Array.isArray(rawFeuilles)
-      ? rawFeuilles
-      : (rawFeuilles ? [rawFeuilles] : []);
-
-    const rawPvs = linkedDossier ? pvsParDossier[linkedDossier.id] : [];
-    const linkedPvs: PvDetail[] = Array.isArray(rawPvs)
-      ? rawPvs
-      : (rawPvs ? [rawPvs] : []);
-
-    // Statut demande de communication
-    let demandeStatusText = 'Non lancée';
-    let demandeStatusDetail = 'Aucune réquisition de communication émise';
-    if (linkedDemandes.length > 0) {
-      const d = linkedDemandes[0];
-      if (d.evaluationReponse === 'SATISFAISANTE') {
-        demandeStatusText = 'Réponse satisfaisante';
-        demandeStatusDetail = `Justificatifs conformes (${d.reference}) — Clôture sans suite`;
-      } else if (d.evaluationReponse === 'NON_SATISFAISANTE') {
-        demandeStatusText = 'Réponse non satisfaisante';
-        demandeStatusDetail = `Défaut de justificatifs (${d.reference}) — Feuille d’observation requise`;
-      } else if (d.statut === 'REPONSE_COMPLETE') {
-        demandeStatusText = 'Réponse reçue';
-        demandeStatusDetail = `Réponse enregistrée (${d.reference}) — En cours d’évaluation`;
-      } else {
-        demandeStatusText = 'Émise & Notifiée';
-        demandeStatusDetail = `Réquisition notifiée (${d.reference}) — Réponse attendue`;
-      }
-    }
-
-    // Statut feuille d'observation
-    let feuilleStatusText = 'Non initiée';
-    let feuilleStatusDetail = 'Aucune feuille d’observation contradictoire';
-    if (linkedFeuilles.length > 0) {
-      const f = linkedFeuilles[0];
-      if (f.decisionFinale === 'CLASSE_SANS_SUITE') {
-        feuilleStatusText = 'Satisfaite & Clôturée';
-        feuilleStatusDetail = `Constats levés (${f.reference}) — Dossier classé sans suite`;
-      } else if (f.decisionFinale === 'PV_INFRACTION_GLEC') {
-        feuilleStatusText = 'Contradictoire clos — PV dressé';
-        feuilleStatusDetail = `Infractions retenues (${f.reference})`;
-      } else {
-        feuilleStatusText = 'Notifiée — En cours';
-        feuilleStatusDetail = `Feuille notifiée (${f.reference}) — Audition contradictoire`;
-      }
-    }
-
-    // Statut procès-verbal
-    let pvStatusText = 'Aucun PV dressé';
-    let pvStatusDetail = 'Aucune infraction répressive actée';
-    if (linkedPvs.length > 0) {
-      pvStatusText = 'Dressé & Transmis';
-      pvStatusDetail = `PV n° ${linkedPvs[0].reference} transmis au contentieux`;
-    } else if (linkedDossier && linkedDossier.hasPv) {
-      pvStatusText = 'Dressé & Transmis';
-      pvStatusDetail = 'Procès-verbal d’infraction transmis au contentieux';
-    }
 
     return (
       <div key={`renseignement-detail-${selectedRenseignement.id}`} className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
@@ -463,7 +422,10 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
               {hasDossier ? (
                 <button
                   type="button"
-                  onClick={() => onOpenDossier(selectedRenseignement.dossiersLies[0])}
+                  onClick={() => {
+                    const targetId = linkedDossier ? linkedDossier.id : (selectedRenseignement.dossiersLies?.[0] || '');
+                    if (targetId) onOpenDossier(targetId);
+                  }}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -481,7 +443,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                   <span>Consulter le dossier d’enquête rattaché</span>
                   <ExternalLink size={13} />
                 </button>
-              ) : (
+              ) : isAssignedInspector ? (
                 <button
                   type="button"
                   onClick={handleOpenCreateDossierModal}
@@ -500,9 +462,9 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                   }}
                 >
                   <FolderPlus size={15} />
-                  <span>Création du dossier</span>
+                  <span>Créer un dossier</span>
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -531,12 +493,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
             </div>
 
             <div style={{ backgroundColor: 'none', border: 'none', padding: '16px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-                Niveau de priorité & Délai
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '6px' }}>
-                {selectedRenseignement.priorite || 'NORMALE'}
-              </div>
+
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
                 Délai d’instruction prescrit : {selectedRenseignement.delaiPrescritJours || 15} jours
               </div>
@@ -598,20 +555,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
             </div>
 
             {/* Suivi des actes du dossier lié */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingBottom: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px', fontSize: '12px' }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Demande de communication :</span>
-                <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{demandeStatusText} — {demandeStatusDetail}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px', fontSize: '12px' }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Feuille d'observation :</span>
-                <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{feuilleStatusText} — {feuilleStatusDetail}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px', fontSize: '12px' }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Procès-verbal :</span>
-                <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{pvStatusText} — {pvStatusDetail}</span>
-              </div>
-            </div>
+
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {!selectedRenseignement.cycleEvolution?.length && (
@@ -674,43 +618,25 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
               ))}
             </div>
           </div>
-
-          {/* CTA Bas de page si pas encore de dossier */}
-          {!hasDossier && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '16px 20px',
-                borderRadius: 'var(--radius-card)',
-                border: '1px solid var(--color-border)',
-                backgroundColor: 'var(--color-surface)',
-              }}
-            >
-         
-
-           
-            </div>
-          )}
         </div>
 
         {/* Modal de Création de Dossier depuis le Renseignement */}
         {showCreateDossierModal && (
-          <div
-            className="modal-backdrop-responsive"
-            style={{
-              position: 'fixed',
-              inset: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.65)',
-              backdropFilter: 'blur(4px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000,
-              padding: '20px',
-            }}
-          >
+          <ModalPortal>
+            <div
+              className="modal-backdrop-responsive"
+              style={{
+                position: 'fixed',
+                inset: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 99999,
+                padding: '20px',
+              }}
+            >
             <div
               className="modal-card-responsive"
               style={{
@@ -983,6 +909,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
               </form>
             </div>
           </div>
+          </ModalPortal>
         )}
       </div>
     );
@@ -1036,8 +963,8 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
           </div>
         </div>
 
-        {/* Bouton Nouvelle Demande de Renseignement (Admin) */}
-        {currentUser.role === 'admin' && (
+        {/* Bouton Nouvelle Demande de Renseignement (director) */}
+        {currentUser.role === 'director' && (
           <button
             type="button"
             onClick={() => setShowCreateRenseignementModal(true)}
@@ -1230,22 +1157,23 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
         />
       </div>
 
-      {/* Modal : Nouvelle Demande de Renseignement (Admin) */}
+      {/* Modal : Nouvelle Demande de Renseignement (director) */}
       {showCreateRenseignementModal && (
-        <div
-          className="modal-backdrop-responsive"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px',
-          }}
-        >
+        <ModalPortal>
+          <div
+            className="modal-backdrop-responsive"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.65)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 99999,
+              padding: '20px',
+            }}
+          >
           <div
             className="modal-card-responsive"
             style={{
@@ -1267,9 +1195,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                 <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>
                   Nouvelle Demande de Renseignement
                 </h3>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                  Enregistrement, qualification et affectation de l’information à l'agent
-                </div>
+
               </div>
               <button
                 type="button"
@@ -1301,7 +1227,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                   }}
                 >
                   <option value="Douane )">Douane </option>
-                  <option value="Rapport de service administratif">Rapport de service administratif</option>
+                  <option value="Rapport de service directoristratif">Rapport de service directoristratif</option>
                   <option value="Informations de l’opinion">Informations de l’opinion </option>
                 
                 </select>
@@ -1383,48 +1309,11 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                   </div>
                 )}
 
-                <input
-                  type="text"
-                  placeholder="Désignation ou inventaire complémentaire (optionnel)..."
-                  value={formPiecesDisponibles}
-                  onChange={(e) => setFormPiecesDisponibles(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: 'var(--radius-btn)',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    color: 'var(--color-text-primary)',
-                    fontSize: '12px',
-                    outline: 'none',
-                  }}
-                />
+
               </div>
 
               {/* Niveau de priorité (Date prise automatiquement à la date du jour) */}
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '5px' }}>
-                  Niveau de priorité
-                </label>
-                <select
-                  value={formPriorite}
-                  onChange={(e) => setFormPriorite(e.target.value as any)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: 'var(--radius-btn)',
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    color: 'var(--color-text-primary)',
-                    fontSize: '12px',
-                    outline: 'none',
-                  }}
-                >
-                  <option value="NORMALE">Normale (15 jours)</option>
-                  <option value="URGENTE">Urgente (7 jours)</option>
-                  <option value="SIGNALEE">Signalée (20 jours)</option>
-                </select>
-              </div>
+
 
               {/* Affectation à qui (Agent désigné) */}
               <div>
@@ -1516,6 +1405,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

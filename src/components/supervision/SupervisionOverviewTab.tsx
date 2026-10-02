@@ -63,6 +63,70 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
       .slice(0, 4);
   }, [dossiers]);
 
+  // Courbe d'évolution dynamique des renseignements dans le mois
+  const sparklineData = useMemo(() => {
+    if (!renseignements || renseignements.length === 0) {
+      return { path: 'M 2 28 L 124 28', lastX: 124, lastY: 28 };
+    }
+
+    const validDates = renseignements
+      .map((r) => r.dateReception)
+      .filter(Boolean)
+      .sort();
+
+    const targetMonth = validDates.length > 0
+      ? validDates[validDates.length - 1].slice(0, 7)
+      : new Date().toISOString().slice(0, 7);
+
+    const [yearStr, monthStr] = targetMonth.split('-');
+    const year = parseInt(yearStr, 10) || new Date().getFullYear();
+    const month = parseInt(monthStr, 10) || (new Date().getMonth() + 1);
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    // Échantillonnage régulier sur le mois pour tracer la courbe d'évolution
+    const sampleDays = [1, 5, 10, 15, 20, 25, daysInMonth];
+    const rawData = sampleDays.map((day) => {
+      const dStr = `${targetMonth}-${String(day).padStart(2, '0')}`;
+      const count = renseignements.filter((r) => r.dateReception && r.dateReception <= dStr).length;
+      return { day, count };
+    });
+
+    const counts = rawData.map((d) => d.count);
+    const minVal = Math.min(...counts);
+    const maxVal = Math.max(...counts);
+
+    const minX = 2;
+    const maxX = 124;
+    const minY = 6;
+    const maxY = 28;
+
+    const points = rawData.map((d) => {
+      const x = minX + ((d.day - 1) / (daysInMonth - 1)) * (maxX - minX);
+      const y = maxVal > minVal
+        ? maxY - ((d.count - minVal) / (maxVal - minVal)) * (maxY - minY)
+        : (minY + maxY) / 2;
+      return { x: Number(x.toFixed(1)), y: Number(y.toFixed(1)) };
+    });
+
+    let path = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[Math.max(0, i - 1)];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[Math.min(points.length - 1, i + 2)];
+
+      const cp1x = Number((p1.x + (p2.x - p0.x) / 6).toFixed(1));
+      const cp1y = Number((p1.y + (p2.y - p0.y) / 6).toFixed(1));
+      const cp2x = Number((p2.x - (p3.x - p1.x) / 6).toFixed(1));
+      const cp2y = Number((p2.y - (p3.y - p1.y) / 6).toFixed(1));
+
+      path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+    }
+
+    const lastPoint = points[points.length - 1];
+    return { path, lastX: lastPoint.x, lastY: lastPoint.y };
+  }, [renseignements]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Section KPI : Disposition type Dashboard moderne (1 Grande carte à gauche + 3 Cartes empilées à droite) */}
@@ -108,8 +172,18 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
                 </div>
               </div>
 
-              {/* Période fournie par le serveur */}
-              <div style={{ width: '130px', height: '36px', opacity: 0.85 }}>
+              {/* Courbe des ressources chargées et période fournie par le serveur */}
+              <div style={{ width: '130px', display: 'flex', flexDirection: 'column', gap: '4px', opacity: 0.85 }}>
+                <svg width="100%" height="36" viewBox="0 0 130 36" fill="none">
+                  <path
+                    d={sparklineData.path}
+                    fill="none"
+                    stroke="var(--color-accent)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                  <circle cx={sparklineData.lastX} cy={sparklineData.lastY} r="3" fill="var(--color-accent)" />
+                </svg>
                 <span style={{ color: 'var(--color-text-muted)', fontSize: '11px' }}>
                   {statistics ? `${statistics.start} – ${statistics.end}` : 'Période indisponible'}
                 </span>

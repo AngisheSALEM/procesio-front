@@ -11,7 +11,7 @@ export function userAccount(user: ApiUser, role = user.memberships[0]?.role): Us
   const nom = user.last_name || user.username;
   return {
     id: String(user.id), prenom, nom, email: user.email || '', matricule: '',
-    role: role === 'manager' ? 'admin' : 'enqueteur', grade: '',
+    role: role === 'manager' ? 'director' : 'enqueteur', grade: '',
     unite: user.memberships[0]?.unit.name || '',
     avatarInitials: `${prenom.charAt(0)}${nom.charAt(0)}`.toUpperCase(),
   };
@@ -57,6 +57,7 @@ export function renseignementFromApi(item: ApiIntelligence, agents: ApiUser[], u
     niveauAcces: item.classification === 1 ? 'Restreint' : 'Interne',
     serviceDestinataire: unitNames.get(item.unit) || '', statut: 'Enregistré', dossiersLies: [],
     piecesDisponibles: item.available_pieces ? [item.available_pieces] : [],
+    assigneeId: item.assignee,
     coteA: agentName(item.assignee, agents), cotePar: item.rated_by ? agentName(item.rated_by, agents) : undefined,
     dateCotation: item.rated_at?.slice(0, 10), degreFiabilite: item.reliability || undefined,
     priorite: item.priority === 'urgent' ? 'URGENTE' : item.priority === 'flagged' ? 'SIGNALEE' : 'NORMALE',

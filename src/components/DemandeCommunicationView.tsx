@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { DemandeCommunication, FeuilleObservation, UserAccount } from '../types';
 import { formatDate } from '../utils/dateUtils';
+import { ModalPortal } from './common/ModalPortal';
 
 const fileSizeLabel = (file: File) => `${Math.round(file.size / 1024)} Ko`;
 
@@ -351,20 +352,21 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
   };
 
   const renderCreateModal = () => (
-    <div
-      className="modal-backdrop-responsive"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.65)',
-        backdropFilter: 'blur(4px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: '20px',
-      }}
-    >
+    <ModalPortal>
+      <div
+        className="modal-backdrop-responsive"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px',
+        }}
+      >
       <div
         className="modal-card-responsive"
         style={{
@@ -556,6 +558,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
         </form>
       </div>
     </div>
+  </ModalPortal>
   );
 
   // =========================================================================
@@ -877,7 +880,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           }}
         >
           <div>
-            {/* Référence administrative : JAMAIS en gras, JAMAIS en couleur accent */}
+            {/* Référence directoristrative : JAMAIS en gras, JAMAIS en couleur accent */}
             {/* <div
               className="font-sf"
               style={{
@@ -1315,8 +1318,9 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           5. Fichier PDF
           ========================================================================= */}
       {showCreateModal && (
-        <div
-          className="modal-backdrop-responsive"
+        <ModalPortal>
+          <div
+            className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1607,6 +1611,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             </form>
           </div>
         </div>
+      </ModalPortal>
       )}
 
       {/* =========================================================================
@@ -1618,8 +1623,9 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           5. Document PDF joint
           ========================================================================= */}
       {showFeuilleModal && (
-        <div
-          className="modal-backdrop-responsive"
+        <ModalPortal>
+          <div
+            className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1894,6 +1900,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             </form>
           </div>
         </div>
+      </ModalPortal>
       )}
 
       {/* =========================================================================
@@ -1905,8 +1912,9 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           5. Observations de l'enquêteur
           ========================================================================= */}
       {showReponseModal && (
-        <div
-          className="modal-backdrop-responsive"
+        <ModalPortal>
+          <div
+            className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -2100,6 +2108,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             </form>
           </div>
         </div>
+      </ModalPortal>
       )}
 
       {/* =========================================================================
@@ -2108,8 +2117,9 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           et d'enregistrer ce motif pour classer le dossier sans suite.
           ========================================================================= */}
       {showSatisfactionModal && (
-        <div
-          className="modal-backdrop-responsive"
+        <ModalPortal>
+          <div
+            className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -2282,6 +2292,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             </form>
           </div>
         </div>
+      </ModalPortal>
       )}
 
       {/* =========================================================================
@@ -2290,8 +2301,9 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           et de joindre la pièce justificative associée à ce revirement.
           ========================================================================= */}
       {showRevirementModal && (
-        <div
-          className="modal-backdrop-responsive"
+        <ModalPortal>
+          <div
+            className="modal-backdrop-responsive"
           style={{
             position: 'fixed',
             inset: 0,
@@ -2499,6 +2511,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             </form>
           </div>
         </div>
+      </ModalPortal>
       )}
     </div>
   );

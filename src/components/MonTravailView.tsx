@@ -28,7 +28,7 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
 
   // Le serveur applique déjà les droits et renvoie les dossiers nécessitant une action.
   const workCaseIds = new Set(workItems.map((item) => item.case));
-  const visibleDossiers = user.role === 'admin' ? dossiers : dossiers.filter((d) => workCaseIds.has(d.id));
+  const visibleDossiers = user.role === 'director' ? dossiers : dossiers.filter((d) => workCaseIds.has(d.id));
 
   // Filter dossiers
   const filteredDossiers = visibleDossiers.filter((d) => {

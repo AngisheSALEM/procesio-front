@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'enqueteur';
+export type UserRole = 'director' | 'enqueteur';
 
 export interface UserAccount {
   id: string;
@@ -405,6 +405,7 @@ export interface RenseignementItem {
   // Cotation managériale (Savoir qui a été coté)
   cotePar?: string;
   coteA?: string;
+  assigneeId?: number;
   dateCotation?: string;
   degreFiabilite?: string;
   priorite?: 'NORMALE' | 'URGENTE' | 'SIGNALEE';

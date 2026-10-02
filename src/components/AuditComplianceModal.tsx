@@ -6,6 +6,7 @@ import {
   Shield
 } from 'lucide-react';
 import type { AuditReport } from '../hooks/useDesignSystemAudit';
+import { ModalPortal } from './common/ModalPortal';
 
 interface AuditComplianceModalProps {
   isOpen: boolean;
@@ -23,8 +24,9 @@ export const AuditComplianceModal: React.FC<AuditComplianceModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="modal-backdrop-responsive"
+    <ModalPortal>
+      <div
+        className="modal-backdrop-responsive"
       style={{
         position: 'fixed',
         inset: 0,
@@ -369,5 +371,6 @@ export const AuditComplianceModal: React.FC<AuditComplianceModalProps> = ({
         </div>
       </div>
     </div>
+  </ModalPortal>
   );
 };

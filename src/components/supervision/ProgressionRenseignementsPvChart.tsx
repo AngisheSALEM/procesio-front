@@ -159,7 +159,7 @@ export const ProgressionRenseignementsPvChart: React.FC<ProgressionRenseignement
                 style={{
                   background: isActive ? 'var(--color-surface-elevated)' : 'transparent',
                   border: 'none',
-                  color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                  color: isActive ? 'var(--color-accent)' : 'var(--color-text-muted)',
                   fontSize: '11px',
                   fontWeight: isActive ? 700 : 500,
                   padding: '3px 9px',
@@ -211,9 +211,9 @@ export const ProgressionRenseignementsPvChart: React.FC<ProgressionRenseignement
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',
-                color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                color: isSelected ? 'var(--color-accent)' : 'var(--color-text-muted)',
                 fontWeight: isSelected ? 600 : 400,
-                borderBottom: isSelected ? '1.5px solid var(--color-text-primary)' : '1.5px solid transparent',
+                borderBottom: isSelected ? '1.5px solid var(--color-accent)' : '1.5px solid transparent',
                 transition: 'color var(--transition-fast), border-color var(--transition-fast)',
               }}
               onMouseEnter={(e) => {
@@ -227,7 +227,7 @@ export const ProgressionRenseignementsPvChart: React.FC<ProgressionRenseignement
               <span
                 style={{
                   fontSize: '10px',
-                  color: isSelected ? 'var(--color-text-secondary)' : 'var(--color-text-muted)',
+                  color: isSelected ? 'var(--color-text-accent)' : 'var(--color-text-muted)',
                   fontWeight: 500,
                 }}
               >

@@ -134,7 +134,7 @@ export function useAppController() {
     me.memberships.some((membership) => membership.role === 'manager') ? 'manager' : 'investigator',
   ) : null, [me]);
   const agentAccounts = useMemo(() => (workspace?.users || []).filter((user) => workspace?.restrictedAgentIds.includes(user.id)).map((user) => userAccount(user, user.id === me?.id
-    ? currentUser?.role === 'admin' ? 'manager' : 'investigator' : 'investigator')),
+    ? currentUser?.role === 'director' ? 'manager' : 'investigator' : 'investigator')),
   [workspace, me, currentUser]);
   const dossiers = workspace?.dossiers || [];
   const renseignements = workspace?.renseignements || [];
@@ -146,9 +146,10 @@ export function useAppController() {
   const visibleDossiers = dossiers;
   const visibleRenseignements = renseignements;
 
-  const fromHash = window.location.hash.match(/^#\/?dossier\/([0-9a-f-]{36})/i)?.[1];
-  const effectiveSelectedDossierId = visibleDossiers.find((item) => item.id === selectedDossierId)?.id
-    || visibleDossiers.find((item) => item.id === fromHash)?.id
+  const hashReference = window.location.hash.replace(/^#\/?/, '').split('?')[0];
+  const fromHash = hashReference.startsWith('dossier/') ? hashReference.slice('dossier/'.length) : '';
+  const effectiveSelectedDossierId = visibleDossiers.find((item) => item.id === fromHash || item.reference === fromHash)?.id
+    || visibleDossiers.find((item) => item.id === selectedDossierId || item.reference === selectedDossierId)?.id
     || visibleDossiers[0]?.id || '';
 
   useEffect(() => {
@@ -167,8 +168,9 @@ export function useAppController() {
       const route = window.location.hash.replace(/^#\/?/, '').split('?')[0];
       if (route.startsWith('dossier/')) {
         const id = route.slice('dossier/'.length);
-        if (visibleDossiers.some((item) => item.id === id)) {
-          setSelectedDossierId(id);
+        const target = visibleDossiers.find((item) => item.id === id || item.reference === id);
+        if (target) {
+          setSelectedDossierId(target.id);
           setActiveNav('dossier-detail');
         }
       } else if (NAV_ROUTES.has(route)) setActiveNav(route === 'dossiers-enquete' ? 'dossier-detail' : route);
@@ -206,18 +208,28 @@ export function useAppController() {
   }, []);
 
   const handleOpenDossier = useCallback((id: string, tab?: DossierTabId) => {
-    if (!visibleDossiers.some((item) => item.id === id)) return;
-    setSelectedDossierId(id);
+    const target = visibleDossiers.find((item) => item.id === id || item.reference === id);
+    if (!target) return;
+    setSelectedDossierId(target.id);
+    localStorage.setItem(STORAGE_SELECTED_DOSSIER, target.id);
     if (tab) setActiveDossierTab(tab);
     setActiveNav('dossier-detail');
+    window.location.hash = `#/dossier/${target.id}`;
   }, [visibleDossiers]);
 
   const handleCreateDossier = useCallback(async (data: DossierEnquete, intelligenceId?: string, assigneeId?: number) => {
     if (!workspace || !me) throw new Error('Données de session indisponibles.');
     let created: ApiCase | null = null;
     await mutate(async () => { created = await createCase(workspace, me, data, intelligenceId, assigneeId || (data as DossierEnquete & { assigneeId?: number }).assigneeId); });
-    if (created && currentUser?.role !== 'admin') handleOpenDossier((created as ApiCase).id);
-  }, [workspace, me, mutate, currentUser, handleOpenDossier]);
+    if (created) {
+      const id = (created as ApiCase).id;
+      setSelectedDossierId(id);
+      localStorage.setItem(STORAGE_SELECTED_DOSSIER, id);
+      setActiveDossierTab('vue-ensemble');
+      setActiveNav('dossier-detail');
+      window.location.hash = `#/dossier/${id}`;
+    }
+  }, [workspace, me, mutate]);
 
   const handleAddRenseignement = useCallback(async (item: RenseignementItem, files?: File[], assigneeId?: number) => {
     if (!workspace || !me) throw new Error('Données de session indisponibles.');
