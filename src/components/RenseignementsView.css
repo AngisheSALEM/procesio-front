@@ -1,0 +1,57 @@
+.renseignement-create-access {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.renseignement-create-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.renseignement-create-field > span {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.renseignement-create-field > select {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 8px 12px;
+  border-radius: var(--radius-btn);
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.renseignement-create-field > select:hover {
+  border-color: var(--color-text-secondary);
+}
+
+.renseignement-create-field > select:focus-visible {
+  outline: 2px solid var(--color-text-secondary);
+  outline-offset: 2px;
+}
+
+.renseignement-create-help {
+  margin: 6px 0 8px;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 480px) {
+  .renseignement-create-access {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

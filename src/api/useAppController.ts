@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DemandeCommunication, DossierEnquete, FeuilleObservation, PvDetail, RenseignementItem } from '../types';
 import type { DossierTabId } from '../components/DossierHeader';
-import { apiGet, getSession, login, logout, type ApiCase, type ApiUser } from './client';
+import { apiAll, apiGet, cancelSessionRequests, getSession, isSessionExpired, onSessionExpired, login, logout, type ApiCase, type ApiUser, type ApiWorkItem, type ApiValidationItem } from './client';
 import { userAccount } from './mappers';
-import { loadWorkspace, type WorkspaceData } from './workspace';
+import { loadWorkspace, loadSingleCaseDetails, type WorkspaceData } from './workspace';
 import {
   createCase, createIntelligence, createRequest, createSheet, proposeClassification,
-  saveRequest, saveSheet, updateIntelligence,
+  saveRequest, saveSheet, updateIntelligence, updateCase, assignCase, linkIntelligenceToCase,
 } from './actions';
 
 const STORAGE_THEME = 'procezo_theme';
@@ -32,6 +32,10 @@ export function useAppController() {
   const [workspace, setWorkspace] = useState<WorkspaceData | null>(null);
   const [authStatus, setAuthStatus] = useState<'loading' | 'unauthenticated' | 'authenticated' | 'error'>('loading');
   const [authError, setAuthError] = useState('');
+  const generation = useRef(0);
+  const mutationPending = useRef(false);
+  const loadingCasesRef = useRef<Set<string>>(new Set());
+  const [loggingOut, setLoggingOut] = useState(false);
   const [mutationError, setMutationError] = useState('');
   const [mutationInfo, setMutationInfo] = useState('');
   const [activeNav, setActiveNav] = useState(initialNav);
@@ -48,92 +52,182 @@ export function useAppController() {
   }, [theme]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_TAB, activeDossierTab);
-  }, [activeDossierTab]);
+    if (authStatus === 'authenticated') localStorage.setItem(STORAGE_TAB, activeDossierTab);
+  }, [authStatus, activeDossierTab]);
 
-  useEffect(() => {
-    let live = true;
-    async function boot() {
-      let authenticated = false;
-      try {
-        const session = await getSession();
-        if (!live) return;
-        if (!session.authenticated) {
-          setAuthStatus('unauthenticated');
-          return;
-        }
-        authenticated = true;
-        const user = await apiGet<ApiUser>('/me/');
-        if (live) setMe(user);
-        const data = await loadWorkspace(user);
-        if (!live) return;
-        setMe(user);
-        setWorkspace(data);
-        setAuthError('');
-        setAuthStatus('authenticated');
-      } catch (error) {
-        if (!live) return;
-        setAuthError(error instanceof Error ? error.message : 'Connexion au serveur impossible.');
-        setAuthStatus(authenticated ? 'error' : 'unauthenticated');
-      }
-    }
-    void boot();
-    return () => { live = false; };
+  const clearSession = useCallback((message = '') => {
+    cancelSessionRequests();
+    generation.current += 1;
+    setMe(null);
+    setWorkspace(null);
+    setAuthError(message);
+    setMutationError('');
+    setMutationInfo('');
+    setSelectedDossierId('');
+    setActiveNav('mon-travail');
+    setActiveDossierTab('vue-ensemble');
+    for (const key of [STORAGE_NAV, STORAGE_TAB, STORAGE_SELECTED_DOSSIER]) localStorage.removeItem(key);
+    window.location.hash = '';
+    setAuthStatus('unauthenticated');
   }, []);
 
-  const refreshWorkspace = useCallback(async (user = me) => {
-    if (!user) throw new Error('Session expirée. Reconnectez-vous.');
-    const data = await loadWorkspace(user);
-    setWorkspace(data);
-    return data;
-  }, [me]);
+  const expireSession = useCallback(() => clearSession('Votre session a expiré. Reconnectez-vous.'), [clearSession]);
 
-  const handleLogin = useCallback(async (username: string, password: string) => {
-    setAuthError('');
-    await login(username, password);
-    const user = await apiGet<ApiUser>('/me/');
-    setMe(user);
-    setAuthStatus('loading');
-    const data = await loadWorkspace(user);
-    setMe(user);
-    setWorkspace(data);
-    setAuthError('');
-    setAuthStatus('authenticated');
-    setActiveNav(user.memberships.some((membership) => membership.role === 'manager') ? 'rapports-stats' : 'mon-travail');
-  }, []);
-
-  const retryWorkspace = useCallback(async () => {
-    setAuthStatus('loading');
-    setAuthError('');
+  const loadSession = useCallback(async (ticket: number) => {
     try {
-      const user = me || await apiGet<ApiUser>('/me/');
-      const data = await loadWorkspace(user);
+      const session = await getSession();
+      if (ticket !== generation.current) return;
+      if (!session.authenticated) { clearSession(); return; }
+      const user = await apiGet<ApiUser>('/me/');
+      if (ticket !== generation.current) return;
+      const savedDossier = localStorage.getItem(STORAGE_SELECTED_DOSSIER) || '';
+      const hashRef = window.location.hash.replace(/^#\/?/, '').split('?')[0];
+      const fromHash = hashRef.startsWith('dossier/') ? hashRef.slice('dossier/'.length) : '';
+      const data = await loadWorkspace(user, fromHash || savedDossier || undefined);
+      if (ticket !== generation.current) return;
       setMe(user);
       setWorkspace(data);
+      setAuthError('');
       setAuthStatus('authenticated');
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Actualisation impossible.');
+      if (ticket !== generation.current) return;
+      if (isSessionExpired(error)) { expireSession(); return; }
+      setAuthError(error instanceof Error ? error.message : 'Connexion au serveur impossible.');
       setAuthStatus('error');
     }
-  }, [me]);
+  }, [clearSession, expireSession]);
+
+  useEffect(() => {
+    const unsubscribe = onSessionExpired(expireSession);
+    const ticket = ++generation.current;
+    void loadSession(ticket);
+    return () => { generation.current += 1; cancelSessionRequests(); unsubscribe(); };
+  }, [loadSession, expireSession]);
+
+  useEffect(() => {
+    if (authStatus !== 'authenticated') return;
+    let checking = false;
+    let live = true;
+    const checkSession = async () => {
+      if (checking || document.visibilityState === 'hidden') return;
+      checking = true;
+      const ticket = generation.current;
+      try {
+        const session = await getSession();
+        if (live && ticket === generation.current && !session.authenticated) expireSession();
+      } catch {
+        // A temporary network failure does not establish that the session expired.
+      } finally { checking = false; }
+    };
+    const interval = window.setInterval(() => void checkSession(), 60_000);
+    window.addEventListener('focus', checkSession);
+    document.addEventListener('visibilitychange', checkSession);
+    return () => {
+      live = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', checkSession);
+      document.removeEventListener('visibilitychange', checkSession);
+    };
+  }, [authStatus, expireSession]);
+
+  const refreshWorkspace = useCallback(async (targetCaseId?: string) => {
+    const ticket = generation.current;
+    if (targetCaseId && workspace && me) {
+      try {
+        const caseItem = await apiGet<ApiCase>(`/dossiers/${encodeURIComponent(targetCaseId)}/`);
+        if (ticket !== generation.current) return;
+        const updated = await loadSingleCaseDetails(targetCaseId, workspace, me);
+        if (ticket !== generation.current) return;
+        const memberships = me.memberships.filter((m) => m.role === 'manager' || m.role === 'investigator');
+        const workItems = (await Promise.all(['cases', 'requests', 'decisions'].map((kind) =>
+          apiAll<ApiWorkItem>(`/mon-travail/?kind=${kind}&page_size=100`).catch(() => [])
+        ))).flat();
+        const validationItems: ApiValidationItem[] = [];
+        if (memberships.some((m) => m.role === 'manager')) {
+          const valResults = await Promise.all(['requests', 'decisions'].map((kind) =>
+            apiAll<ApiValidationItem>(`/a-valider/?kind=${kind}&page_size=100`).catch(() => [])
+          ));
+          validationItems.push(...valResults.flat());
+        }
+        if (ticket !== generation.current) return;
+        const resultWorkspace: WorkspaceData = {
+          ...updated,
+          cases: updated.cases.map((c) => c.id === targetCaseId ? caseItem : c),
+          workItems,
+          validationItems,
+        };
+        setWorkspace(resultWorkspace);
+        return resultWorkspace;
+      } catch (err) {
+        if (isSessionExpired(err)) throw err;
+        // Fall back to full load if targeted single-case refresh fails
+      }
+    }
+    // Delegations may have expired or been revoked since login.
+    try {
+      const user = await apiGet<ApiUser>('/me/');
+      if (ticket !== generation.current) return;
+      const data = await loadWorkspace(user, targetCaseId || undefined);
+      if (ticket !== generation.current) return;
+      setMe(user);
+      setWorkspace(data);
+      return data;
+    } catch (error) {
+      if (ticket === generation.current && !isSessionExpired(error)) {
+        setAuthError(error instanceof Error ? error.message : 'Actualisation impossible.');
+        setAuthStatus('error');
+      }
+      throw error;
+    }
+  }, [workspace, me]);
+
+  const handleLogin = useCallback(async (username: string, password: string) => {
+    cancelSessionRequests();
+    const ticket = ++generation.current;
+    setAuthError('');
+    try {
+      await login(username, password);
+    } catch (error) {
+      if (ticket !== generation.current) return;
+      setAuthError(error instanceof Error ? error.message : 'Connexion impossible.');
+      setAuthStatus('unauthenticated');
+      return;
+    }
+    if (ticket !== generation.current) return;
+    setAuthStatus('loading');
+    await loadSession(ticket);
+  }, [loadSession]);
+
+  const retryWorkspace = useCallback(async () => {
+    cancelSessionRequests();
+    setAuthStatus('loading');
+    setAuthError('');
+    await loadSession(++generation.current);
+  }, [loadSession]);
 
   const handleLogout = useCallback(async () => {
+    if (loggingOut) return;
+    // Invalidate refreshes already in flight so they cannot restore the old account.
+    generation.current += 1;
+    cancelSessionRequests();
+    setLoggingOut(true);
+    setMutationError('');
     try {
+      await getSession();
       await logout();
-      setMe(null);
-      setWorkspace(null);
-      setAuthStatus('unauthenticated');
-      setMutationError('');
-      window.location.hash = '';
+      clearSession();
     } catch (error) {
-      setMutationError(error instanceof Error ? error.message : 'Déconnexion impossible.');
+      if (isSessionExpired(error)) clearSession();
+      else setMutationError(error instanceof Error ? error.message : 'Déconnexion impossible. Réessayez.');
+    } finally {
+      setLoggingOut(false);
     }
-  }, []);
+  }, [clearSession, loggingOut]);
 
   const currentUser = useMemo(() => me ? userAccount(me,
     me.memberships.some((membership) => membership.role === 'manager') ? 'manager' : 'investigator',
   ) : null, [me]);
-  const agentAccounts = useMemo(() => (workspace?.users || []).filter((user) => workspace?.restrictedAgentIds.includes(user.id)).map((user) => userAccount(user, user.id === me?.id
+  const agentAccounts = useMemo(() => (workspace?.users || []).filter((user) => workspace?.assignableAgentIds.includes(user.id)).map((user) => userAccount(user, user.id === me?.id
     ? currentUser?.role === 'director' ? 'manager' : 'investigator' : 'investigator')),
   [workspace, me, currentUser]);
   const dossiers = workspace?.dossiers || [];
@@ -179,27 +273,58 @@ export function useAppController() {
     return () => window.removeEventListener('hashchange', onHash);
   }, [visibleDossiers]);
 
+  useEffect(() => {
+    if (authStatus !== 'authenticated' || !effectiveSelectedDossierId || !me || !workspace) return;
+    if (workspace.loadedCaseIds?.has(effectiveSelectedDossierId)) return;
+    if (loadingCasesRef.current.has(effectiveSelectedDossierId)) return;
+    loadingCasesRef.current.add(effectiveSelectedDossierId);
+    void (async () => {
+      try {
+        const updated = await loadSingleCaseDetails(effectiveSelectedDossierId, workspace, me);
+        setWorkspace((prev) => prev ? {
+          ...updated,
+          loadedCaseIds: new Set([...(prev.loadedCaseIds || []), effectiveSelectedDossierId]),
+        } : null);
+      } catch (error) {
+        if (!isSessionExpired(error)) {
+          console.error(`Erreur de chargement du dossier ${effectiveSelectedDossierId}:`, error);
+        }
+      } finally {
+        loadingCasesRef.current.delete(effectiveSelectedDossierId);
+      }
+    })();
+  }, [authStatus, effectiveSelectedDossierId, me, workspace]);
+
   const currentDossier = visibleDossiers.find((item) => item.id === effectiveSelectedDossierId) || null;
   const currentDemandes = currentDossier ? demandesParDossier[currentDossier.id] || [] : [];
   const currentFeuilles = currentDossier ? feuillesParDossier[currentDossier.id] || [] : [];
   const currentPvs: PvDetail[] = [];
 
-  const mutate = useCallback(async (operation: () => Promise<unknown>, message?: string) => {
+  const mutate = useCallback(async (operation: () => Promise<unknown>, message?: string, targetCaseId?: string) => {
+    if (mutationPending.current || loggingOut) throw new Error('Une opération est déjà en cours.');
+    mutationPending.current = true;
+    const ticket = generation.current;
     setMutationError('');
     setMutationInfo('');
     let completed = false;
     try {
       await operation();
       completed = true;
-      await refreshWorkspace();
+      if (ticket !== generation.current) return;
+      await refreshWorkspace(targetCaseId);
+      if (ticket !== generation.current) return;
       if (message) setMutationInfo(message);
     } catch (error) {
+      if (ticket !== generation.current || isSessionExpired(error)) throw error;
       const detail = error instanceof Error ? error.message : 'L’opération a échoué.';
       setMutationError(completed ? `Écriture enregistrée, mais actualisation impossible : ${detail}` : detail);
-      if (!completed) await refreshWorkspace().catch(() => undefined);
+      if (completed) { setAuthError(detail); setAuthStatus('error'); }
+      else await refreshWorkspace(targetCaseId).catch(() => undefined);
       throw error;
+    } finally {
+      mutationPending.current = false;
     }
-  }, [refreshWorkspace]);
+  }, [refreshWorkspace, loggingOut]);
 
   const unsupported = useCallback(async (message: string): Promise<void> => {
     setMutationInfo('');
@@ -219,8 +344,10 @@ export function useAppController() {
 
   const handleCreateDossier = useCallback(async (data: DossierEnquete, intelligenceId?: string, assigneeId?: number) => {
     if (!workspace || !me) throw new Error('Données de session indisponibles.');
+    const ticket = generation.current;
     let created: ApiCase | null = null;
     await mutate(async () => { created = await createCase(workspace, me, data, intelligenceId, assigneeId || (data as DossierEnquete & { assigneeId?: number }).assigneeId); });
+    if (ticket !== generation.current) return;
     if (created) {
       const id = (created as ApiCase).id;
       setSelectedDossierId(id);
@@ -242,31 +369,47 @@ export function useAppController() {
   }, [workspace, me, mutate]);
 
   const handleAddDemande = useCallback(async (item: DemandeCommunication, file?: File) => {
-    await mutate(() => createRequest(item, file));
+    await mutate(() => createRequest(item, file), 'Brouillon enregistré. Ouvrez la demande pour préparer son PDF ; retrouvez les pièces jointes dans Documents.', item.dossierId);
   }, [mutate]);
 
   const handleSaveDemande = useCallback(async (item: DemandeCommunication, file?: File) => {
     if (!workspace) throw new Error('Données de session indisponibles.');
-    await mutate(() => saveRequest(workspace, item, file));
+    await mutate(() => saveRequest(workspace, item, file), undefined, item.dossierId);
   }, [workspace, mutate]);
 
   const handleAddFeuille = useCallback(async (item: FeuilleObservation, file?: File) => {
-    await mutate(() => createSheet(item, file));
+    await mutate(() => createSheet(item, file), undefined, item.dossierId);
   }, [mutate]);
 
   const handleSaveFeuille = useCallback(async (item: FeuilleObservation, file?: File) => {
     if (!workspace) throw new Error('Données de session indisponibles.');
-    await mutate(() => saveSheet(workspace, item, file));
+    await mutate(() => saveSheet(workspace, item, file), undefined, item.dossierId);
   }, [workspace, mutate]);
 
   const handleCloturerSansSuite = useCallback(async (reason: string, caseId?: string) => {
-    if (!workspace || (!caseId && !currentDossier)) throw new Error('Dossier indisponible.');
-    await mutate(() => proposeClassification(workspace, caseId || currentDossier!.id, reason),
-      'Proposition de classement enregistrée. Une validation hiérarchique reste nécessaire.');
+    const targetId = caseId || currentDossier?.id;
+    if (!workspace || !targetId) throw new Error('Dossier indisponible.');
+    await mutate(() => proposeClassification(workspace, targetId, reason),
+      'Proposition de classement enregistrée. Une validation hiérarchique reste nécessaire.', targetId);
   }, [workspace, currentDossier, mutate]);
 
+  const handleUpdateCase = useCallback(async (caseId: string, data: Parameters<typeof updateCase>[3]) => {
+    if (!workspace || !me) throw new Error('Données de session indisponibles.');
+    await mutate(() => updateCase(workspace, me, caseId, data), 'Dossier mis à jour avec succès.', caseId);
+  }, [workspace, me, mutate]);
+
+  const handleAssignCase = useCallback(async (caseId: string, newAssigneeId: number, reason: string, version: number) => {
+    if (!workspace || !me) throw new Error('Données de session indisponibles.');
+    await mutate(() => assignCase(workspace, me, caseId, newAssigneeId, reason, version), 'Dossier réaffecté avec succès.', caseId);
+  }, [workspace, me, mutate]);
+
+  const handleLinkIntelligence = useCallback(async (intelligenceId: string, caseId: string, version?: number) => {
+    if (!workspace) throw new Error('Données de session indisponibles.');
+    await mutate(() => linkIntelligenceToCase(workspace, intelligenceId, caseId, version), 'Renseignement lié au dossier avec succès.', caseId);
+  }, [workspace, mutate]);
+
   return {
-    authStatus, authError, mutationError, mutationInfo, setMutationError, setMutationInfo,
+    authStatus, authError, loggingOut, mutationError, mutationInfo, setMutationError, setMutationInfo,
     theme, toggleTheme: () => setTheme((value) => value === 'dark' ? 'light' : 'dark'),
     me, workspace, currentUser, agentAccounts, activeNav, setActiveNav,
     selectedDossierId, activeDossierTab, setActiveDossierTab,
@@ -274,11 +417,15 @@ export function useAppController() {
     demandesParDossier, feuillesParDossier, pvsParDossier, documentsParDossier,
     visibleDossiers, visibleRenseignements, currentDossier, currentDemandes, currentFeuilles, currentPvs,
     handleLogin, handleLogout, retryWorkspace, handleOpenDossier, handleCreateDossier,
+    handleUpdateCase, handleAssignCase, handleLinkIntelligence,
     handleAddRenseignement, handleUpdateRenseignement, handleAddDemande, handleSaveDemande,
     handleCancelDemande: () => unsupported('L’annulation d’une demande n’est pas disponible dans l’API.'),
     handleAddFeuille, handleSaveFeuille, handleCreateFeuilleFromDemande: handleAddFeuille,
     handleCloturerSansSuite,
-    handleRevirementJugement: () => unsupported('Le revirement requiert une nouvelle appréciation et une décision sur le serveur.'),
+    handleRevirementJugement: async () => {
+      setActiveDossierTab('vue-ensemble');
+      setMutationInfo('Dans Décisions et relais GELEC, choisissez une appréciation actuelle puis proposez un remplacement motivé.');
+    },
     handleAddPv: (_pv: PvDetail) => unsupported('La création de PV officiel attend la procédure métier validée.'),
     handleUpdatePv: (_pv: PvDetail) => unsupported('La modification de PV officiel attend la procédure métier validée.'),
     handleLancerPv: () => unsupported('La création de PV officiel attend la procédure métier validée.'),

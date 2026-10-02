@@ -10,12 +10,25 @@ import {
   RotateCcw
 } from 'lucide-react';
 import type { DemandeCommunication, FeuilleObservation, UserAccount } from '../types';
+import { requestStatusLabel } from '../utils/statusLabels';
 import { formatDate } from '../utils/dateUtils';
 import { ModalPortal } from './common/ModalPortal';
+import type { ApiAssessment, ApiDocument, ApiRequest, ApiResponse, ApiUser } from '../api/client';
+import { downloadFile } from '../api/client';
+import { RequestWorkflowPanel } from './RequestWorkflowPanel';
+import { RequestResponsesPanel } from './RequestResponsesPanel';
+import { DocumentPicker } from './common/DocumentPicker';
 
 const fileSizeLabel = (file: File) => `${Math.round(file.size / 1024)} Ko`;
 
 interface DemandeCommunicationViewProps {
+  apiRequests?: ApiRequest[];
+  responses?: Record<string, ApiResponse[]>;
+  assessments?: Record<string, ApiAssessment[]>;
+  documents?: ApiDocument[];
+  users?: ApiUser[];
+  onRefresh?: () => Promise<unknown>;
+  canEdit?: boolean;
   dossierId?: string;
   demandes?: DemandeCommunication[];
   initialDemande?: DemandeCommunication | null;
@@ -33,6 +46,8 @@ interface DemandeCommunicationViewProps {
 }
 
 export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> = ({
+  apiRequests = [], responses = {}, assessments = {}, documents = [], users = [], onRefresh,
+  canEdit = false,
   dossierId,
   demandes,
   initialDemande,
@@ -58,6 +73,8 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
     ? (demandesList.find((d) => d.id === selectedDemandeId) || null)
     : null;
 
+  const apiDemande = apiRequests.find((item) => item.id === selectedDemandeId);
+
   const defaultAuteur = currentUser
     ? `${currentUser.prenom} ${currentUser.nom}`
     : (demande?.auteur?.replace(/^(Inspecteur|Contrôleur|Directeur|Chef de Bureau)\s+/i, '') || demande?.redacteur?.replace(/^(Inspecteur|Contrôleur|Directeur|Chef de Bureau)\s+/i, '') || 'Marc Kabamba');
@@ -70,6 +87,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
 
   // Formulaire de satisfaction & classement sans suite
   const [showSatisfactionModal, setShowSatisfactionModal] = useState(false);
+  const [evaluation, setEvaluation] = useState<'SATISFAISANTE' | 'NON_SATISFAISANTE'>('SATISFAISANTE');
   const [satisfactionForm, setSatisfactionForm] = useState({
     inspecteur: defaultAuteur,
     dateDecision: new Date().toISOString().split('T')[0],
@@ -87,7 +105,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
     if (demande && onUpdateDemande) {
       const updated: DemandeCommunication = {
         ...demande,
-        evaluationReponse: 'SATISFAISANTE',
+        evaluationReponse: evaluation,
         motifSatisfaction: satisfactionForm.motif,
       };
       setIsSaving(true);
@@ -128,6 +146,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
     commentaire: '',
     pdfFile: null as File | null,
   });
+  const [responseDocumentId, setResponseDocumentId] = useState('');
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
 
   // État du formulaire épuré : champs avec qualification de cible et adresse
@@ -295,6 +314,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
   const handleReponseFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setResponseDocumentId('');
       setReponseForm((prev) => ({
         ...prev,
         pdfFile: file,
@@ -304,18 +324,20 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
 
   const handleReponseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!demande || !reponseForm.pdfFile || !onUpdateDemande || selectedElementIds.length === 0 || isSaving) {
+    if (!demande || (!reponseForm.pdfFile && !responseDocumentId) || !onUpdateDemande || selectedElementIds.length === 0 || isSaving) {
       setActionError('Sélectionnez le PDF et les éléments réellement fournis.');
       return;
     }
 
-    const fileName = reponseForm.pdfFile.name;
-    const fileSize = `${Math.round(reponseForm.pdfFile.size / 1024)} Ko`;
+    const stored = documents.find((item) => item.id === responseDocumentId);
+    const fileName = reponseForm.pdfFile?.name || stored?.original_name || '';
+    const fileSize = `${Math.round((reponseForm.pdfFile?.size || stored?.size || 0) / 1024)} Ko`;
     const refCourrier = reponseForm.reference.trim();
 
     const updated: DemandeCommunication = {
       ...demande,
       statut: 'REPONSE_PARTIELLE',
+      reponseDocumentId: responseDocumentId || undefined,
       reponsePdfNom: fileName,
       reponsePdfDate: reponseForm.dateReception,
       reponsePdfTaille: fileSize,
@@ -340,9 +362,11 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
     setIsSaving(true);
     setActionError(null);
     try {
-      await onUpdateDemande(updated, reponseForm.pdfFile);
+      await onUpdateDemande(updated, reponseForm.pdfFile || undefined);
       setShowReponseModal(false);
       setSelectedElementIds([]);
+      setResponseDocumentId('');
+      setReponseForm((prev) => ({ ...prev, pdfFile: null }));
       showToast('Réponse enregistrée. Les pièces restent soumises à vérification.');
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Enregistrement de la réponse impossible.');
@@ -624,7 +648,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
 
           </div>
 
-          <button
+          {canEdit && (<button
             type="button"
             className="btn-primary"
             onClick={() => {
@@ -651,7 +675,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           >
             <Plus size={14} />
             <span>Nouvelle demande</span>
-          </button>
+          </button>)}
         </div>
 
         {/* Grille des cartes des demandes */}
@@ -671,13 +695,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
         ) : (
           <div className="cards-grid-auto">
             {demandesList.map((item) => {
-              const hasRep = Boolean(
-                item.reponsePdfNom ||
-                (item.reponsesRecues && item.reponsesRecues.length > 0 && (
-                  Boolean(item.reponsesRecues[0].piecesJointes?.length) ||
-                  Boolean(item.reponsesRecues[0].referenceCourrier)
-                ))
-              );
+
 
               return (
                 <div
@@ -725,7 +743,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {hasRep ? 'Réponse reçue' : 'En attente'}
+                        {requestStatusLabel(item.statut)}
                       </span>
                     </div>
 
@@ -784,9 +802,11 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
   // 2. PAGE DÉTAIL D'UNE DEMANDE SÉLECTIONNÉE
   // =========================================================================
   const hasReponse = Boolean(demande.reponsePdfNom || demande.reponsesRecues?.length);
-  const canRecordResponse = ['EMISE', 'REPONSE_PARTIELLE', 'REPONSE_COMPLETE'].includes(demande.statut);
+  const canRecordResponse = canEdit && ['EMISE', 'REPONSE_PARTIELLE', 'REPONSE_COMPLETE'].includes(demande.statut);
+  const responseDocument = documents.find((item) => item.id === demande.reponsesRecues?.[0]?.piecesJointes?.[0]);
 
   const reponsePdfNom =
+    responseDocument?.original_name ||
     demande.reponsePdfNom ||
     demande.reponsesRecues?.[0]?.piecesJointes?.[0] ||
     'Document non renseigné';
@@ -852,6 +872,9 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           <span>Retour à toutes les demandes</span>
         </button>
       </div>
+
+      {apiDemande && onRefresh && <RequestWorkflowPanel key={`circuit-${apiDemande.id}`} request={apiDemande} documents={documents} users={users} onRefresh={onRefresh} />}
+      {apiDemande && onRefresh && <RequestResponsesPanel key={`responses-${apiDemande.id}`} request={apiDemande} responses={responses[apiDemande.id] || []} assessments={assessments} documents={documents} canEdit={canEdit} onRefresh={onRefresh} />}
 
       {/* =========================================================================
           PAGE INFO ÉPURÉE : DEMANDE DE COMMUNICATION SÉLECTIONNÉE
@@ -947,7 +970,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 color: 'var(--color-text-secondary)',
               }}
             >
-              {hasReponse ? 'Réponse reçue' : 'En attente'}
+              {requestStatusLabel(demande.statut)}
             </span>
           </div>
         </div>
@@ -980,45 +1003,15 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
            
           </div>
 
-          {/* 3. Document PDF joint officiel */}
-          <div>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
-              Document joint à la demande
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                backgroundColor: 'var(--color-bg)',
-                borderRadius: '6px',
-                border: 'none',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div>
-                  <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', fontWeight: 500 }}>
-                    {demande.pdfSourceNom || 'Aucun document joint'}
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                    {demande.pdfSourceTaille || ''}
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled
-                style={{ fontSize: '11px', padding: '6px 12px' }}
-                title="Téléchargement indisponible dans ce parcours"
-              >
-                <Download size={13} />
-              </button>
-            </div>
+          <div aria-label="Éléments demandés">
+            {demande.elementsDemandes.map((element) => (
+              <p key={element.id} style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                {element.libelle} — {{ FOURNI: 'Fourni', EN_ATTENTE: 'En attente', MANQUANT: 'Manquant', INCOMPLET: 'Incomplet' }[element.statutRemise]}
+                {element.appreciation && ` · ${{ pending: 'À apprécier', satisfactory: 'Satisfaisant', unsatisfactory: 'Non satisfaisant' }[element.appreciation]}`}
+                {element.motifAppreciation && ` : ${element.motifAppreciation}`}
+              </p>
+            ))}
           </div>
-
           {/* 4. Réponse à la demande de communication (PDF ou Pas de réponse) */}
           <div>
             <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
@@ -1053,22 +1046,32 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                   <button
                     type="button"
                     className="btn-secondary"
-                    disabled
+                    disabled={isSaving || responseDocument?.state !== 'accepted'}
                     style={{ fontSize: '11px', padding: '6px 12px' }}
-                    title="Téléchargement indisponible dans ce parcours"
+                    title="Télécharger le courrier de réponse"
+                    aria-label="Télécharger le courrier de réponse"
+                    onClick={async () => {
+                      if (!responseDocument || isSaving) return;
+                      setIsSaving(true); setActionError(null);
+                      try { await downloadFile(`/documents/${responseDocument.id}/telecharger/`, responseDocument.original_name); }
+                      catch (cause) {
+                        setActionError(cause instanceof Error ? cause.message : 'Téléchargement impossible.');
+                        await onRefresh?.().catch(() => undefined);
+                      } finally { setIsSaving(false); }
+                    }}
                   >
                     <Download size={13} />
                   </button>
-                  <button
+                  {canEdit && (<button
                     type="button"
                     className="btn-ghost"
-                    disabled={!canRecordResponse}
+                          disabled={isSaving || !canRecordResponse}
                     title={canRecordResponse ? 'Ajouter un complément' : 'Disponible après émission de la demande'}
                     style={{ fontSize: '11px', padding: '6px 10px', color: 'var(--color-text-muted)' }}
                     onClick={() => setShowReponseModal(true)}
                   >
                     <Upload size={12} />
-                  </button>
+                  </button>)}
                 </div>
               </div>
             ) : (
@@ -1086,17 +1089,17 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 <span style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
                   Pas de réponse
                 </span>
-                <button
+                {canEdit && (<button
                   type="button"
                   className="btn-secondary"
-                  disabled={!canRecordResponse}
+                        disabled={isSaving || !canRecordResponse}
                   title={canRecordResponse ? 'Ajouter la réponse' : 'Disponible après émission de la demande'}
                   onClick={() => setShowReponseModal(true)}
                   style={{ fontSize: '11px', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
                   <Upload size={12} />
                   <span>Ajouter la réponse</span>
-                </button>
+                </button>)}
               </div>
             )}
           </div>
@@ -1129,28 +1132,29 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                   <span>Annulation indisponible</span>
                 </button>
 
-                <button
+                {canEdit && (<button
                   type="button"
                   className="btn-primary"
-                  disabled={!canRecordResponse}
+                        disabled={isSaving || !canRecordResponse}
                   title={canRecordResponse ? 'Ajouter la réponse' : 'Disponible après émission de la demande'}
                   onClick={() => setShowReponseModal(true)}
                   style={{ fontSize: '12px' }}
                 >
                   <Upload size={14} />
                   <span>Ajouter la réponse</span>
-                </button>
+                </button>)}
               </div>
             ) : (
               /* DÈS QU'IL Y A UNE RÉPONSE UPLOADÉE */
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                {!demande.evaluationReponse && (
+                {canEdit && !apiDemande && !isSaving && !demande.evaluationReponse && (
                   <>
-                    {!hasPv && (
+                    {!hasPv && demande.elementsDemandes.every((element) => element.statutRemise === 'FOURNI') && (
                       <button
                         type="button"
                         className="btn-primary"
                         onClick={() => {
+                          setEvaluation('SATISFAISANTE');
                           setSatisfactionForm((prev) => ({
                             ...prev,
                             inspecteur: defaultAuteur,
@@ -1161,49 +1165,26 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                         style={{ fontSize: '12px' }}
                       >
                         <CheckCircle size={14} />
-                        <span>Marquer comme satisfait</span>
+                        <span>Apprécier tous les éléments : satisfaisants</span>
                       </button>
                     )}
 
                     <button
                       type="button"
                       className="btn-secondary"
-                      onClick={async () => {
-                        const updated: DemandeCommunication = {
-                          ...demande,
-                          evaluationReponse: 'NON_SATISFAISANTE',
-                        };
-                        setIsSaving(true);
-                        setActionError(null);
-                        try {
-                          if (!onUpdateDemande) throw new Error('Appréciation indisponible.');
-                          await onUpdateDemande(updated);
-                        } catch (error) {
-                          setActionError(error instanceof Error ? error.message : 'Appréciation impossible.');
-                          return;
-                        } finally {
-                          setIsSaving(false);
-                        }
-                        setFeuilleForm({
-                          inspecteur: defaultAuteur,
-                          destinataire: demande.destinataire?.nom || '',
-                          typeCible: demande.destinataire?.typeCible || demande.destinataire?.qualite || 'Entreprise commerciale',
-                          pourLeCompteDe: demande.destinataire?.pourLeCompteDe || '',
-                          adresse: demande.destinataire?.adresse || '',
-                          objet: '',
-                          auditionPrevue: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
-                          pdfFile: null,
-                        });
-                        setShowFeuilleModal(true);
+                      onClick={() => {
+                        setEvaluation('NON_SATISFAISANTE');
+                        setSatisfactionForm((prev) => ({ ...prev, motif: '' }));
+                        setShowSatisfactionModal(true);
                       }}
                       style={{ fontSize: '12px' }}
                     >
-                      <span>Non satisfait</span>
+                      <span>Apprécier les éléments reçus : non satisfaisants</span>
                     </button>
                   </>
                 )}
 
-                {demande.evaluationReponse === 'NON_SATISFAISANTE' && !hasFeuille && (
+                {canEdit && demande.evaluationReponse === 'NON_SATISFAISANTE' && !hasFeuille && (
                   <button
                     type="button"
                     className="btn-secondary"
@@ -2010,6 +1991,9 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                   </div>
                 </div>
               </div>
+
+              <DocumentPicker documents={documents} value={responseDocumentId} label="Ou sélectionner un courrier déjà déposé" disabled={isSaving}
+                onChange={(id) => { setResponseDocumentId(id); setReponseForm((prev) => ({ ...prev, pdfFile: null })); }} />
 
               {/* Champ 2 : Date de réception */}
               <div>

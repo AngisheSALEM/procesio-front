@@ -252,7 +252,7 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
               margin: 0,
             }}
           >
-            {dossier.entiteControlee.nom}
+            {dossier.entiteControlee.nom || dossier.objet || dossier.reference}
           </h1>
 
           {/* Badge statut sobre et monochromatique selon la règle 60-30-10 */}
@@ -270,6 +270,10 @@ export const DossierHeader: React.FC<DossierHeaderProps> = ({
           >
             {dossier.decisionCloture === 'CLASSE_SANS_SUITE'
               ? 'Classé sans suite'
+              : dossier.statut === 'OUVERT'
+              ? 'Ouvert'
+              : dossier.statut === 'A_AFFECTER'
+              ? 'À affecter'
               : dossier.statut === 'EN_COURS'
               ? 'En cours'
               : dossier.statut === 'A_VALIDER'

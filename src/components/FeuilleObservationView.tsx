@@ -12,12 +12,27 @@ import {
 } from 'lucide-react';
 import type { FeuilleObservation, UserAccount } from '../types';
 import type { DossierTabId } from './DossierHeader';
+import { sheetStatusLabel } from '../utils/statusLabels';
 import { formatDate } from '../utils/dateUtils';
 import { ModalPortal } from './common/ModalPortal';
+import type { ApiCase, ApiDefense, ApiDocument, ApiMission, ApiObservationAssessment, ApiSheet, ApiUser } from '../api/client';
+import { InspectionWorkflowPanel } from './InspectionWorkflowPanel';
+import { MissionsPanel } from './MissionsPanel';
 
 const fileSizeLabel = (file: File) => `${Math.round(file.size / 1024)} Ko`;
 
 interface FeuilleObservationViewProps {
+  apiSheets?: ApiSheet[];
+  missions?: ApiMission[];
+  defenses?: Record<string, ApiDefense[]>;
+  assessments?: Record<string, ApiObservationAssessment[]>;
+  documents?: ApiDocument[];
+  users?: ApiUser[];
+  caseRow?: ApiCase;
+  eligibleIds?: number[];
+  actorId?: number;
+  onRefresh?: () => Promise<unknown>;
+  canEdit?: boolean;
   dossierId?: string;
   feuilles?: FeuilleObservation[];
   initialFeuille?: FeuilleObservation | null;
@@ -33,6 +48,8 @@ interface FeuilleObservationViewProps {
 }
 
 export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
+  apiSheets = [], missions = [], defenses = {}, assessments = {}, documents = [], users = [], caseRow, eligibleIds = [], actorId, onRefresh,
+  canEdit = false,
   dossierId,
   feuilles,
   initialFeuille,
@@ -52,10 +69,12 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [faitsObservation, setFaitsObservation] = useState('');
+  const [createMissionId, setCreateMissionId] = useState('');
 
   const feuille = selectedFeuilleId
     ? (feuillesList.find((f) => f.id === selectedFeuilleId) || null)
     : null;
+  const apiFeuille = apiSheets.find((row) => row.id === selectedFeuilleId);
 
   const defaultAuteur = currentUser
     ? `${currentUser.prenom} ${currentUser.nom}`
@@ -105,7 +124,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
     pourLeCompteDe: '',
     adresse: feuille?.adresse || '',
     objet: feuille?.objetControle || '',
-    auditionPrevue: feuille?.dateReunionCloturePrevue || '2026-10-20',
+    auditionPrevue: feuille?.dateReunionCloturePrevue || '',
     pdfFile: null as File | null,
   });
 
@@ -136,6 +155,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
     const newFeuille: FeuilleObservation = {
       id: newId,
       dossierId,
+      missionId: createMissionId || undefined,
       dateRedaction: new Date().toISOString().split('T')[0],
       statutFeuille: 'BROUILLON',
       reference: `DGDA/DRK/FO/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
@@ -243,6 +263,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
         </div>
 
         <form onSubmit={handleCreateSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <label className="workflow-field"><span>Origine de la feuille</span><select value={createMissionId} disabled={isSaving} onChange={(event) => setCreateMissionId(event.target.value)}><option value="">Constat terrain</option>{missions.map((mission) => <option key={mission.id} value={mission.id}>Mission du {mission.occurred_on} · {mission.context}</option>)}</select></label>
               {actionError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{actionError}</div>}
           <div>
             <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
@@ -479,6 +500,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
   if (!feuille) {
     return (
       <div key="feuille-cards-list" className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
+        {caseRow && onRefresh && <MissionsPanel caseRow={caseRow} missions={missions} documents={documents} users={users} eligibleIds={eligibleIds} actorId={actorId} canEdit={canEdit} onRefresh={onRefresh} />}
         {/* Toast Notification */}
         {notification && (
           <div
@@ -538,7 +560,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             </p> */}
           </div>
 
-          <button
+          {canEdit && (<button
             type="button"
             className="btn-primary"
             onClick={() => {
@@ -547,7 +569,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                 destinataire: dossierNom || '',
                 typeCible: 'Entreprise commerciale',
                 pourLeCompteDe: '',
-                adresse: '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
+                adresse: caseRow?.controlled_entity?.adresse || '',
                 objet: '',
                 auditionPrevue: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
                 pdfFile: null,
@@ -564,7 +586,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
           >
             <Plus size={14} />
             <span>Nouvelle feuille</span>
-          </button>
+          </button>)}
         </div>
 
         {/* Grille des cartes des feuilles d'observation */}
@@ -632,7 +654,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {hasPvAttached ? 'PV dressé' : 'Contradictoire en cours'}
+                        {hasPvAttached ? 'PV dressé' : sheetStatusLabel(item.statutFeuille)}
                       </span>
                     </div>
 
@@ -694,6 +716,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
 
   return (
     <div key={`feuille-detail-${feuille.id}`} className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
+      {onRefresh && apiSheets.find((row) => row.id === feuille.id) && <InspectionWorkflowPanel key={feuille.id} sheet={apiSheets.find((row) => row.id === feuille.id)!} missions={missions} defenses={defenses[feuille.id] || []} assessments={assessments} documents={documents} canEdit={canEdit} actorId={actorId} onRefresh={onRefresh} />}
       {/* Toast Notification */}
       {notification && (
         <div
@@ -833,7 +856,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                 color: 'var(--color-text-secondary)',
               }}
             >
-              {isPvLance ? 'PV dressé' : 'Contradictoire en cours'}
+              {isPvLance ? 'PV dressé' : sheetStatusLabel(feuille.statutFeuille)}
             </span>
           </div>
         </div>
@@ -871,7 +894,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
           {/* 3. Document PDF associé au projet */}
           <div>
             <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '4px' }}>
-              Feuille d’observation notifiée 
+              Projet de feuille d’observation
             </div>
             <div
               style={{
@@ -886,7 +909,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div>
                   <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', fontWeight: 500 }}>
-                    {feuille.pdfSourceNom || 'Aucun document joint'}
+                    {apiFeuille ? (apiFeuille.projects?.length ? `${apiFeuille.projects.length} projet(s) PDF consultable(s) dans le circuit` : 'Aucun projet PDF préparé') : feuille.pdfSourceNom || 'Aucun document joint'}
                   </div>
                 </div>
               </div>
@@ -927,6 +950,11 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                   <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '3px', lineHeight: 1.4 }}>
                     {obs.faitsConstates}
                   </p>
+                  <p>{obs.defenseRecue ? `Défense reçue le ${formatDate(obs.defenseRecue.dateReception)}` : 'Aucune défense reçue'}</p>
+                  {obs.appreciationEnqueteur && <p>
+                    {{ POINT_EXPLIQUE: 'Point expliqué', COMPLEMENT_REQUIS: 'Complément requis', ANALYSE_EN_COURS: 'Analyse en cours', CONSTAT_CONFIRME: 'Constat confirmé' }[obs.appreciationEnqueteur]}
+                    {' : '}{obs.analyseMotivee}
+                  </p>}
                 </div>
               ))}
             </div>
@@ -1010,10 +1038,10 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             ) : (
               /* DÈS QU'UN JUGEMENT EST RENDU (PV DRESSÉ OU CLASSÉ SANS SUITE) : LES BOUTONS DE JUGEMENT DISPARAISSENT */
               <>
-                <button
+                {canEdit && (<button
                   type="button"
                   className="btn-secondary"
-                  onClick={() => {
+                        onClick={() => {
                     setCreateForm({
                       inspecteur: defaultAuteur,
                       destinataire: feuille?.destinataire || dossierNom || '',
@@ -1030,7 +1058,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                 >
                   <Plus size={13} />
                   <span>Nouvelle feuille d’observation</span>
-                </button>
+                </button>)}
 
                 <button
                   type="button"
@@ -1152,6 +1180,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
 
             {/* Modal Form */}
             <form onSubmit={handleCreateSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <label className="workflow-field"><span>Origine de la feuille</span><select value={createMissionId} disabled={isSaving} onChange={(event) => setCreateMissionId(event.target.value)}><option value="">Constat terrain</option>{missions.map((mission) => <option key={mission.id} value={mission.id}>Mission du {mission.occurred_on} · {mission.context}</option>)}</select></label>
               {actionError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{actionError}</div>}
               {/* Champ 1 : Nom de l'inspecteur vérificateur */}
               <div>

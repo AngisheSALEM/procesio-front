@@ -212,7 +212,7 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
             </div>
 
             {/* Classements sans suite intégrés discrètement */}
-            <div>
+            <button type="button" aria-label="Voir les classements sans suite" onClick={(event) => { event.stopPropagation(); onNavigateSubView('classements'); }} style={{ background: 'transparent', border: 0, padding: 0, textAlign: 'left', cursor: 'pointer' }}>
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
                 Classés sans suite
               </div>
@@ -222,7 +222,7 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
                   dossiers
                 </span>
               </div>
-            </div>
+            </button>
 
             <div>
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
@@ -340,16 +340,16 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                Dossiers avec PV établi
+                Dossiers avec PV établi (DEC-04)
               </span>
               <ArrowRight size={14} color="var(--color-text-muted)" />
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: '8px' }}>
-              <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
+              <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-muted)' }}>
                 {metric('cases.pv_proven') ?? '—'}
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
-                {indicator('cases.pv_proven')?.status === 'masked' ? 'Indicateur masqué' : 'Indisponible'}
+              <div style={{ fontSize: '11px', color: 'var(--color-warning, #eab308)', fontWeight: 600, backgroundColor: 'rgba(234, 179, 8, 0.12)', padding: '2px 7px', borderRadius: 'var(--radius-sm)' }}>
+                Indicateur masqué (DEC-04)
               </div>
             </div>
           </div>

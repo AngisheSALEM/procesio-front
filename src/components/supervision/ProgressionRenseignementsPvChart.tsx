@@ -39,7 +39,6 @@ export const ProgressionRenseignementsPvChart: React.FC<ProgressionRenseignement
   const totalR = renseignements.length;
   const totalD = allDemandes.length;
   const totalF = allFeuilles.length;
-  const totalP = allPvs.length;
 
   // Les points reflètent les dates présentes dans les ressources, sans chiffres de démonstration.
   const dataPoints: DataPoint[] = useMemo(() => {
@@ -189,16 +188,18 @@ export const ProgressionRenseignementsPvChart: React.FC<ProgressionRenseignement
           { id: 'renseignements' as MetricType, label: 'Renseignements', count: totalR },
           { id: 'demandes' as MetricType, label: 'Demandes de communication', count: totalD },
           { id: 'feuilles' as MetricType, label: 'Feuilles d’observation', count: totalF },
-          { id: 'pvs' as MetricType, label: 'Procès-verbaux', count: totalP },
+          { id: 'pvs' as MetricType, label: 'Procès-verbaux (DEC-04 Indisponible)', count: '—' as unknown as number },
         ].map((m) => {
           const isSelected = activeMetric === m.id;
+          const isDisabled = m.id === 'pvs';
           return (
             <button
               key={m.id}
               type="button"
-                disabled={m.id === 'pvs'}
-                title={m.id === 'pvs' ? 'Indicateur PV indisponible dans le backend' : undefined}
+              disabled={isDisabled}
+              title={isDisabled ? 'Indicateur PV indisponible dans le backend (DEC-04)' : undefined}
               onClick={() => {
+                if (isDisabled) return;
                 setActiveMetric(m.id);
                 setHoveredIndex(null);
               }}
@@ -207,7 +208,8 @@ export const ProgressionRenseignementsPvChart: React.FC<ProgressionRenseignement
                 border: 'none',
                 padding: '4px 0',
                 fontSize: '11px',
-                cursor: 'pointer',
+                cursor: isDisabled ? 'not-allowed' : 'pointer',
+                opacity: isDisabled ? 0.55 : 1,
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',

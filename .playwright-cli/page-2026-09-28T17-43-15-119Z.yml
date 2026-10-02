@@ -1,0 +1,19 @@
+- generic [ref=e5]:
+  - generic [ref=e6]:
+    - img "Logo DGDA" [ref=e8]
+    - heading "PROCEZO" [level=1] [ref=e9]
+    - paragraph [ref=e10]: Direction Générale des Douanes et Accises — RDC
+    - generic [ref=e11]: Portail de gestion des enquêtes et du renseignement
+  - generic [ref=e18]:
+    - generic [ref=e19]: Accès réservé aux agents habilités
+    - generic [ref=e20]: Votre profil et votre unité sont définis par votre compte.
+  - generic [ref=e21]:
+    - generic [ref=e22]:
+      - generic [ref=e23]: Identifiant professionnel
+      - textbox [ref=e28]: demo_manager
+    - generic [ref=e29]:
+      - generic [ref=e30]: Mot de passe
+      - textbox [ref=e36]: DemoPass!2026-09-28
+    - alert [ref=e43]: Identifiants invalides.
+    - button "Se connecter" [ref=e37] [cursor=pointer]
+  - generic [ref=e41]: Accès réservé aux agents habilités DGDA

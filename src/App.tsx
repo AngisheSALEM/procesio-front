@@ -29,6 +29,8 @@ export function App() {
         <div role="alert" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)', padding: '24px', maxWidth: '480px' }}>
           <p>Les données du serveur n’ont pas pu être chargées : {controller.authError}</p>
           <button type="button" className="btn-primary" onClick={() => void controller.retryWorkspace()}>Réessayer</button>
+          <button type="button" className="btn-secondary" disabled={controller.loggingOut} onClick={() => void controller.handleLogout()}>Se déconnecter</button>
+          {controller.mutationError && <p role="alert">{controller.mutationError}</p>}
         </div>
       </div>
     );
@@ -41,16 +43,21 @@ export function App() {
     theme, toggleTheme, currentUser, workspace, agentAccounts,
     activeNav, activeDossierTab, setActiveDossierTab,
     isSidebarCollapsed, setIsSidebarCollapsed,
-    dossiers, renseignements, demandesParDossier, feuillesParDossier, pvsParDossier, documentsParDossier,
+    dossiers, renseignements, demandesParDossier, feuillesParDossier, pvsParDossier,
     visibleDossiers, visibleRenseignements, currentDemandes, currentFeuilles, currentPvs,
     mutationError, mutationInfo, setMutationError, setMutationInfo,
     handleLogout, handleOpenDossier, handleCreateDossier,
+    handleUpdateCase, handleAssignCase, handleLinkIntelligence,
     handleAddRenseignement, handleUpdateRenseignement, handleAddDemande, handleSaveDemande,
     handleCancelDemande, handleAddFeuille, handleSaveFeuille, handleCreateFeuilleFromDemande,
     handleCloturerSansSuite, handleRevirementJugement, handleLancerPv,
     handleBackToDashboard, handleSelectNav,
   } = controller;
   const currentDossier = controller.currentDossier!;
+  const canEditCase = currentDossier?.capabilities?.includes('case.update') === true;
+  const apiCase = workspace.cases.find((row) => row.id === currentDossier?.id);
+  const eligibleIds = apiCase ? (workspace.agentScopes[apiCase.unit]?.[apiCase.classification === 1 ? 'restricted' : 'ordinary'] || []) : [];
+  const eligibleAgents = agentAccounts.filter((agent) => eligibleIds.includes(Number(agent.id)));
   const hasDemande = currentDemandes.length > 0;
   const hasFeuille = currentFeuilles.length > 0;
   const hasPv = currentPvs.length > 0;
@@ -76,6 +83,7 @@ export function App() {
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
         onLogout={handleLogout}
+        loggingOut={controller.loggingOut}
       />
 
       {/* Main Workspace Column (Header at top, then scrolling view area) */}
@@ -137,6 +145,7 @@ export function App() {
           {(mutationError || mutationInfo || workspace.warnings.length > 0) && (
             <div role={mutationError ? 'alert' : 'status'} style={{ padding: '12px 18px', backgroundColor: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
               {mutationError || mutationInfo || workspace.warnings.join(' · ')}
+              <button type="button" onClick={() => void controller.retryWorkspace()} style={{ marginLeft: '12px' }}>Actualiser</button>
               <button type="button" onClick={() => { setMutationError(''); setMutationInfo(''); }} style={{ marginLeft: '12px', background: 'transparent', border: 'none', color: 'var(--color-accent)', cursor: 'pointer' }}>Fermer</button>
             </div>
           )}
@@ -178,13 +187,25 @@ export function App() {
                     onSaveFeuille={handleSaveFeuille}
                     onCloturerSansSuite={handleCloturerSansSuite}
                     currentUser={currentUser}
+                    onUpdateCase={handleUpdateCase}
+                    onAssignCase={handleAssignCase}
+                    onRefresh={controller.refreshWorkspace}
+                    eligibleAgents={eligibleAgents}
+                    allAgents={agentAccounts}
                   />
                 )}
 
 
                 {activeDossierTab === 'actions-echanges' && (
                   <DemandeCommunicationView
+                    apiRequests={workspace.requests[currentDossier.id] || []}
+                    responses={workspace.responses}
+                    assessments={workspace.assessments}
+                    documents={workspace.documents[currentDossier.id] || []}
+                    users={workspace.users}
+                    onRefresh={controller.refreshWorkspace}
                     key={currentDossier.id}
+                    canEdit={canEditCase}
                     dossierId={currentDossier.id}
                     demandes={currentDemandes}
                     initialDemande={currentDemandes[0] || null}
@@ -204,7 +225,18 @@ export function App() {
 
                 {activeDossierTab === 'constats-defense' && (
                   <FeuilleObservationView
+                    apiSheets={workspace.sheets[currentDossier.id] || []}
+                    missions={workspace.missions[currentDossier.id] || []}
+                    defenses={workspace.defenses}
+                    assessments={workspace.observationAssessments}
+                    documents={workspace.documents[currentDossier.id] || []}
+                    users={workspace.users}
+                    caseRow={apiCase}
+                    eligibleIds={apiCase ? workspace.agentScopes[apiCase.unit]?.[apiCase.classification === 1 ? 'restricted' : 'ordinary'] || [] : []}
+                    actorId={controller.me?.id}
+                    onRefresh={controller.refreshWorkspace}
                     key={currentDossier.id}
+                    canEdit={canEditCase}
                     dossierId={currentDossier.id}
                     feuilles={currentFeuilles}
                     initialFeuille={currentFeuilles[0] || null}
@@ -222,7 +254,10 @@ export function App() {
 
                 {activeDossierTab === 'documents' && (
                   <DocumentsTab
-                    documents={documentsParDossier[currentDossier.id] || []}
+                    caseId={currentDossier.id}
+                    documents={workspace.documents[currentDossier.id] || []}
+                    onRefresh={controller.refreshWorkspace}
+                    canWrite={canEditCase}
                   />
                 )}
               </div>
@@ -235,6 +270,7 @@ export function App() {
               <MonTravailView
                 dossiers={visibleDossiers}
                 workItems={workspace.workItems}
+                validationItems={workspace.validationItems}
                 onOpenDossier={handleOpenDossier}
                 onCreateDossier={handleCreateDossier}
                 user={currentUser}
@@ -248,11 +284,15 @@ export function App() {
               <RenseignementsView
                 renseignements={visibleRenseignements}
                 agents={agentAccounts}
+                memberships={controller.me?.memberships || []}
+                agentScopes={workspace.agentScopes}
                 currentUser={currentUser}
                 onOpenDossier={handleOpenDossier}
                 onCreateDossier={handleCreateDossier}
                 onAddRenseignement={handleAddRenseignement}
                 onUpdateRenseignement={handleUpdateRenseignement}
+                onLinkIntelligence={handleLinkIntelligence}
+                onRefresh={controller.refreshWorkspace}
                 dossiers={visibleDossiers}
                 demandesParDossier={demandesParDossier}
                 feuillesParDossier={feuillesParDossier}
@@ -279,6 +319,7 @@ export function App() {
                 demandesParDossier={demandesParDossier}
                 feuillesParDossier={feuillesParDossier}
                 pvsParDossier={pvsParDossier}
+                me={controller.me}
               />
             </div>
           )}
@@ -290,6 +331,7 @@ export function App() {
                 user={currentUser}
                 theme={theme}
                 onToggleTheme={toggleTheme}
+                onRefreshProfile={controller.refreshWorkspace}
               />
             </div>
           )}

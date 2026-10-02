@@ -1,6 +1,8 @@
 import type { DemandeCommunication, DossierEnquete, FeuilleObservation, RenseignementItem } from '../types';
-import { apiAll, apiPatch, apiPost, uploadFile, type ApiCase, type ApiDecision, type ApiDocument, type ApiIntelligence, type ApiRequest, type ApiResponse, type ApiSheet, type ApiUser } from './client';
+import { apiAll, apiGet, apiPatch, apiPost, uploadFile, type ApiCase, type ApiCaseAssignment, type ApiCaseTimelineEntry, type ApiDecision, type ApiDissemination, type ApiDisseminationReturn, type ApiDocument, type ApiIntelligence, type ApiRequest, type ApiResponse, type ApiSheet, type ApiUnit, type ApiUser } from './client';
+import { latestVersion } from './mappers';
 import type { WorkspaceData } from './workspace';
+import { decisionSources, proposeDecision } from './decisions';
 
 function required(value: string | undefined | null, label: string): string {
   if (!value?.trim()) throw new Error(`${label} est requis pour enregistrer cette donnée.`);
@@ -23,9 +25,10 @@ function activeUnit(user: ApiUser, requested?: string, workspace?: WorkspaceData
   return membership.unit.id;
 }
 
-function resolveAssignee(workspace: WorkspaceData, label: string | undefined, explicit?: number): number {
-  if (explicit && workspace.assignableAgentIds.includes(explicit)) return explicit;
-  const agent = workspace.users.filter((user) => workspace.assignableAgentIds.includes(user.id)).find((user) =>
+function resolveAssignee(workspace: WorkspaceData, label: string | undefined, explicit?: number, unit?: string, classification = 0): number {
+  const eligibleIds = unit ? workspace.agentScopes[unit]?.[classification === 1 ? 'restricted' : 'ordinary'] || [] : workspace.assignableAgentIds;
+  if (explicit && eligibleIds.includes(explicit)) return explicit;
+  const agent = workspace.users.filter((user) => eligibleIds.includes(user.id)).find((user) =>
     label && [user.username, `${user.first_name} ${user.last_name}`.trim()].some((name) => name.localeCompare(label, 'fr', { sensitivity: 'base' }) === 0),
   );
   if (!agent) throw new Error('Choisissez un agent habilité dans la liste des agents.');
@@ -35,7 +38,7 @@ function resolveAssignee(workspace: WorkspaceData, label: string | undefined, ex
 export async function createCase(workspace: WorkspaceData, user: ApiUser, data: DossierEnquete, intelligenceId?: string, assigneeId?: number): Promise<ApiCase> {
   const intelligence = intelligenceId ? workspace.intelligence.find((item) => item.id === intelligenceId) : undefined;
   const unit = intelligence?.unit || activeUnit(user, data.unite, workspace);
-  const assignee = resolveAssignee(workspace, data.responsable, assigneeId);
+  const assignee = resolveAssignee(workspace, data.responsable, assigneeId, unit, intelligence?.classification || 0);
   if (intelligence?.classification === 1 && !workspace.restrictedAgentIds.includes(assignee)) {
     throw new Error('L’agent choisi n’a pas l’habilitation requise pour ce renseignement restreint.');
   }
@@ -51,7 +54,7 @@ export async function createCase(workspace: WorkspaceData, user: ApiUser, data: 
       adresse: entity.adresse || '', contact: entity.contact || '', type_cible: entity.typeCible || '',
       pour_le_compte_de: entity.pourLeCompteDe || '',
     } } : {}),
-    team: (data.equipe || []).map((name) => resolveAssignee(workspace, name)),
+    team: (data.equipe || []).map((name) => resolveAssignee(workspace, name, undefined, unit, intelligence?.classification || 0)),
     customs_operations: (data.operationsDouanieres || []).map((operation) => ({
       reference_sydonia: operation.referenceSydonia, bureau: operation.bureau,
       date_declaration: operation.dateDeclaration || null, regime: operation.regime,
@@ -70,11 +73,11 @@ export async function createCase(workspace: WorkspaceData, user: ApiUser, data: 
 }
 
 export async function createIntelligence(workspace: WorkspaceData, user: ApiUser, item: RenseignementItem, files: File[] = [], assigneeId?: number) {
-  const assignee = resolveAssignee(workspace, item.coteA, assigneeId);
+  const unit = activeUnit(user, item.serviceDestinataire, workspace);
+  const assignee = resolveAssignee(workspace, item.coteA, assigneeId, unit, item.niveauAcces.toLowerCase().includes('restreint') ? 1 : 0);
   if (item.niveauAcces.toLowerCase().includes('restreint') && !workspace.restrictedAgentIds.includes(assignee)) {
     throw new Error('L’agent choisi n’a pas l’habilitation requise pour un renseignement restreint.');
   }
-  const unit = activeUnit(user, item.serviceDestinataire, workspace);
   if (files.length && !user.memberships.some((membership) => membership.unit.id === unit && membership.capabilities.includes('source.write'))) {
     throw new Error('Votre compte ne peut pas déposer de pièces sur un renseignement. Retirez les fichiers ou demandez l’habilitation nécessaire.');
   }
@@ -124,16 +127,18 @@ function requestPayload(item: DemandeCommunication) {
     legal_basis: item.baseLegale || '', delivery_method: item.modaliteRemise || '',
     internal_comments: item.commentairesInternes || '', due_on: item.echeanceReponse || null,
     items: item.elementsDemandes.map((element) => ({
+      id: /^[0-9a-f-]{36}$/i.test(element.id) ? element.id : null,
       label: required(element.libelle, 'Le libellé d’un élément'), period: element.periodeConcernee || '',
       reason: element.motifExigence || '',
     })),
   };
 }
 
-async function acceptedDocument(file: File, caseId: string): Promise<ApiDocument> {
-  const document = await uploadFile(file, { case: caseId });
+async function acceptedDocument(file: File | string, caseId: string): Promise<ApiDocument> {
+  const document = typeof file === 'string' ? await apiGet<ApiDocument>(`/documents/${file}/`) : await uploadFile(file, { case: caseId });
+  if (document.case !== caseId || document.content_type !== 'application/pdf') throw new Error('Choisissez une pièce PDF du dossier.');
   if (document.state !== 'accepted') {
-    throw new Error('Le fichier a été déposé mais attend son contrôle de sécurité. Réessayez après acceptation du document.');
+    throw new Error(`La pièce ${document.original_name} est ${document.state === 'rejected' ? 'non utilisable' : 'encore en vérification'}. Consultez l’onglet Documents, puis sélectionnez cette pièce lorsqu’elle sera disponible.`);
   }
   return document;
 }
@@ -141,13 +146,16 @@ async function acceptedDocument(file: File, caseId: string): Promise<ApiDocument
 export async function createRequest(item: DemandeCommunication, file?: File): Promise<ApiRequest> {
   if (item.statut !== 'BROUILLON') throw new Error('Enregistrez d’abord un brouillon. Validation, signature et émission exigent des preuves distinctes.');
   const caseId = required(item.dossierId, 'Le dossier');
-  let imported: ApiDocument | undefined;
-  if (file) imported = await uploadFile(file, { case: caseId });
+  if (file && file.size > 10 * 1024 * 1024) throw new Error('Le PDF dépasse la limite de 10 Mio.');
   const created = await apiPost<ApiRequest>('/demandes/', {
-    case: caseId, ...requestPayload(item), mode: imported ? 'imported' : 'generated',
+    case: caseId, ...requestPayload(item), mode: file ? 'imported' : 'generated',
   });
-  if (imported?.state === 'accepted') {
-    await apiPost(`/demandes/${created.id}/preparer/`, { version: created.version, document: imported.id });
+  if (file) {
+    try {
+      await uploadFile(file, { case: caseId });
+    } catch (cause) {
+      throw new Error(`Brouillon ${created.reference || created.id} enregistré, mais dépôt du PDF impossible : ${cause instanceof Error ? cause.message : String(cause)}. Ouvrez ce brouillon et déposez la pièce dans Documents.`);
+    }
   }
   return created;
 }
@@ -162,10 +170,11 @@ export async function saveRequest(workspace: WorkspaceData, item: DemandeCommuni
   const newResponses = item.reponsesRecues.filter((response) => !priorResponses.some((old) => old.id === response.id));
   if (newResponses.length) {
     if (newResponses.length !== 1) throw new Error('Enregistrez une réponse à la fois.');
-    if (!file) throw new Error('Le PDF réel de la réponse est requis.');
-    const document = await acceptedDocument(file, existing.case);
+    if (!file && !item.reponseDocumentId) throw new Error('Le PDF réel de la réponse est requis.');
+    const document = await acceptedDocument(file || item.reponseDocumentId!, existing.case);
     const response = newResponses[0];
     const itemIds = response.elementsFournisIds.filter((id) => existing.items.some((element) => element.id === id));
+    if (itemIds.length !== response.elementsFournisIds.length) throw new Error('Les éléments de la demande ont changé. Rechargez la page.');
     if (!itemIds.length) throw new Error('Associez la réponse à au moins un élément demandé.');
     try {
       await apiPost(`/demandes/${existing.id}/reponses/`, {
@@ -183,13 +192,16 @@ export async function saveRequest(workspace: WorkspaceData, item: DemandeCommuni
     const linkedIds = new Set(priorResponses.flatMap((response) => response.item_links
       .filter((link) => !link.voided_at).map((link) => link.item)));
     const linkedItems = existing.items.filter((element) => linkedIds.has(element.id));
+    if (item.evaluationReponse === 'SATISFAISANTE' && linkedItems.length !== existing.items.length) {
+      throw new Error('Tous les éléments demandés doivent avoir une réponse avant une appréciation globale satisfaisante.');
+    }
     if (!linkedItems.length) throw new Error('Aucun élément ne possède de réponse liée à apprécier.');
     const satisfied = item.evaluationReponse === 'SATISFAISANTE';
     const reason = required(item.motifSatisfaction, 'Le motif de l’appréciation');
     for (const element of linkedItems) {
       await apiPost(`/demandes/${existing.id}/elements/${element.id}/appreciations/`, {
         version: element.assessment_version, receipt: 'received',
-        completeness: satisfied ? 'complete' : 'insufficient',
+        completeness: satisfied ? 'complete' : latestVersion(workspace.assessments[element.id] || [])?.completeness || 'unknown',
         substance: satisfied ? 'satisfactory' : 'unsatisfactory', reason,
       });
     }
@@ -202,19 +214,24 @@ export async function saveRequest(workspace: WorkspaceData, item: DemandeCommuni
     throw new Error('Cette demande ne peut plus être modifiée. Créez un acte complémentaire selon la procédure.');
   }
   const updated = await apiPatch<ApiRequest>(`/demandes/${existing.id}/`, {
-    version: existing.version, ...requestPayload(item),
+    version: existing.version, ...requestPayload(item), ...(file ? { mode: 'imported' } : {}),
   });
   if (file) {
-    const document = await acceptedDocument(file, existing.case);
-    await apiPost(`/demandes/${updated.id}/preparer/`, { version: updated.version, document: document.id });
+    try {
+      const document = await uploadFile(file, { case: existing.case });
+      if (document.state === 'accepted') await apiPost(`/demandes/${updated.id}/preparer/`, { version: updated.version, document: document.id });
+    } catch (cause) {
+      throw new Error(`Brouillon enregistré, mais préparation du PDF impossible : ${cause instanceof Error ? cause.message : String(cause)}. Reprenez depuis ce brouillon et sélectionnez la pièce déjà déposée dans Documents.`);
+    }
   }
 }
 
 function sheetPayload(item: FeuilleObservation, documentId?: string) {
   const observations = item.observations.map((observation, index) => ({
+    id: observation.id || null,
     facts: required(observation.faitsConstates, 'Les faits constatés'), title: observation.titre || '',
     legal_references: observation.referencesJuridiques || '', questions: observation.questionsAssujetti || '',
-    analysis: observation.analyseMotivee || '', documents: index === 0 && documentId ? [documentId] : [],
+    analysis: observation.analyseMotivee || '', documents: [...new Set([...observation.justificatifsAssocies, ...(index === 0 && documentId ? [documentId] : [])])],
   }));
   if (!observations.length) throw new Error('Ajoutez au moins une observation.');
   return {
@@ -230,7 +247,7 @@ function sheetPayload(item: FeuilleObservation, documentId?: string) {
 export async function createSheet(item: FeuilleObservation, file?: File): Promise<ApiSheet> {
   const caseId = required(item.dossierId, 'Le dossier');
   const document = file ? await acceptedDocument(file, caseId) : undefined;
-  return apiPost<ApiSheet>('/feuilles/', { case: caseId, origin: 'field', ...sheetPayload(item, document?.id) });
+  return apiPost<ApiSheet>('/feuilles/', { case: caseId, origin: item.missionId ? 'mission' : 'field', ...(item.missionId ? { mission: item.missionId } : {}), ...sheetPayload(item, document?.id) });
 }
 
 export async function saveSheet(workspace: WorkspaceData, item: FeuilleObservation, file?: File): Promise<void> {
@@ -247,15 +264,165 @@ export async function saveSheet(workspace: WorkspaceData, item: FeuilleObservati
 }
 
 export async function proposeClassification(workspace: WorkspaceData, caseId: string, reason: string): Promise<ApiDecision> {
-  const targetCase = workspace.cases.find((item) => item.id === caseId);
-  if (!targetCase) throw new Error('Dossier introuvable.');
-  const assessments = (await Promise.all((workspace.requests[caseId] || []).flatMap((request) =>
-    request.items.map(async (item) => apiAll<{ id: string; substance: string }>(`/demandes/${request.id}/elements/${item.id}/appreciations/?page_size=100`))
-  ))).flat();
-  const latest = assessments.reverse().find((item) => item.substance === 'satisfactory');
-  if (!latest) throw new Error('Une appréciation satisfaisante enregistrée sur le serveur est requise avant une proposition de classement.');
-  return apiPost<ApiDecision>('/decisions/', {
-    case: caseId, case_version: targetCase.version, kind: 'classification',
-    reason: required(reason, 'Le motif de classement'), request_assessment: latest.id,
+  const source = decisionSources(workspace, caseId).find((row) => row.conclusion === 'satisfactory');
+  if (!source) throw new Error('Une appréciation satisfaisante actuelle du dossier est requise avant une proposition de classement.');
+  return proposeDecision(workspace, caseId, 'classification', reason, source.id);
+}
+
+export async function updateCase(
+  workspace: WorkspaceData,
+  _user: ApiUser,
+  caseId: string,
+  data: {
+    version?: number;
+    next_action?: string;
+    object?: string;
+    perimeter?: string;
+    opening_reason?: string;
+    priority?: 'normal' | 'urgent' | 'flagged';
+    deadline?: string | null;
+    team?: number[];
+    controlled_entity?: Partial<DossierEnquete['entiteControlee']>;
+    customs_operations?: DossierEnquete['operationsDouanieres'];
+  }
+): Promise<ApiCase> {
+  const currentCase = workspace.cases.find((row) => row.id === caseId);
+  const effectiveVersion = data.version ?? currentCase?.version;
+  if (!effectiveVersion) throw new Error('Version du dossier indisponible.');
+  const payload: Record<string, unknown> = { version: effectiveVersion };
+  if (data.next_action !== undefined) payload.next_action = required(data.next_action, 'La prochaine action');
+  if (data.object !== undefined) payload.object = data.object;
+  if (data.perimeter !== undefined) payload.perimeter = data.perimeter;
+  if (data.opening_reason !== undefined) payload.opening_reason = data.opening_reason;
+  if (data.priority !== undefined) payload.priority = data.priority;
+  if (data.deadline !== undefined) payload.deadline = data.deadline;
+  if (data.team !== undefined) payload.team = data.team;
+  if (data.controlled_entity) {
+    const entity = data.controlled_entity;
+    payload.controlled_entity = {
+      nom: required(entity.nom, 'Le nom de l’opérateur'),
+      rccm: entity.rccm || '',
+      nif: entity.nif || '',
+      type_entite: entity.typeEntite || '',
+      role_dans_dossier: entity.roleDansDossier || 'Entreprise contrôlée',
+      adresse: entity.adresse || '',
+      contact: entity.contact || '',
+      type_cible: entity.typeCible || '',
+      pour_le_compte_de: entity.pourLeCompteDe || '',
+    };
+  }
+  if (data.customs_operations) {
+    payload.customs_operations = data.customs_operations.map((op) => ({
+      reference_sydonia: op.referenceSydonia,
+      bureau: op.bureau || '',
+      date_declaration: op.dateDeclaration || null,
+      regime: op.regime || '',
+      marchandise: op.marchandise || '',
+      valeur_declaree_usd: op.valeurDeclareeUSD || 0,
+    }));
+  }
+  return apiPatch<ApiCase>(`/dossiers/${caseId}/`, payload);
+}
+
+export async function assignCase(
+  _workspace: WorkspaceData,
+  _user: ApiUser,
+  caseId: string,
+  newAssigneeId: number,
+  reason: string,
+  version: number,
+): Promise<ApiCase> {
+  const cleanReason = required(reason, 'Le motif de réaffectation');
+  return apiPost<ApiCase>(`/dossiers/${caseId}/affectations/`, {
+    version,
+    assignee: newAssigneeId,
+    new_assignee: newAssigneeId,
+    reason: cleanReason,
   });
 }
+
+export async function fetchCaseTimeline(caseId: string): Promise<ApiCaseTimelineEntry[]> {
+  return apiAll<ApiCaseTimelineEntry>(`/dossiers/${caseId}/chronologie/?page_size=100`);
+}
+
+export async function fetchCaseAssignments(caseId: string): Promise<ApiCaseAssignment[]> {
+  return apiAll<ApiCaseAssignment>(`/dossiers/${caseId}/affectations/?page_size=100`);
+}
+
+export async function linkIntelligenceToCase(
+  workspace: WorkspaceData,
+  intelligenceId: string,
+  caseId: string,
+  version?: number,
+): Promise<ApiIntelligence> {
+  const item = workspace.intelligence.find((entry) => entry.id === intelligenceId);
+  const currentVersion = version ?? item?.version;
+  if (!currentVersion) throw new Error('Version du renseignement indisponible.');
+  return apiPost<ApiIntelligence>(`/renseignements/${intelligenceId}/dossiers/`, {
+    version: currentVersion,
+    case: caseId,
+  });
+}
+
+export async function fetchProtectedSource(intelligenceId: string): Promise<string> {
+  const result = await apiGet<{ identity: string }>(`/renseignements/${intelligenceId}/source/`);
+  return result.identity;
+}
+
+export async function fetchDisseminations(intelligenceId: string): Promise<ApiDissemination[]> {
+  return apiAll<ApiDissemination>(`/renseignements/${intelligenceId}/diffusions/?page_size=100`);
+}
+
+export async function createDissemination(
+  intelligenceId: string,
+  data: {
+    recipient_unit: string;
+    channel: string;
+    expected_action: string;
+    reference?: string;
+    sent_at?: string | null;
+  }
+): Promise<ApiDissemination> {
+  return apiPost<ApiDissemination>(`/renseignements/${intelligenceId}/diffusions/`, {
+    recipient_unit: required(data.recipient_unit, 'L’unité destinataire'),
+    channel: required(data.channel, 'Le canal de transmission'),
+    expected_action: required(data.expected_action, 'L’action attendue'),
+    reference: data.reference || '',
+    sent_at: data.sent_at || null,
+    idempotency_key: crypto.randomUUID(),
+  });
+}
+
+export async function confirmDissemination(
+  disseminationId: string,
+  sentAt?: string,
+): Promise<ApiDissemination> {
+  return apiPost<ApiDissemination>(`/diffusions/${disseminationId}/confirmer/`, {
+    sent_at: sentAt || new Date().toISOString(),
+  });
+}
+
+export async function fetchDisseminationReturns(disseminationId: string): Promise<ApiDisseminationReturn[]> {
+  return apiAll<ApiDisseminationReturn>(`/diffusions/${disseminationId}/retours/?page_size=100`);
+}
+
+export async function createDisseminationReturn(
+  disseminationId: string,
+  data: {
+    acknowledged: boolean;
+    received_at: string;
+    note?: string;
+  }
+): Promise<ApiDisseminationReturn> {
+  return apiPost<ApiDisseminationReturn>(`/diffusions/${disseminationId}/retours/`, {
+    acknowledged: data.acknowledged,
+    received_at: required(data.received_at, 'La date de réception'),
+    note: data.note || '',
+    idempotency_key: crypto.randomUUID(),
+  });
+}
+
+export async function fetchAllUnits(): Promise<ApiUnit[]> {
+  return apiAll<ApiUnit>('/unites/?all=true&page_size=100');
+}
+
