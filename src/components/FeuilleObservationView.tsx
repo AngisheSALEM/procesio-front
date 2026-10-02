@@ -678,7 +678,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {hasPvAttached ? 'PV dressé' : 'Contradictoire en cours'}
+                        {hasPvAttached ? 'PV dressé' : 'en cours'}
                       </span>
                     </div>
 
