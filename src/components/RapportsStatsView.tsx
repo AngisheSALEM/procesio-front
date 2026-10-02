@@ -7,13 +7,7 @@ import type {
   RenseignementItem
 } from '../types';
 import type { DossierTabId } from './DossierHeader';
-import {
-  mockDossiers,
-  mockDemandesParDossier,
-  mockFeuillesParDossier,
-  mockPvsParDossier,
-  mockRenseignements
-} from '../data/mockData';
+import type { ApiStatistics } from '../api/client';
 import { SupervisionOverviewTab } from './supervision/SupervisionOverviewTab';
 import { SupervisionDossiersView } from './supervision/SupervisionDossiersView';
 import { SupervisionDemandesView } from './supervision/SupervisionDemandesView';
@@ -38,29 +32,17 @@ interface RapportsStatsViewProps {
   feuillesParDossier?: Record<string, FeuilleObservation[]>;
   pvsParDossier?: Record<string, PvDetail[]>;
   renseignements?: RenseignementItem[];
+  statistics?: ApiStatistics | null;
 }
 
 export const RapportsStatsView: React.FC<RapportsStatsViewProps> = ({
   onOpenDossier,
-  dossiers = mockDossiers,
-  demandesParDossier = {
-    'dossier-0842': [mockDemandesParDossier['dossier-0842']],
-    'dossier-0843': [mockDemandesParDossier['dossier-0843']],
-    'dossier-0844': [mockDemandesParDossier['dossier-0844']],
-    'dossier-0845': [mockDemandesParDossier['dossier-0845']],
-    'dossier-0846': [mockDemandesParDossier['dossier-0846']],
-    'dossier-0847': [mockDemandesParDossier['dossier-0847']],
-  },
-  feuillesParDossier = {
-    'dossier-0842': [mockFeuillesParDossier['dossier-0842']],
-    'dossier-0843': [mockFeuillesParDossier['dossier-0843']],
-    'dossier-0844': [mockFeuillesParDossier['dossier-0844']],
-    'dossier-0845': [mockFeuillesParDossier['dossier-0845']],
-    'dossier-0846': [mockFeuillesParDossier['dossier-0846']],
-    'dossier-0847': [mockFeuillesParDossier['dossier-0847']],
-  },
-  pvsParDossier = mockPvsParDossier,
-  renseignements = mockRenseignements,
+  dossiers = [],
+  demandesParDossier = {},
+  feuillesParDossier = {},
+  pvsParDossier = {},
+  renseignements = [],
+  statistics,
 }) => {
   const [activeTab, setActiveTab] = useState<SupervisionTabId>('overview');
 
@@ -161,6 +143,7 @@ export const RapportsStatsView: React.FC<RapportsStatsViewProps> = ({
             demandes={demandesParDossier}
             feuilles={feuillesParDossier}
             pvs={pvsParDossier}
+            statistics={statistics}
           />
         )}
 

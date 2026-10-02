@@ -18,23 +18,16 @@ import type {
   FeuilleObservation,
   PvDetail
 } from '../types';
-import {
-  mockRenseignements,
-  mockDossiers,
-  mockDemandesParDossier,
-  mockFeuillesParDossier,
-  mockPvsParDossier
-} from '../data/mockData';
 import { TablePagination } from './common/TablePagination';
-import { isAssignedToUser } from '../utils/userUtils';
 
 interface RenseignementsViewProps {
   renseignements?: RenseignementItem[];
   currentUser: UserAccount;
   onOpenDossier: (dossierId: string) => void;
-  onCreateDossier: (dossierData: any, renseignementId?: string) => void;
-  onAddRenseignement?: (item: RenseignementItem) => void;
+  onCreateDossier: (dossierData: any, renseignementId?: string) => Promise<void>;
+  onAddRenseignement?: (item: RenseignementItem, files?: File[], assigneeId?: number) => Promise<void>;
   onUpdateRenseignement?: (item: RenseignementItem) => void;
+  agents?: UserAccount[];
   dossiers?: DossierEnquete[];
   demandesParDossier?: Record<string, any>;
   feuillesParDossier?: Record<string, any>;
@@ -42,16 +35,16 @@ interface RenseignementsViewProps {
 }
 
 export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
-  renseignements = mockRenseignements,
+  renseignements = [],
   currentUser,
   onOpenDossier,
   onCreateDossier,
   onAddRenseignement,
-  onUpdateRenseignement,
-  dossiers = mockDossiers,
-  demandesParDossier = mockDemandesParDossier,
-  feuillesParDossier = mockFeuillesParDossier,
-  pvsParDossier = mockPvsParDossier,
+  agents = [],
+  dossiers = [],
+  demandesParDossier = {},
+  feuillesParDossier = {},
+  pvsParDossier = {},
 }) => {
   const [items, setItems] = useState<RenseignementItem[]>(renseignements);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -60,6 +53,8 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   const [showCreateRenseignementModal, setShowCreateRenseignementModal] = useState(false);
   const [showCreateDossierModal, setShowCreateDossierModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 6;
 
@@ -74,34 +69,32 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   };
 
   // Inspecteurs disponibles pour affectation
-  const inspecteursDisponibles = [
-    'Inspecteur Marc Kabamba (Chef de brigade)',
-    'Inspecteur Patrick Kalonji (Vérificateur)',
-    'Inspecteur Sarah Mutombo (Vérificateur)',
-    'Inspecteur Jean-Paul Ilunga (Enquêteur senior)',
-    'Inspecteur Adjoint Mireille Kabamba (Vérificateur)',
-    'Contrôleur David Mwamba (Section Exonérations)',
-  ];
+  const inspecteursDisponibles = agents;
 
   // Formulaire de Nouveau Renseignement (source, objet, pièces disponibles avec upload, priorité, affectation à qui)
   const [formSource, setFormSource] = useState('Douane');
   const [formObjet, setFormObjet] = useState('');
   const [formPiecesDisponibles, setFormPiecesDisponibles] = useState('');
-  const [formUploadedFiles, setFormUploadedFiles] = useState<{ name: string; size: string }[]>([]);
+  const [formUploadedFiles, setFormUploadedFiles] = useState<File[]>([]);
   const [formPriorite, setFormPriorite] = useState<'NORMALE' | 'URGENTE' | 'SIGNALEE'>('NORMALE');
-  const [formAffectation, setFormAffectation] = useState(inspecteursDisponibles[0]);
+  const [formAffectation, setFormAffectation] = useState('');
   const [formInstructions, setFormInstructions] = useState('');
+
+  React.useEffect(() => {
+    if (!formAffectation && agents.length > 0) setFormAffectation(agents[0].id);
+  }, [agents, formAffectation]);
 
   // Formulaire de Création de Dossier
   const [dossierNom, setDossierNom] = useState('');
-  const dossierNif = 'A1099882Z';
-  const dossierRccm = 'CD/LSH/RCCM/24-B-00812';
+  const dossierNif = '';
+  const dossierRccm = '';
   const [dossierTypeCible, setDossierTypeCible] = useState('Entreprise commerciale');
   const [dossierPourLeCompteDe, setDossierPourLeCompteDe] = useState('');
-  const [dossierAdresse, setDossierAdresse] = useState('04 Avenue des Métaux, Quartier Industriel, Lubumbashi');
-  const [dossierContact, setDossierContact] = useState('+243 81 234 5678 — contact@entreprise.cd');
+  const [dossierAdresse, setDossierAdresse] = useState('');
+  const [dossierContact, setDossierContact] = useState('');
   const [dossierObjet, setDossierObjet] = useState('');
   const [dossierResponsable, setDossierResponsable] = useState('');
+  const [dossierAssigneeId, setDossierAssigneeId] = useState('');
   const [dossierPriorite, setDossierPriorite] = useState<Priorite>('NORMALE');
   const [dossierEcheance, setDossierEcheance] = useState(() => {
     const d = new Date();
@@ -154,7 +147,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   };
 
   // Filtrage selon le rôle : l'enquêteur ne voit que les renseignements qui lui sont formellement assignés
-  const visibleItems = items.filter((r) => isAssignedToUser(r.coteA, null, currentUser));
+  const visibleItems = items;
 
   // Filtrage par recherche et source
   const filteredItems = visibleItems.filter((r) => {
@@ -188,125 +181,83 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   const handleUploadedFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      const list: { name: string; size: string }[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const f = files[i];
-        list.push({
-          name: f.name,
-          size: `${Math.round(f.size / 1024)} Ko`,
-        });
-      }
-      setFormUploadedFiles((prev) => [...prev, ...list]);
+      setFormUploadedFiles((prev) => [...prev, ...Array.from(files)]);
     }
   };
 
   // Création d'une nouvelle demande de renseignement
-  const handleCreateRenseignementSubmit = (e: React.FormEvent) => {
+  const handleCreateRenseignementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formObjet.trim()) return;
+    if (!formObjet.trim() || !onAddRenseignement || !formAffectation || isSaving) return;
 
     const todayDate = new Date().toISOString().split('T')[0];
-    const newId = `RN-${new Date().getFullYear()}-0${Math.floor(100 + Math.random() * 900)}`;
-    const newRef = `DGDA/DRK/REN/${new Date().getFullYear()}/${newId.split('-')[2]}`;
-
-    const uploadedPieces = formUploadedFiles.map((f) => `${f.name} (${f.size})`);
     const textPieces = formPiecesDisponibles
       .split(',')
       .map((p) => p.trim())
       .filter(Boolean);
-    const piecesArray = [...uploadedPieces, ...textPieces];
+    const piecesArray = textPieces;
 
     const newItem: RenseignementItem = {
-      id: newId,
-      reference: newRef,
+      id: '',
+      reference: '',
       dateReception: todayDate,
       origine: formSource,
       objet: formObjet.trim(),
       resume: formObjet.trim(),
       piecesDisponibles: piecesArray,
       niveauAcces: 'Diffusion Restreinte',
-      serviceDestinataire: 'Division des Recherches & Enquêtes Douanières',
-      statut: 'Enregistré & Affecté',
+      serviceDestinataire: currentUser.unite,
+      statut: 'À enregistrer',
       dossiersLies: [],
-      cotePar: `${currentUser.prenom} ${currentUser.nom}`,
-      coteA: formAffectation,
-      dateCotation: todayDate,
-      degreFiabilite: 'B2 — Source qualifiée, faits à vérifier',
+      coteA: (() => { const agent = agents.find((a) => a.id === formAffectation); return agent ? `${agent.prenom} ${agent.nom}` : ''; })(),
+      degreFiabilite: '',
       priorite: formPriorite,
-      instructionCotation: formInstructions.trim() || 'Enregistrer, qualifier et procéder aux investigations préalables.',
+      instructionCotation: formInstructions.trim(),
       delaiPrescritJours: formPriorite === 'URGENTE' ? 7 : 15,
-      effetProduit: 'EN_EVALUATION',
-      effetDescription: 'Renseignement qualifié et affecté à l’agent désigné. Instruction en cours.',
-      cycleEvolution: [
-        {
-          etape: '1. Enregistrement de la demande de renseignement',
-          date: todayDate,
-          acteur: `${currentUser.prenom} ${currentUser.nom}`,
-          statut: 'TERMINE',
-          commentaire: `Renseignement enregistré depuis la source : ${formSource}.`,
-        },
-        {
-          etape: '2. Qualification & Affectation à l’agent',
-          date: todayDate,
-          acteur: formAffectation,
-          statut: 'TERMINE',
-          commentaire: `Dossier et pièces orientés vers ${formAffectation}.`,
-        },
-        {
-          etape: '3. Ouverture du dossier d’enquête',
-          date: 'En attente',
-          acteur: formAffectation,
-          statut: 'A_VENIR',
-          commentaire: 'Création du dossier d’enquête contradictoire.',
-        },
-      ],
     };
 
-    setItems((prev) => [newItem, ...prev]);
-    onAddRenseignement?.(newItem);
-    setShowCreateRenseignementModal(false);
-
-    // Réinitialiser le formulaire
-    setFormObjet('');
-    setFormPiecesDisponibles('');
-    setFormUploadedFiles([]);
-    setFormInstructions('');
-
-    // Basculer directement sur la page de détail du nouveau renseignement
-    setSelectedId(newItem.id);
-    showToast(`Renseignement ${newItem.reference} enregistré et affecté.`);
+    setIsSaving(true);
+    setActionError(null);
+    try {
+      await onAddRenseignement(newItem, formUploadedFiles, Number(formAffectation));
+      setShowCreateRenseignementModal(false);
+      setFormObjet('');
+      setFormPiecesDisponibles('');
+      setFormUploadedFiles([]);
+      setFormInstructions('');
+      showToast('Renseignement enregistré.');
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Enregistrement impossible.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Ouverture du modal de création de dossier pré-rempli
   const handleOpenCreateDossierModal = () => {
     if (!selectedRenseignement) return;
+    setActionError(null);
 
-    // Détection éventuelle du nom de l'entreprise dans l'objet
-    let defaultNom = 'ENTREPRISE CONTRÔLÉE SAS';
-    const mots = selectedRenseignement.objet.split(' ');
-    if (mots.length > 2) {
-      defaultNom = mots.slice(0, 3).join(' ').toUpperCase().replace(/[^A-Z\s]/g, '');
-      if (defaultNom.length < 5) defaultNom = 'SOCIÉTÉ CONTRÔLÉE SARL';
-    }
-
-    setDossierNom(defaultNom);
+    setDossierNom('');
     setDossierObjet(selectedRenseignement.objet);
     setDossierResponsable(selectedRenseignement.coteA || `${currentUser.prenom} ${currentUser.nom}`);
+    const matchingAgent = agents.find((agent) => `${agent.prenom} ${agent.nom}` === selectedRenseignement.coteA);
+    setDossierAssigneeId(matchingAgent?.id || '');
     setDossierPriorite((selectedRenseignement.priorite as Priorite) || 'NORMALE');
     setShowCreateDossierModal(true);
   };
 
   // Soumission de la création de dossier depuis le renseignement
-  const handleCreateDossierSubmit = (e: React.FormEvent) => {
+  const handleCreateDossierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRenseignement || !dossierNom.trim()) return;
+    if (!selectedRenseignement || !dossierNom.trim() || !dossierAssigneeId || isSaving) return;
 
     const newDossierData = {
-      reference: `DGDA/DRK/DIR-ENQ/${new Date().getFullYear()}/08${Math.floor(50 + Math.random() * 49)}`,
+      assigneeId: Number(dossierAssigneeId),
       objet: dossierObjet.trim(),
       perimetre: `Contrôle contradictoire issu du renseignement ${selectedRenseignement.reference} (Origine : ${selectedRenseignement.origine})`,
       motifOuverture: `Ouverture consécutive à l’exploitation du renseignement qualifié ${selectedRenseignement.reference}`,
-      unite: 'Direction des Recherches et Enquêtes Douanières (DRK)',
+      unite: currentUser.unite,
       responsable: dossierResponsable.trim() || selectedRenseignement.coteA || `${currentUser.prenom} ${currentUser.nom}`,
       statut: 'EN_COURS' as const,
       priorite: dossierPriorite,
@@ -321,23 +272,21 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
         typeCible: dossierTypeCible,
         pourLeCompteDe: dossierPourLeCompteDe.trim() || undefined,
         roleDansDossier: 'Entreprise contrôlée' as const,
-        adresse: dossierAdresse.trim() || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
-        contact: dossierContact.trim() || '+243 81 234 5678 — contact@entreprise.cd',
+        adresse: dossierAdresse.trim(),
+        contact: dossierContact.trim(),
       },
     };
-
-    const updatedR: RenseignementItem = {
-      ...selectedRenseignement,
-      statut: 'Dossier d’enquête ouvert',
-      effetProduit: 'ENQUETE_EN_COURS',
-      dossiersLies: [...(selectedRenseignement.dossiersLies || []), newDossierData.reference],
-    };
-
-    setItems((prev) => prev.map((r) => (r.id === selectedRenseignement.id ? updatedR : r)));
-    onUpdateRenseignement?.(updatedR);
-
-    setShowCreateDossierModal(false);
-    onCreateDossier(newDossierData, selectedRenseignement.id);
+    setIsSaving(true);
+    setActionError(null);
+    try {
+      await onCreateDossier(newDossierData, selectedRenseignement.id);
+      setShowCreateDossierModal(false);
+      showToast('Dossier enregistré et lié au renseignement.');
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Création du dossier impossible.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // =========================================================================
@@ -665,29 +614,12 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {(selectedRenseignement.cycleEvolution || [
-                {
-                  etape: '1. Réception & Enregistrement',
-                  date: selectedRenseignement.dateReception,
-                  acteur: selectedRenseignement.cotePar || 'Directeur Provincial',
-                  statut: 'TERMINE' as const,
-                  commentaire: 'Fiche enregistrée au registre DRK.',
-                },
-                {
-                  etape: '2. Qualification & Affectation',
-                  date: selectedRenseignement.dateCotation || selectedRenseignement.dateReception,
-                  acteur: selectedRenseignement.coteA || 'Inspecteur vérificateur',
-                  statut: 'TERMINE' as const,
-                  commentaire: 'Information cotée et transmise à l’agent désigné.',
-                },
-                {
-                  etape: hasDossier ? '3. Dossier d’enquête ouvert' : '3. Ouverture du dossier d’enquête',
-                  date: hasDossier ? 'Effectué' : 'À venir',
-                  acteur: selectedRenseignement.coteA || 'Inspecteur',
-                  statut: hasDossier ? ('TERMINE' as const) : ('A_VENIR' as const),
-                  commentaire: hasDossier ? 'Le dossier contradictoire a été initié.' : 'Attente du déclenchement du dossier.',
-                },
-              ]).map((item, idx) => (
+              {!selectedRenseignement.cycleEvolution?.length && (
+                <div style={{ padding: '12px 14px', color: 'var(--color-text-muted)', fontSize: '12px', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border-subtle)', borderRadius: '8px' }}>
+                  Évolution non documentée par le serveur.
+                </div>
+              )}
+              {(selectedRenseignement.cycleEvolution || []).map((item, idx) => (
                 <div
                   key={idx}
                   style={{
@@ -967,20 +899,27 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                     <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '5px' }}>
                       Responsable désigné
                     </label>
-                    <input
-                      type="text"
-                      readOnly
-                      value={dossierResponsable}
+                    <select
+                      required
+                      value={dossierAssigneeId}
+                      onChange={(e) => {
+                        const agent = agents.find((entry) => entry.id === e.target.value);
+                        setDossierAssigneeId(e.target.value);
+                        setDossierResponsable(agent ? `${agent.prenom} ${agent.nom}` : '');
+                      }}
                       style={{
                         width: '100%',
                         padding: '8px 12px',
                         borderRadius: 'var(--radius-btn)',
-                        backgroundColor: 'var(--color-surface-muted)',
-                        border: '1px solid var(--color-border-subtle)',
+                        backgroundColor: 'var(--color-bg)',
+                        border: '1px solid var(--color-border)',
                         color: 'var(--color-text-primary)',
                         fontSize: '12px',
                       }}
-                    />
+                    >
+                      <option value="">Choisir un agent habilité</option>
+                      {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.prenom} {agent.nom}</option>)}
+                    </select>
                   </div>
 
                   <div>
@@ -1006,6 +945,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                   </div>
                 </div>
 
+                {actionError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{actionError}</div>}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
                   <button
                     type="button"
@@ -1025,6 +965,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                   </button>
                   <button
                     type="submit"
+                    disabled={isSaving || !dossierAssigneeId}
                     style={{
                       padding: '8px 18px',
                       borderRadius: 'var(--radius-btn)',
@@ -1036,7 +977,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                       cursor: 'pointer',
                     }}
                   >
-                    Créer et ouvrir le dossier
+                    {isSaving ? 'Enregistrement...' : 'Créer et ouvrir le dossier'}
                   </button>
                 </div>
               </form>
@@ -1422,7 +1363,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                   <input
                     type="file"
                     multiple
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg"
+                    accept=".pdf,.png,.jpg,.jpeg"
                     onChange={handleUploadedFilesChange}
                     style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
                   />
@@ -1432,7 +1373,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '6px' }}>
                     {formUploadedFiles.map((f, i) => (
                       <div key={i} style={{ fontSize: '11px', color: 'var(--color-text-primary)' }}>
-                        • {f.name} ({f.size})
+                        • {f.name} ({Math.round(f.size / 1024)} Ko)
                       </div>
                     ))}
                   </div>
@@ -1504,9 +1445,10 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                     outline: 'none',
                   }}
                 >
+                  <option value="">Choisir un agent habilité</option>
                   {inspecteursDisponibles.map((insp) => (
-                    <option key={insp} value={insp}>
-                      {insp}
+                    <option key={insp.id} value={insp.id}>
+                      {insp.prenom} {insp.nom}
                     </option>
                   ))}
                 </select>
@@ -1536,6 +1478,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                 />
               </div>
 
+              {actionError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{actionError}</div>}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
                 <button
                   type="button"
@@ -1555,6 +1498,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                 </button>
                 <button
                   type="submit"
+                  disabled={isSaving || !formAffectation || !onAddRenseignement}
                   style={{
                     padding: '8px 18px',
                     borderRadius: 'var(--radius-btn)',
@@ -1566,7 +1510,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                     cursor: 'pointer',
                   }}
                 >
-                  Enregistrer et affecter
+                  {isSaving ? 'Enregistrement...' : 'Enregistrer et affecter'}
                 </button>
               </div>
             </form>

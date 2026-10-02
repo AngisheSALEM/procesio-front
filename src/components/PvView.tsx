@@ -32,37 +32,12 @@ export const PvView: React.FC<PvViewProps> = ({
   currentUser,
   documents = [],
   onNavigateTab,
-  onUpdatePv,
-  onAddPv,
 }) => {
   const defaultAuteur = currentUser
     ? `${currentUser.prenom} ${currentUser.nom}`
     : (feuille?.inspecteurs?.[0]?.replace(/^(Inspecteur|Contrôleur|Directeur|Chef de Bureau)\s+/i, '') || 'Marc Kabamba');
 
-  // PV par défaut synthétisé si la feuille d'observation a un PV GLEC
-  const fallbackPvs: PvDetail[] = feuille?.pvInfractionGlec ? [{
-    id: 'pv-01',
-    reference: feuille.pvInfractionGlec.reference,
-    dossierId: dossier.id,
-    datePv: feuille.pvInfractionGlec.date,
-    typePv: 'Procès-verbal d’infraction',
-    inspecteurs: feuille.pvInfractionGlec.inspecteurs,
-    destinataire: feuille.destinataire || dossier.entiteControlee.nom,
-    objet: feuille.objetControle || dossier.objet,
-    cadreLegal: feuille.cadreLegal,
-    infractions: feuille.pvInfractionGlec.infractions,
-    droitsEludesUSD: 0,
-    droitsEludesCDF: 0,
-    amendeUSD: 0,
-    destinationContentieuse: 'Transmission à la Division Contentieuse DRK Lubumbashi & Parquet près le Tribunal de Grande Instance',
-    statutPv: 'TRANSMIS_CONTENTIEUX',
-    pdfNom: 'PV_Infraction_Douaniere_Officiel.pdf',
-    pdfTaille: '1.2 Mo',
-  }] : [];
-
-  const pvsList: PvDetail[] = (pvs && pvs.length > 0)
-    ? pvs
-    : (initialPv ? [initialPv] : fallbackPvs);
+  const pvsList: PvDetail[] = pvs ?? (initialPv ? [initialPv] : []);
 
   // null = vue cartes (liste), string = id du PV affiché en détail
   const [selectedPvId, setSelectedPvId] = useState<string | null>(null);
@@ -93,65 +68,7 @@ export const PvView: React.FC<PvViewProps> = ({
 
   const handleModalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!modalForm.reference.trim() || !modalForm.inspecteurs.trim() || !modalForm.objet.trim()) {
-      alert('Veuillez remplir les informations obligatoires.');
-      return;
-    }
-
-    const updatedInfractions = modalForm.infractions
-      .split('\n')
-      .map((i) => i.trim())
-      .filter(Boolean);
-
-    const inspArray = modalForm.inspecteurs.split(',').map((s) => s.trim()).filter(Boolean);
-
-    if (modalMode === 'create') {
-      const newId = `pv-${Date.now()}`;
-      const newPv: PvDetail = {
-        id: newId,
-        reference: modalForm.reference,
-        dossierId: dossier.id,
-        datePv: modalForm.date,
-        typePv: modalForm.typePv || 'Procès-verbal d’infraction',
-        destinataire: dossier.entiteControlee.nom,
-        inspecteurs: inspArray.length > 0 ? inspArray : [defaultAuteur],
-        objet: modalForm.objet.trim(),
-        cadreLegal: 'Articles 356, 357, 398 et 402 du Code des douanes (Loi n° 10/002)',
-        infractions: updatedInfractions.length > 0 ? updatedInfractions : ['Minoration de la valeur en douane taxable'],
-        droitsEludesUSD: 0,
-        droitsEludesCDF: 0,
-        amendeUSD: 0,
-        destinationContentieuse: modalForm.destination,
-        statutPv: 'DRESSE',
-        pdfNom: 'PV_Infraction_Douaniere_Officiel.pdf',
-        pdfTaille: '1.2 Mo',
-      };
-
-      if (onAddPv) {
-        onAddPv(newPv);
-      } else if (onUpdatePv) {
-        onUpdatePv(newPv);
-      }
-      setSelectedPvId(newId);
-      setShowEditModal(false);
-      showToast('Nouveau procès-verbal dressé avec succès.');
-    } else {
-      if (!activePv) return;
-      const updated: PvDetail = {
-        ...activePv,
-        reference: modalForm.reference,
-        datePv: modalForm.date,
-        typePv: modalForm.typePv || activePv.typePv || 'Procès-verbal d’infraction',
-        objet: modalForm.objet.trim() || activePv.objet,
-        inspecteurs: inspArray.length > 0 ? inspArray : activePv.inspecteurs,
-        infractions: updatedInfractions.length > 0 ? updatedInfractions : activePv.infractions,
-        destinationContentieuse: modalForm.destination,
-      };
-
-      onUpdatePv?.(updated);
-      setShowEditModal(false);
-      showToast('Procès-verbal mis à jour avec succès.');
-    }
+    showToast('La création ou modification d’un PV officiel n’est pas disponible dans l’API.');
   };
 
   const renderModal = () => (
@@ -436,6 +353,8 @@ export const PvView: React.FC<PvViewProps> = ({
           <button
             type="button"
             className="btn-primary"
+            disabled
+            title="La création de PV officiel n’est pas disponible"
             onClick={() => {
               setModalMode('create');
               setModalForm({
@@ -458,7 +377,7 @@ export const PvView: React.FC<PvViewProps> = ({
             }}
           >
             <Plus size={14} />
-            <span>Dresser un nouveau PV</span>
+            <span>PV officiel indisponible</span>
           </button>
         </div>
 
@@ -730,6 +649,7 @@ export const PvView: React.FC<PvViewProps> = ({
             <button
               type="button"
               className="btn-secondary"
+              disabled
               onClick={() => {
                 setModalMode('edit');
                 setModalForm({
@@ -825,8 +745,7 @@ export const PvView: React.FC<PvViewProps> = ({
                   type="button"
                   className="btn-secondary"
                   style={{ fontSize: '11px', padding: '6px 12px' }}
-                  onClick={() => showToast('Téléchargement du procès-verbal d’infraction...')}
-                  title="Télécharger le PV officiel"
+                  disabled title="Téléchargement indisponible dans ce parcours"
                 >
                   <Download size={13} />
                 </button>
@@ -953,6 +872,7 @@ export const PvView: React.FC<PvViewProps> = ({
             <button
               type="button"
               className="btn-secondary"
+              disabled
               onClick={() => {
                 setModalMode('edit');
                 setModalForm({

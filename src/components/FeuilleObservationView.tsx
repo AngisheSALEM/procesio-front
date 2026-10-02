@@ -14,14 +14,17 @@ import type { FeuilleObservation, UserAccount } from '../types';
 import type { DossierTabId } from './DossierHeader';
 import { formatDate } from '../utils/dateUtils';
 
+const fileSizeLabel = (file: File) => `${Math.round(file.size / 1024)} Ko`;
+
 interface FeuilleObservationViewProps {
+  dossierId?: string;
   feuilles?: FeuilleObservation[];
   initialFeuille?: FeuilleObservation | null;
   currentUser?: UserAccount;
   dossierNom?: string;
   onNavigateTab?: (tab: DossierTabId) => void;
-  onSaveFeuille?: (feuille: FeuilleObservation) => void;
-  onAddFeuille?: (feuille: FeuilleObservation) => void;
+  onSaveFeuille?: (feuille: FeuilleObservation, file?: File) => Promise<void>;
+  onAddFeuille?: (feuille: FeuilleObservation, file?: File) => Promise<void>;
   onLancerPv?: (pvData: { reference: string; date: string; motif: string; infractions: string[] }) => void;
   onCloturerSansSuite?: (motif: string) => void;
   onRevirementJugement?: (motif: string, docNom?: string) => void;
@@ -29,6 +32,7 @@ interface FeuilleObservationViewProps {
 }
 
 export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
+  dossierId,
   feuilles,
   initialFeuille,
   currentUser,
@@ -36,9 +40,6 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
   onNavigateTab,
   onSaveFeuille,
   onAddFeuille,
-  onLancerPv,
-  onCloturerSansSuite,
-  onRevirementJugement,
   hasPv = false,
 }) => {
   const feuillesList = (feuilles && feuilles.length > 0)
@@ -47,6 +48,9 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
 
   // null = vue cartes (liste), string = id de la feuille affichée en détail
   const [selectedFeuilleId, setSelectedFeuilleId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [faitsObservation, setFaitsObservation] = useState('');
 
   const feuille = selectedFeuilleId
     ? (feuillesList.find((f) => f.id === selectedFeuilleId) || null)
@@ -54,7 +58,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
 
   const defaultAuteur = currentUser
     ? `${currentUser.prenom} ${currentUser.nom}`
-    : (feuille?.inspecteurs?.[0]?.replace(/^(Inspecteur|Contrôleur|Directeur|Chef de Bureau)\s+/i, '') || 'Marc Kabamba');
+    : (feuille?.inspecteurs?.[0]?.replace(/^(Inspecteur|Contrôleur|Directeur|Chef de Bureau)\s+/i, '') || '');
 
   // Modale de création feuille d'observation
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -74,23 +78,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
 
   const handleSatisfactionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!satisfactionForm.motif.trim()) {
-      alert('Veuillez renseigner le motif de satisfaction.');
-      return;
-    }
-    if (feuille) {
-      const updated: FeuilleObservation = {
-        ...feuille,
-        statutFeuille: 'CLOTUREE',
-        decisionFinale: 'CLASSE_SANS_SUITE',
-        motifSatisfaction: satisfactionForm.motif,
-        dateCloture: satisfactionForm.dateDecision,
-      };
-      onSaveFeuille?.(updated);
-    }
-    onCloturerSansSuite?.(satisfactionForm.motif);
-    setShowSatisfactionModal(false);
-    showToast('Observations satisfaites — Feuille clôturée et dossier classé sans suite.');
+    setActionError('Le classement exige une décision proposée et validée dans l’API.');
   };
 
   // Modale de revirement sur le jugement (Feuille d'observation)
@@ -100,47 +88,24 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
     dateRevirement: new Date().toISOString().split('T')[0],
     motif: '',
     documentNom: '',
-    pdfFile: null as { name: string; size: string } | null,
+    pdfFile: null as File | null,
   });
 
   const handleRevirementSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!revirementForm.motif.trim()) {
-      alert('Veuillez renseigner le motif du revirement de situation.');
-      return;
-    }
-    const docName = revirementForm.pdfFile?.name || revirementForm.documentNom || 'Nouvelle pièce probante';
-    if (feuille) {
-      const updated: FeuilleObservation = {
-        ...feuille,
-        statutFeuille: 'REUNION_CONTRADICTOIRE',
-        decisionFinale: undefined,
-        motifSatisfaction: undefined,
-        revirementJugement: {
-          date: revirementForm.dateRevirement,
-          motif: revirementForm.motif,
-          documentNom: docName,
-          documentTaille: revirementForm.pdfFile?.size || '620 Ko',
-          inspecteur: revirementForm.inspecteur,
-        },
-      };
-      onSaveFeuille?.(updated);
-    }
-    onRevirementJugement?.(revirementForm.motif, docName);
-    setShowRevirementModal(false);
-    showToast('Revirement de situation acté. Vous pouvez réévaluer la feuille d’observation.');
+    setActionError('La révision du jugement n’est pas disponible dans ce parcours.');
   };
 
   // État du formulaire épuré : avec type de cible, agissant pour le compte de et adresse
   const [createForm, setCreateForm] = useState({
     inspecteur: defaultAuteur,
-    destinataire: feuille?.destinataire || dossierNom || 'CONGO MINING & CHEMICAL LOGISTICS SAS',
+    destinataire: feuille?.destinataire || dossierNom || '',
     typeCible: 'Entreprise commerciale',
     pourLeCompteDe: '',
-    adresse: feuille?.adresse || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
-    objet: feuille?.objetControle || 'Vérification de la valeur transactionnelle et assiette taxable du fret CIF',
+    adresse: feuille?.adresse || '',
+    objet: feuille?.objetControle || '',
     auditionPrevue: feuille?.dateReunionCloturePrevue || '2026-10-20',
-    pdfFile: null as { name: string; size: string } | null,
+    pdfFile: null as File | null,
   });
 
   // Formulaire PV d'infraction : STRICTEMENT 5 champs
@@ -159,19 +124,19 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createForm.destinataire.trim() || !createForm.objet.trim()) {
-      alert('Veuillez remplir l’entreprise destinataire et l’objet.');
+    if (!createForm.destinataire.trim() || !createForm.objet.trim() || !faitsObservation.trim() || !dossierId || isSaving) {
+      setActionError('Renseignez le destinataire, l’objet et les faits observés.');
       return;
     }
 
     const newId = `fo-${Date.now()}`;
     const newFeuille: FeuilleObservation = {
       id: newId,
-      dossierId: feuille?.dossierId || 'dossier-0842',
+      dossierId,
       dateRedaction: new Date().toISOString().split('T')[0],
-      statutFeuille: 'NOTIFIEE',
+      statutFeuille: 'BROUILLON',
       reference: `DGDA/DRK/FO/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
       inspecteurs: [createForm.inspecteur],
       destinataire: createForm.destinataire,
@@ -180,19 +145,33 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
       adresse: createForm.adresse.trim(),
       objetControle: createForm.objet,
       cadreLegal: feuille?.cadreLegal || 'Code des douanes - Contrôle différé et a posteriori',
-      observations: [],
+      observations: [{
+        code: 'O1',
+        titre: createForm.objet.trim(),
+        faitsConstates: faitsObservation.trim(),
+        justificatifsAssocies: [],
+        referencesJuridiques: '',
+        questionsAssujetti: '',
+        statutConstat: 'OUVERT',
+        analyseMotivee: '',
+      }],
       dateReunionCloturePrevue: createForm.auditionPrevue,
-      pdfSourceNom: createForm.pdfFile ? createForm.pdfFile.name : 'feuille_observation_signee.pdf',
+      pdfSourceNom: createForm.pdfFile?.name,
     };
-
-    if (onAddFeuille) {
-      onAddFeuille(newFeuille);
-    } else if (onSaveFeuille) {
-      onSaveFeuille(newFeuille);
+    setIsSaving(true);
+    setActionError(null);
+    try {
+      if (onAddFeuille) await onAddFeuille(newFeuille, createForm.pdfFile || undefined);
+      else if (onSaveFeuille) await onSaveFeuille(newFeuille, createForm.pdfFile || undefined);
+      else throw new Error('Création de feuille indisponible.');
+      setShowCreateModal(false);
+      setFaitsObservation('');
+      showToast('Projet de feuille d’observation enregistré.');
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Enregistrement impossible.');
+    } finally {
+      setIsSaving(false);
     }
-    setSelectedFeuilleId(newId);
-    setShowCreateModal(false);
-    showToast('Nouvelle feuille d’observation créée avec succès.');
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -200,48 +179,14 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
     if (file) {
       setCreateForm((prev) => ({
         ...prev,
-        pdfFile: {
-          name: file.name,
-          size: `${Math.round(file.size / 1024)} Ko`,
-        },
+        pdfFile: file,
       }));
     }
   };
 
   const handlePvSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pvForm.reference.trim() || !pvForm.infractions.trim()) {
-      alert('Veuillez renseigner la référence du PV et les infractions constatées.');
-      return;
-    }
-
-    if (feuille) {
-      const updatedFeuille: FeuilleObservation = {
-        ...feuille,
-        statutFeuille: 'CLOTUREE',
-        decisionFinale: 'PV_INFRACTION_GLEC',
-        pvInfractionGlec: {
-          reference: pvForm.reference,
-          date: pvForm.date,
-          infractions: [pvForm.infractions],
-          droitsEludesUSD: 0,
-          droitsEludesCDF: 0,
-          amendeUSD: 0,
-          inspecteurs: [pvForm.inspecteurs],
-          statutTransmission: 'TRANSMIS_GLEC',
-        },
-      };
-      onSaveFeuille?.(updatedFeuille);
-    }
-
-    onLancerPv?.({
-      reference: pvForm.reference,
-      date: pvForm.date,
-      motif: pvForm.destination,
-      infractions: [pvForm.infractions],
-    });
-    setShowPvModal(false);
-    showToast('Procès-verbal d’infraction dressé avec succès. L’onglet "PV" est désormais accessible.');
+    setActionError('La création d’un PV officiel n’est pas prise en charge par cette API.');
   };
 
   const renderCreateModal = () => (
@@ -296,6 +241,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
         </div>
 
         <form onSubmit={handleCreateSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {actionError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{actionError}</div>}
           <div>
             <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
               Inspecteur vérificateur
@@ -441,7 +387,15 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
 
           <div>
             <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-              Audition contradictoire prévue
+              Faits observés *
+            </label>
+            <textarea required rows={3} value={faitsObservation} onChange={(e) => setFaitsObservation(e.target.value)}
+              style={{ width: '100%', padding: '8px 12px', fontSize: '12px', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-btn)', color: 'var(--color-text-primary)', resize: 'vertical', fontFamily: 'inherit' }} />
+          </div>
+
+          <div>
+            <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              Réunion contradictoire prévue
             </label>
             <input
               type="date"
@@ -463,7 +417,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
 
           <div>
             <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-              Document PDF notifié
+              Document PDF associé au projet
             </label>
             <label
               style={{
@@ -483,7 +437,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             >
               <Upload size={14} color="var(--color-text-muted)" />
               <span style={{ fontSize: '12px', color: createForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {createForm.pdfFile ? `${createForm.pdfFile.name} (${createForm.pdfFile.size})` : 'Cliquer pour choisir un document PDF...'}
+                {createForm.pdfFile ? `${createForm.pdfFile.name} (${fileSizeLabel(createForm.pdfFile)})` : 'Cliquer pour choisir un document PDF...'}
               </span>
               <input
                 type="file"
@@ -494,7 +448,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             </label>
             {createForm.pdfFile && (
               <div style={{ fontSize: '11px', color: 'var(--color-accent)', marginTop: '4px' }}>
-                Document prêt : {createForm.pdfFile.name} ({createForm.pdfFile.size})
+                Document prêt : {createForm.pdfFile.name} ({fileSizeLabel(createForm.pdfFile)})
               </div>
             )}
           </div>
@@ -507,7 +461,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             >
               Annuler
             </button>
-            <button type="submit" className="btn-primary">
+            <button type="submit" disabled={isSaving} className="btn-primary">
               Créer la feuille d’observation
             </button>
           </div>
@@ -587,7 +541,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             onClick={() => {
               setCreateForm({
                 inspecteur: defaultAuteur,
-                destinataire: dossierNom || 'CONGO MINING & CHEMICAL LOGISTICS SAS',
+                destinataire: dossierNom || '',
                 typeCible: 'Entreprise commerciale',
                 pourLeCompteDe: '',
                 adresse: '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
@@ -849,7 +803,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
               <div style={{ fontSize: '12px', marginTop: '2px', color: 'var(--color-text-secondary)' }}>
                 <span style={{ color: 'var(--color-text-muted)' }}>Adresse : </span>
                 <span style={{ color: 'var(--color-text-primary)' }}>
-                  {feuille.adresse || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi'}
+                  {feuille.adresse || ''}
                 </span>
               </div>
             )}
@@ -911,7 +865,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
             </div>
           </div>
 
-          {/* 3. Document PDF notifié */}
+          {/* 3. Document PDF associé au projet */}
           <div>
             <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '4px' }}>
               Feuille d’observation notifiée 
@@ -929,7 +883,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div>
                   <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', fontWeight: 500 }}>
-                    {feuille.pdfSourceNom || "AUCUNE FEUILLE D'OBSERVATION "}
+                    {feuille.pdfSourceNom || 'Aucun document joint'}
                   </div>
                 </div>
               </div>
@@ -937,8 +891,9 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
               <button
                 type="button"
                 className="btn-secondary"
+                disabled
                 style={{ fontSize: '11px', padding: '5px 10px' }}
-                onClick={() => showToast('Téléchargement du document notifié...')}
+                title="Téléchargement indisponible dans ce parcours"
               >
                 <Download size={13} />
               </button>
@@ -991,7 +946,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px', lineHeight: 1.4 }}>
                   <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>Motif de satisfaction : </span>
-                  {feuille.motifSatisfaction || 'Justificatifs probants acceptés lors de la phase contradictoire. Absence d’infraction constatée.'}
+                  {feuille.motifSatisfaction || 'Motif indisponible.'}
                 </div>
               </div>
             )}
@@ -1012,6 +967,8 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                 <button
                   type="button"
                   className="btn-primary"
+                  disabled
+                  title="Une décision validée est nécessaire pour le classement"
                   onClick={() => {
                     setSatisfactionForm((prev) => ({
                       ...prev,
@@ -1023,12 +980,14 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                   style={{ fontSize: '12px' }}
                 >
                   <CheckCircle size={14} />
-                  <span>Valider la satisfaction & Clôturer sans suite</span>
+                  <span>Classement via décision indisponible ici</span>
                 </button>
 
                 <button
                   type="button"
                   className="btn-secondary"
+                  disabled
+                  title="La création de PV officiel n’est pas prise en charge"
                   onClick={() => {
                     setPvForm({
                       reference: `DGDA/DRK/PV-INF/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
@@ -1042,7 +1001,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                   style={{ fontSize: '12px' }}
                 >
                   <Scale size={13} />
-                  <span>Dresser un procès-verbal d’infraction (PV)</span>
+                  <span>PV officiel indisponible</span>
                 </button>
               </>
             ) : (
@@ -1054,10 +1013,10 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                   onClick={() => {
                     setCreateForm({
                       inspecteur: defaultAuteur,
-                      destinataire: feuille?.destinataire || dossierNom || 'CONGO MINING & CHEMICAL LOGISTICS SAS',
+                      destinataire: feuille?.destinataire || dossierNom || '',
                       typeCible: feuille?.typeCible || 'Entreprise commerciale',
                       pourLeCompteDe: feuille?.pourLeCompteDe || '',
-                      adresse: feuille?.adresse || '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
+                      adresse: feuille?.adresse || '',
                       objet: '',
                       auditionPrevue: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
                       pdfFile: null,
@@ -1073,6 +1032,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                 <button
                   type="button"
                   className="btn-ghost"
+                  disabled
                   onClick={() => {
                     setRevirementForm({
                       inspecteur: defaultAuteur,
@@ -1096,7 +1056,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                   }}
                 >
                   <RotateCcw size={12} />
-                  <span>Revenir sur votre jugement</span>
+                  <span>Révision indisponible</span>
                 </button>
 
                 {(hasPv || feuille?.decisionFinale === 'PV_INFRACTION_GLEC' || feuille?.pvInfractionGlec) && (
@@ -1188,6 +1148,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
 
             {/* Modal Form */}
             <form onSubmit={handleCreateSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {actionError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{actionError}</div>}
               {/* Champ 1 : Nom de l'inspecteur vérificateur */}
               <div>
                 <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
@@ -1261,7 +1222,13 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                 />
               </div>
 
-              {/* Champ 4 : Audition contradictoire prévue */}
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Faits observés *</label>
+                <textarea required rows={3} value={faitsObservation} onChange={(e) => setFaitsObservation(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', fontSize: '12px', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-btn)', color: 'var(--color-text-primary)', resize: 'vertical', fontFamily: 'inherit' }} />
+              </div>
+
+              {/* Champ 4 : Réunion contradictoire prévue */}
               <div>
                 <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                   Audition contradictoire prévue (Date)
@@ -1307,7 +1274,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                 >
                   <Upload size={14} color="var(--color-text-muted)" />
                   <span style={{ fontSize: '12px', color: createForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {createForm.pdfFile ? `${createForm.pdfFile.name} (${createForm.pdfFile.size})` : 'Cliquer pour choisir un document PDF...'}
+                    {createForm.pdfFile ? `${createForm.pdfFile.name} (${fileSizeLabel(createForm.pdfFile)})` : 'Cliquer pour choisir un document PDF...'}
                   </span>
                   <input
                     type="file"
@@ -1318,7 +1285,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                 </label>
                 {createForm.pdfFile && (
                   <div style={{ fontSize: '11px', color: 'var(--color-success)', marginTop: '4px' }}>
-                    Document prêt : {createForm.pdfFile.name} ({createForm.pdfFile.size})
+                    Document prêt : {createForm.pdfFile.name} ({fileSizeLabel(createForm.pdfFile)})
                   </div>
                 )}
               </div>
@@ -1332,7 +1299,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                 >
                   Annuler
                 </button>
-                <button type="submit" className="btn-primary">
+                <button type="submit" disabled={isSaving} className="btn-primary">
                   Créer la feuille d’observation
                 </button>
               </div>
@@ -1399,6 +1366,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
 
             {/* Modal Form */}
             <form onSubmit={handlePvSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {actionError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{actionError}</div>}
 
              
               {/* Champ 2 : Date d'établissement */}
@@ -1504,7 +1472,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                 >
                   Annuler
                 </button>
-                <button type="submit" className="btn-primary">
+                <button type="submit" disabled={isSaving} className="btn-primary">
                   Dresser le procès-verbal
                 </button>
               </div>
@@ -1577,6 +1545,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
 
             {/* Modal Form */}
             <form onSubmit={handleSatisfactionSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {actionError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{actionError}</div>}
               {/* Champ 1 : Motif de satisfaction */}
               <div>
                 <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
@@ -1706,7 +1675,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                 >
                   Annuler
                 </button>
-                <button type="submit" className="btn-primary" style={{ fontSize: '12px' }}>
+                <button type="submit" disabled={isSaving} className="btn-primary" style={{ fontSize: '12px' }}>
                   <CheckCircle size={14} />
                   <span>Valider et classer sans suite</span>
                 </button>
@@ -1800,6 +1769,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
 
             {/* Formulaire de revirement */}
             <form onSubmit={handleRevirementSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {actionError && <div role="alert" style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{actionError}</div>}
               {/* Champ 1 : Motif du revirement */}
               <div>
                 <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, marginBottom: '6px' }}>
@@ -1865,7 +1835,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                   >
                     <Upload size={14} color="var(--color-text-muted)" />
                     <span style={{ fontSize: '12px', color: revirementForm.pdfFile ? 'var(--color-text-primary)' : 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {revirementForm.pdfFile ? `${revirementForm.pdfFile.name} (${revirementForm.pdfFile.size})` : 'Cliquer pour joindre un justificatif...'}
+                      {revirementForm.pdfFile ? `${revirementForm.pdfFile.name} (${fileSizeLabel(revirementForm.pdfFile)})` : 'Cliquer pour joindre un justificatif...'}
                     </span>
                     <input
                       type="file"
@@ -1876,7 +1846,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                           setRevirementForm((prev) => ({
                             ...prev,
                             documentNom: prev.documentNom || file.name,
-                            pdfFile: { name: file.name, size: `${Math.round(file.size / 1024)} Ko` },
+                            pdfFile: file,
                           }));
                         }
                       }}
@@ -1941,7 +1911,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                 >
                   Annuler
                 </button>
-                <button type="submit" className="btn-primary" style={{ fontSize: '12px' }}>
+                <button type="submit" disabled={isSaving} className="btn-primary" style={{ fontSize: '12px' }}>
                   <RotateCcw size={13} />
                   <span>Acter le revirement</span>
                 </button>

@@ -150,7 +150,7 @@ export interface ReponseRecue {
   elementsManquantsIds: string[];
   piecesJointes: string[];
   analyseEnqueteur: string;
-  appreciation: 'SATISFAISANTE' | 'INCOMPLETE_EXPLICATIVE' | 'NON_CONVAINCANTE' | 'CONTRADICTOIRE';
+  appreciation?: 'SATISFAISANTE' | 'INCOMPLETE_EXPLICATIVE' | 'NON_CONVAINCANTE' | 'CONTRADICTOIRE';
   prochaineAction: string;
 }
 
@@ -363,8 +363,8 @@ export interface DocumentItem {
   id: string;
   reference: string;
   titre: string;
-  type: 'PV_OPERATIONS' | 'PV_INFRACTION' | 'DEMANDE_COMMUNICATION' | 'FEUILLE_OBSERVATION' | 'BORDEREAU_GELEC';
-  format: 'PDF' | 'DOCX' | 'SCAN_SIGNE' | 'XLSX';
+  type: 'PV_OPERATIONS' | 'PV_INFRACTION' | 'DEMANDE_COMMUNICATION' | 'FEUILLE_OBSERVATION' | 'BORDEREAU_GELEC' | 'PIECE_JOINTE';
+  format: 'PDF' | 'DOCX' | 'SCAN_SIGNE' | 'XLSX' | 'PNG' | 'JPEG';
   statutValidation: 'BROUILLON' | 'VALIDE_INTERNE' | 'SIGNE_OFFICIEL' | 'TRANSMIS';
   dateCreation: string;
   auteur: string;

@@ -36,50 +36,42 @@ export const ProgressionRenseignementsPvChart: React.FC<ProgressionRenseignement
   const allDemandes = useMemo(() => Object.values(demandes).flat(), [demandes]);
   const allFeuilles = useMemo(() => Object.values(feuilles).flat(), [feuilles]);
 
-  const totalR = renseignements.length || 12;
-  const totalD = allDemandes.length || 7;
-  const totalF = allFeuilles.length || 6;
-  const totalP = allPvs.length || 4;
+  const totalR = renseignements.length;
+  const totalD = allDemandes.length;
+  const totalF = allFeuilles.length;
+  const totalP = allPvs.length;
 
-  // Progression chronologique des données pour chaque métrique
+  // Les points reflètent les dates présentes dans les ressources, sans chiffres de démonstration.
   const dataPoints: DataPoint[] = useMemo(() => {
-    if (selectedPeriod === '7j') {
-      return [
-        { label: 'J-6', fullDate: '22 Août', renseignements: Math.max(1, Math.round(totalR * 0.15)), demandes: Math.max(1, Math.round(totalD * 0.1)), feuilles: 0, pvs: 0 },
-        { label: 'J-5', fullDate: '23 Août', renseignements: Math.max(2, Math.round(totalR * 0.3)), demandes: Math.max(1, Math.round(totalD * 0.2)), feuilles: Math.max(0, Math.round(totalF * 0.15)), pvs: 0 },
-        { label: 'J-4', fullDate: '24 Août', renseignements: Math.max(3, Math.round(totalR * 0.45)), demandes: Math.max(2, Math.round(totalD * 0.35)), feuilles: Math.max(1, Math.round(totalF * 0.3)), pvs: Math.max(0, Math.round(totalP * 0.2)) },
-        { label: 'J-3', fullDate: '25 Août', renseignements: Math.max(5, Math.round(totalR * 0.6)), demandes: Math.max(3, Math.round(totalD * 0.5)), feuilles: Math.max(2, Math.round(totalF * 0.45)), pvs: Math.max(1, Math.round(totalP * 0.4)) },
-        { label: 'J-2', fullDate: '26 Août', renseignements: Math.max(7, Math.round(totalR * 0.75)), demandes: Math.max(4, Math.round(totalD * 0.65)), feuilles: Math.max(3, Math.round(totalF * 0.6)), pvs: Math.max(2, Math.round(totalP * 0.6)) },
-        { label: 'J-1', fullDate: '27 Août', renseignements: Math.max(9, Math.round(totalR * 0.9)), demandes: Math.max(5, Math.round(totalD * 0.8)), feuilles: Math.max(4, Math.round(totalF * 0.8)), pvs: Math.max(3, Math.round(totalP * 0.8)) },
-        { label: 'Aujourd’hui', fullDate: '28 Août', renseignements: totalR, demandes: totalD, feuilles: totalF, pvs: totalP },
-      ];
-    }
-
-    if (selectedPeriod === '30j') {
-      return [
-        { label: '1 Août', fullDate: '01 Août 2026', renseignements: Math.max(2, Math.round(totalR * 0.25)), demandes: Math.max(1, Math.round(totalD * 0.2)), feuilles: Math.max(1, Math.round(totalF * 0.15)), pvs: Math.max(0, Math.round(totalP * 0.15)) },
-        { label: '10 Août', fullDate: '10 Août 2026', renseignements: Math.max(4, Math.round(totalR * 0.5)), demandes: Math.max(3, Math.round(totalD * 0.45)), feuilles: Math.max(2, Math.round(totalF * 0.4)), pvs: Math.max(1, Math.round(totalP * 0.35)) },
-        { label: '20 Août', fullDate: '20 Août 2026', renseignements: Math.max(7, Math.round(totalR * 0.75)), demandes: Math.max(5, Math.round(totalD * 0.7)), feuilles: Math.max(4, Math.round(totalF * 0.7)), pvs: Math.max(2, Math.round(totalP * 0.65)) },
-        { label: '30 Août', fullDate: '30 Août 2026', renseignements: totalR, demandes: totalD, feuilles: totalF, pvs: totalP },
-      ];
-    }
-
-    if (selectedPeriod === '90j') {
-      return [
-        { label: 'Juin', fullDate: 'Juin 2026', renseignements: Math.max(3, Math.round(totalR * 0.35)), demandes: Math.max(2, Math.round(totalD * 0.3)), feuilles: Math.max(1, Math.round(totalF * 0.25)), pvs: Math.max(1, Math.round(totalP * 0.2)) },
-        { label: 'Juillet', fullDate: 'Juillet 2026', renseignements: Math.max(7, Math.round(totalR * 0.7)), demandes: Math.max(4, Math.round(totalD * 0.65)), feuilles: Math.max(3, Math.round(totalF * 0.6)), pvs: Math.max(2, Math.round(totalP * 0.55)) },
-        { label: 'Août', fullDate: 'Août 2026', renseignements: totalR, demandes: totalD, feuilles: totalF, pvs: totalP },
-      ];
-    }
-
-    // 1 an
-    return [
-      { label: 'T1 2026', fullDate: 'Jan - Mar 2026', renseignements: Math.max(3, Math.round(totalR * 0.25)), demandes: Math.max(2, Math.round(totalD * 0.2)), feuilles: Math.max(1, Math.round(totalF * 0.2)), pvs: Math.max(1, Math.round(totalP * 0.2)) },
-      { label: 'T2 2026', fullDate: 'Avr - Jun 2026', renseignements: Math.max(6, Math.round(totalR * 0.55)), demandes: Math.max(4, Math.round(totalD * 0.5)), feuilles: Math.max(3, Math.round(totalF * 0.45)), pvs: Math.max(2, Math.round(totalP * 0.45)) },
-      { label: 'T3 2026', fullDate: 'Juil - Sep 2026', renseignements: Math.max(9, Math.round(totalR * 0.85)), demandes: Math.max(5, Math.round(totalD * 0.8)), feuilles: Math.max(5, Math.round(totalF * 0.75)), pvs: Math.max(3, Math.round(totalP * 0.75)) },
-      { label: 'En cours', fullDate: 'Actuel', renseignements: totalR, demandes: totalD, feuilles: totalF, pvs: totalP },
-    ];
-  }, [selectedPeriod, totalR, totalD, totalF, totalP]);
+    const days = selectedPeriod === '7j' ? 7 : selectedPeriod === '30j' ? 30 : selectedPeriod === '90j' ? 90 : 365;
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(today.getDate() - days + 1);
+    start.setHours(0, 0, 0, 0);
+    const pointCount = selectedPeriod === '7j' ? 7 : 5;
+    const dates = Array.from({ length: pointCount }, (_, index) => {
+      const point = new Date(start);
+      point.setTime(start.getTime() + (today.getTime() - start.getTime()) * (index / (pointCount - 1)));
+      return point;
+    });
+    const countUntil = (values: string[], point: Date) =>
+      values.filter((raw) => {
+        const date = new Date(raw);
+        return !Number.isNaN(date.getTime()) && date >= start && date <= point;
+      }).length;
+    const renseignementsDates = renseignements.map((item) => item.dateReception);
+    const demandesDates = allDemandes.map((item) => item.dateEmission || item.horodatage || '');
+    const feuillesDates = allFeuilles.map((item) => item.dateRedaction);
+    const pvsDates = allPvs.map((item) => item.datePv);
+    return dates.map((date) => ({
+      label: date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }),
+      fullDate: date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
+      renseignements: countUntil(renseignementsDates, date),
+      demandes: countUntil(demandesDates, date),
+      feuilles: countUntil(feuillesDates, date),
+      pvs: countUntil(pvsDates, date),
+    }));
+  }, [selectedPeriod, renseignements, allDemandes, allFeuilles, allPvs]);
 
   // Dimensions
   const svgWidth = 800;
@@ -204,6 +196,8 @@ export const ProgressionRenseignementsPvChart: React.FC<ProgressionRenseignement
             <button
               key={m.id}
               type="button"
+                disabled={m.id === 'pvs'}
+                title={m.id === 'pvs' ? 'Indicateur PV indisponible dans le backend' : undefined}
               onClick={() => {
                 setActiveMetric(m.id);
                 setHoveredIndex(null);
@@ -237,7 +231,7 @@ export const ProgressionRenseignementsPvChart: React.FC<ProgressionRenseignement
                   fontWeight: 500,
                 }}
               >
-                ({m.count})
+                ({m.id === 'pvs' ? '—' : m.count})
               </span>
             </button>
           );
@@ -256,7 +250,7 @@ export const ProgressionRenseignementsPvChart: React.FC<ProgressionRenseignement
                 {activeMetric === 'renseignements'
                   ? 'renseignements'
                   : activeMetric === 'demandes'
-                  ? 'demandes émises'
+                  ? 'demandes enregistrées'
                   : activeMetric === 'feuilles'
                   ? 'feuilles rédigées'
                   : 'PV établis'}

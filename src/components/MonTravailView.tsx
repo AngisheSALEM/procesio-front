@@ -5,27 +5,30 @@ import {
 } from 'lucide-react';
 import type { DossierEnquete, UserAccount } from '../types';
 import { TablePagination } from './common/TablePagination';
-import { isAssignedToUser } from '../utils/userUtils';
+import type { ApiWorkItem } from '../api/client';
 
 interface MonTravailViewProps {
   dossiers: DossierEnquete[];
   onOpenDossier: (dossierId: string) => void;
   onCreateDossier?: (newDossier: any) => void;
   user: UserAccount;
+  workItems?: ApiWorkItem[];
 }
 
 export const MonTravailView: React.FC<MonTravailViewProps> = ({
   dossiers,
   onOpenDossier,
   user,
+  workItems = [],
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statutFilter, setStatutFilter] = useState<'TOUS' | 'EN_COURS' | 'EN_ATTENTE' | 'A_VALIDER'>('TOUS');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 6;
 
-  // Filtrage strict : l'enquêteur ne voit que les dossiers qui lui sont personnellement assignés
-  const visibleDossiers = dossiers.filter((d) => isAssignedToUser(d.responsable, d.equipe, user));
+  // Le serveur applique déjà les droits et renvoie les dossiers nécessitant une action.
+  const workCaseIds = new Set(workItems.map((item) => item.case));
+  const visibleDossiers = user.role === 'admin' ? dossiers : dossiers.filter((d) => workCaseIds.has(d.id));
 
   // Filter dossiers
   const filteredDossiers = visibleDossiers.filter((d) => {
@@ -169,7 +172,7 @@ export const MonTravailView: React.FC<MonTravailViewProps> = ({
             {filteredDossiers.length === 0 ? (
               <tr>
                 <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                  Aucun dossier ne correspond à votre filtre.
+                  Aucun travail ne correspond à votre filtre.
                 </td>
               </tr>
             ) : (

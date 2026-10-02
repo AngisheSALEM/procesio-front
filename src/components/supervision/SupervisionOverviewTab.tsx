@@ -9,6 +9,7 @@ import type {
 } from '../../types';
 import type { DossierTabId } from '../DossierHeader';
 import { ProgressionRenseignementsPvChart } from './ProgressionRenseignementsPvChart';
+import type { ApiStatistics } from '../../api/client';
 
 interface SupervisionOverviewTabProps {
   onNavigateSubView: (tab: 'dossiers' | 'demandes' | 'feuilles' | 'classements' | 'pv' | 'renseignements') => void;
@@ -18,6 +19,7 @@ interface SupervisionOverviewTabProps {
   demandes: Record<string, DemandeCommunication[]>;
   feuilles: Record<string, FeuilleObservation[]>;
   pvs: Record<string, PvDetail[]>;
+  statistics?: ApiStatistics | null;
 }
 
 export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
@@ -28,30 +30,31 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
   demandes,
   feuilles,
   pvs,
+  statistics,
 }) => {
+  const indicator = (key: string) => statistics?.families.flatMap((family) => family.indicators).find((item) => item.key === key);
+  const metric = (key: string) => {
+    const item = indicator(key);
+    return item?.status === 'available' && typeof item.value === 'number' ? item.value : null;
+  };
   // Aggregate KPIs dynamically
-  const allDemandesList = useMemo(() => Object.values(demandes).flat(), [demandes]);
   const allFeuillesList = useMemo(() => Object.values(feuilles).flat(), [feuilles]);
   const allObservationsList = useMemo(() => allFeuillesList.flatMap((f) => f.observations || []), [allFeuillesList]);
-  const allPvsList = useMemo(() => Object.values(pvs).flat(), [pvs]);
 
   // 1. Demandes de communication
-  const totalDemandes = allDemandesList.length;
+  const totalDemandes = metric('requests.issued');
 
   // 2. Feuilles d'observation
-  const totalFeuilles = allFeuillesList.length;
+  const totalFeuilles = metric('sheets.created');
   const totalConstats = allObservationsList.length;
 
   // 3. Classement sans suite
-  const dossiersClasses = dossiers.filter((d) => d.statut === 'CLOTURE' || d.decisionCloture === 'CLASSE_SANS_SUITE');
-  const countClassesSansSuite = dossiersClasses.length;
+  const countClassesSansSuite = metric('cases.classified');
 
   // 4. Dossiers qui ont conduit à 1 ou plusieurs PV
-  const dossiersAvecPv = dossiers.filter((d) => d.hasPv || (pvs[d.id] && pvs[d.id].length > 0));
-
   // 5. Statistiques de renseignement & effets produits
-  const totalRenseignements = renseignements.length;
-  const convertisEnEnquetes = renseignements.filter((r) => r.effetProduit === 'ENQUETE_OUVERTE_AVEC_PV' || r.effetProduit === 'ENQUETE_EN_COURS').length;
+  const totalRenseignements = metric('intelligence.received');
+  const renseignementLies = metric('intelligence.linked_cases');
 
   // 4 derniers dossiers
   const recentDossiers = useMemo(() => {
@@ -101,22 +104,15 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
                   {totalRenseignements}
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '6px' }}>
-                  {convertisEnEnquetes} convertis en enquêtes ({Math.round((convertisEnEnquetes / (totalRenseignements || 1)) * 100)}%)
+                  {renseignementLies ?? '—'} liés à un dossier
                 </div>
               </div>
 
-              {/* Sparkline discrète fidèle à la maquette */}
+              {/* Période fournie par le serveur */}
               <div style={{ width: '130px', height: '36px', opacity: 0.85 }}>
-                <svg width="100%" height="100%" viewBox="0 0 130 36" fill="none">
-                  <path
-                    d="M 2 28 Q 20 20, 35 24 T 70 14 T 100 18 T 124 6"
-                    fill="none"
-                    stroke="var(--color-text-secondary)"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                  <circle cx="124" cy="6" r="3" fill="var(--color-text-primary)" />
-                </svg>
+                <span style={{ color: 'var(--color-text-muted)', fontSize: '11px' }}>
+                  {statistics ? `${statistics.start} – ${statistics.end}` : 'Période indisponible'}
+                </span>
               </div>
             </div>
           </div>
@@ -134,10 +130,10 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
           >
             <div>
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
-                Enquêtes ouvertes
+                Renseignements liés à un dossier
               </div>
               <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '2px' }}>
-                {convertisEnEnquetes}
+                {renseignementLies ?? '—'}
               </div>
             </div>
 
@@ -147,7 +143,7 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
                 Classés sans suite
               </div>
               <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '2px' }}>
-                {countClassesSansSuite}
+                {countClassesSansSuite ?? '—'}
                 <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--color-text-muted)', marginLeft: '4px' }}>
                   dossiers
                 </span>
@@ -156,10 +152,10 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
 
             <div>
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
-                En qualification
+                Sans dossier lié
               </div>
               <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '2px' }}>
-                {Math.max(0, totalRenseignements - convertisEnEnquetes)}
+                {totalRenseignements !== null && renseignementLies !== null ? Math.max(0, totalRenseignements - renseignementLies) : '—'}
               </div>
             </div>
           </div>
@@ -198,10 +194,10 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: '8px' }}>
               <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
-                {totalDemandes}
+                {totalDemandes ?? '—'}
               </div>
               <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
-                réquisitions émises
+                demandes émises
               </div>
             </div>
           </div>
@@ -237,7 +233,7 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: '8px' }}>
               <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
-                {totalFeuilles}
+                {totalFeuilles ?? '—'}
               </div>
               <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
                 {totalConstats} constats rédigés
@@ -270,16 +266,16 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
-                Dossiers ayant conduit à un PV
+                Dossiers avec PV établi
               </span>
               <ArrowRight size={14} color="var(--color-text-muted)" />
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: '8px' }}>
               <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
-                {dossiersAvecPv.length}
+                {metric('cases.pv_proven') ?? '—'}
               </div>
               <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 500 }}>
-                {allPvsList.length} PV dressés
+                {indicator('cases.pv_proven')?.status === 'masked' ? 'Indicateur masqué' : 'Indisponible'}
               </div>
             </div>
           </div>

@@ -1,160 +1,20 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Download,
-  Send,
   CheckCircle2
 } from 'lucide-react';
 
-export interface DocumentItem {
-  id: string;
-  reference: string;
-  titre: string;
-  type: 'PV_OPERATIONS' | 'PV_INFRACTION' | 'DEMANDE_COMMUNICATION' | 'FEUILLE_OBSERVATION' | 'BORDEREAU_GELEC';
-  format: 'PDF' | 'DOCX' | 'SCAN_SIGNE' | 'XLSX';
-  statutValidation: 'BROUILLON' | 'VALIDE_INTERNE' | 'SIGNE_OFFICIEL' | 'TRANSMIS';
-  dateCreation: string;
-  auteur: string;
-  signataire?: string;
-  relaisGelec: boolean;
-}
+import type { DocumentItem } from '../types';
 
 interface DocumentsTabProps {
   documents?: DocumentItem[];
 }
 
 export const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents: propDocuments }) => {
-  const defaultDocs: DocumentItem[] = [
-    {
-      id: 'DOC-01',
-      reference: 'DGDA/DRK/FO/2026/018',
-      titre: 'Feuille d’observation contradictoire provisoire (O1, O2, O3)',
-      type: 'FEUILLE_OBSERVATION',
-      format: 'PDF',
-      statutValidation: 'VALIDE_INTERNE',
-      dateCreation: '2026-08-28',
-      auteur: 'Insp. Principal Salem Mukendi',
-      signataire: 'Inspecteur Principal Salem Mukendi',
-      relaisGelec: true,
-    },
-    {
-      id: 'DOC-02',
-      reference: 'DGDA/DRK/ENQ/DC/2026/042',
-      titre: 'Demande de communication de pièces bancaires',
-      type: 'DEMANDE_COMMUNICATION',
-      format: 'SCAN_SIGNE',
-      statutValidation: 'SIGNE_OFFICIEL',
-      dateCreation: '2026-08-20',
-      auteur: 'Insp. Principal Salem Mukendi',
-      signataire: 'Jean-Paul Tshilombo (Directeur Provincial)',
-      relaisGelec: true,
-    },
-    {
-      id: 'DOC-03',
-      reference: 'DGDA/DRK/PV-OP/2026/091',
-      titre: 'Procès-verbal de constat d’opérations sur pièces',
-      type: 'PV_OPERATIONS',
-      format: 'PDF',
-      statutValidation: 'VALIDE_INTERNE',
-      dateCreation: '2026-09-05',
-      auteur: 'Insp. Adjoint Mireille Kabamba',
-      signataire: 'Mireille Kabamba & Salem Mukendi',
-      relaisGelec: true,
-    },
-    {
-      id: 'DOC-04',
-      reference: 'DGDA/DRK/PROJET-PV-INF/2026/014',
-      titre: 'Projet de Procès-verbal d’infraction douanière',
-      type: 'PV_INFRACTION',
-      format: 'DOCX',
-      statutValidation: 'BROUILLON',
-      dateCreation: '2026-09-20',
-      auteur: 'Insp. Principal Salem Mukendi',
-      relaisGelec: true,
-    },
-    {
-      id: 'DOC-05',
-      reference: 'DGDA/DRK/TAB-STAT/2026/008',
-      titre: 'Bordereau chiffré des droits compromis et pénalités calculées',
-      type: 'BORDEREAU_GELEC',
-      format: 'XLSX',
-      statutValidation: 'VALIDE_INTERNE',
-      dateCreation: '2026-09-22',
-      auteur: 'Contrôleur Éric Tshimanga',
-      relaisGelec: true,
-    },
-  ];
-
-  const [documents] = useState<DocumentItem[]>(propDocuments || defaultDocs);
-
-  const [relaisStatut, setRelaisStatut] = useState<'NON_TRANSMIS' | 'PROPOSE' | 'TRANSMIS' | 'RECEPTIONNE'>('PROPOSE');
+  const documents = propDocuments ?? [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-      {/* Relais Contentieux GELEC Card */}
-      <div
-        style={{
-          backgroundColor: 'var(--color-surface)',
-          border: 'none',
-          borderRadius: 'var(--radius-card)',
-          padding: '18px 20px',
-          display:'none'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Send size={16} color="var(--color-accent)" />
-              <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                Préparation du bordereau de transmission vers GELEC
-              </h3>
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-              Transfert tracé vers la Direction du Contentieux Douanier (GELEC)
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span
-              style={{
-                fontSize: '12px',
-                color:
-                  relaisStatut === 'PROPOSE'
-                    ? 'var(--color-warning)'
-                    : 'var(--color-success)',
-                fontWeight: 600,
-              }}
-            >
-              Statut : {relaisStatut === 'PROPOSE' ? 'Proposé pour transmission' : 'Transmis et consigné'}
-            </span>
-
-            <button
-              onClick={() => {
-                setRelaisStatut('TRANSMIS');
-                alert('Bordereau de transmission GELEC généré et horodaté sous référence TR-GELEC-2026-0842.');
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '7px 12px',
-                borderRadius: 'var(--radius-btn)',
-                backgroundColor: 'var(--color-accent)',
-                color: 'var(--color-on-accent)',
-                border: 'none',
-                fontWeight: 600,
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              <Send size={13} strokeWidth={2} />
-              <span>Générer le bordereau GELEC</span>
-            </button>
-          </div>
-        </div>
-
-      
-      </div>
 
       {/* Documents Table */}
       <div
@@ -193,6 +53,11 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents: propDocum
             </tr>
           </thead>
           <tbody>
+            {documents.length === 0 && (
+              <tr><td colSpan={6} style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                Aucune pièce enregistrée pour ce dossier.
+              </td></tr>
+            )}
             {documents.map((doc) => (
               <tr key={doc.id} style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
                 <td style={{ padding: '12px 16px' }}>
@@ -220,7 +85,11 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents: propDocum
                   </span>
                 </td>
                 <td style={{ padding: '12px 16px' }}>
-                  {doc.statutValidation === 'SIGNE_OFFICIEL' && (
+                  {doc.type === 'PIECE_JOINTE' ? (
+                    <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                      {doc.statutValidation === 'VALIDE_INTERNE' ? 'Fichier contrôlé' : 'Analyse en attente'}
+                    </span>
+                  ) : doc.statutValidation === 'SIGNE_OFFICIEL' && (
                     <span
                       style={{
                         fontSize: '12px',
@@ -234,7 +103,7 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents: propDocum
                       <CheckCircle2 size={13} /> Signé officiel
                     </span>
                   )}
-                  {doc.statutValidation === 'VALIDE_INTERNE' && (
+                  {doc.type !== 'PIECE_JOINTE' && doc.statutValidation === 'VALIDE_INTERNE' && (
                     <span
                       style={{
                         fontSize: '12px',
@@ -245,7 +114,7 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents: propDocum
                       Validé enquête
                     </span>
                   )}
-                  {doc.statutValidation === 'BROUILLON' && (
+                  {doc.type !== 'PIECE_JOINTE' && doc.statutValidation === 'BROUILLON' && (
                     <span
                       style={{
                         fontSize: '12px',
@@ -257,11 +126,11 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents: propDocum
                   )}
                 </td>
                 <td style={{ padding: '12px 16px', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                  {doc.signataire || 'Non signé'}
+                  {doc.type === 'PIECE_JOINTE' ? '—' : doc.signataire || 'Non signé'}
                 </td>
                 <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                   <button
-                    onClick={() => alert(`Téléchargement de ${doc.reference}`)}
+                    disabled title="Téléchargement indisponible dans ce parcours"
                     style={{
                       background: 'none',
                       border: '1px solid var(--color-border)',
@@ -276,7 +145,7 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents: propDocum
                     }}
                   >
                     <Download size={12} strokeWidth={2} />
-                    <span>Consulter</span>
+                    <span>Indisponible</span>
                   </button>
                 </td>
               </tr>
