@@ -138,9 +138,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
           <h1 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)', margin: '4px 0 0 0', letterSpacing: '-0.3px' }}>
             Supervision Globale du Système
           </h1>
-          <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>
-            Session d'audit : {currentUser.prenom} {currentUser.nom} ({currentUser.matricule || 'DGDA-SYS-001'}) • Contrôle d'intégrité opérationnel
-          </p>
+       
         </div>
 
         {/* Action Buttons: Primary Color strictly on CTA */}
@@ -194,7 +192,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
               <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.5px' }}>
                 Journal d’Audit Cryptographique 
               </span>
-              <ShieldCheck size={16} color="var(--color-text-muted)" />
+            
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '18px', flexWrap: 'wrap', gap: '16px' }}>
@@ -203,7 +201,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
                   {totalAuditEvents}
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '6px' }}>
-                  Événements horodatés enregistrés • 100% conformes et inaltérables
+                  Événements horodatés enregistrés 
                 </div>
               </div>
 
@@ -263,9 +261,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
               <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)', marginTop: '4px' }}>
                 {dossiers.length}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                {validUUIDCases} synchronisés en base
-              </div>
+          
             </div>
             <ArrowRight size={16} color="var(--color-text-muted)" />
           </div>
@@ -333,8 +329,8 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
         {[
           { id: 'audit', label: 'Journal d’Audit & Événements', count: filteredEvents.length },
           { id: 'cases', label: 'Tous les Dossiers Système', count: dossiers.length },
-          { id: 'agents', label: 'Agents & Habilitations RBAC', count: allAgents.length },
-          { id: 'integrity', label: 'Santé Technique & Services DRF', count: technicalDebt ? technicalDebt.summary.healthScore : 100 },
+          { id: 'agents', label: 'Agents', count: allAgents.length },
+
         ].map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -681,8 +677,8 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
                   <th style={{ padding: '12px 16px', width: '100px' }}>Unité</th>
                   <th style={{ padding: '12px 16px' }}>Action & Objet</th>
                   <th style={{ padding: '12px 16px', width: '140px' }}>Ressource</th>
-                  <th style={{ padding: '12px 16px', width: '100px' }}>Statut</th>
-                  <th style={{ padding: '12px 16px', width: '90px', textAlign: 'right' }}>Détail</th>
+                
+             
                 </tr>
               </thead>
               <tbody>
@@ -711,55 +707,24 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
                         <div style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
                           {evt.acteurNom}
                         </div>
-                        {evt.acteurMatricule && (
-                          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                            {evt.acteurMatricule}
-                          </div>
-                        )}
+                     
                       </td>
                       <td style={{ padding: '12px 16px', color: 'var(--color-text-secondary)', fontSize: '12px' }}>
-                        <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+                       
                           {evt.uniteCode}
-                        </span>
+                        
                       </td>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
                           {evt.actionLabel}
                         </div>
-                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
-                          {evt.action}
-                        </div>
+                   
                       </td>
                       <td style={{ padding: '12px 16px', color: 'var(--color-text-secondary)', fontSize: '12px' }}>
                         {evt.resourceType}
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            padding: '3px 8px',
-                            borderRadius: '12px',
-                            backgroundColor: evt.statut === 'SUCCES' ? 'rgba(52, 199, 89, 0.12)' : 'rgba(255, 149, 0, 0.12)',
-                            color: evt.statut === 'SUCCES' ? '#34C759' : '#FF9500',
-                          }}
-                        >
-                          {evt.statut}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                        <button
-                          type="button"
-                          className="btn-secondary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedEvent(evt);
-                          }}
-                          style={{ fontSize: '11px', padding: '4px 10px' }}
-                        >
-                          Voir
-                        </button>
-                      </td>
+                  
+                     
                     </tr>
                   ))
                 )}
@@ -800,7 +765,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
                   <th style={{ padding: '12px 16px', width: '160px' }}>Responsable Affecté</th>
                   <th style={{ padding: '12px 16px', width: '120px' }}>Unité</th>
                   <th style={{ padding: '12px 16px', width: '110px' }}>Statut</th>
-                  <th style={{ padding: '12px 16px', width: '110px' }}>Concordance</th>
+                  
                 
                 </tr>
               </thead>
@@ -844,20 +809,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
                           {dossier.statut}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            padding: '3px 8px',
-                            borderRadius: '12px',
-                            backgroundColor: isUUID ? 'rgba(52, 199, 89, 0.12)' : 'rgba(255, 149, 0, 0.12)',
-                            color: isUUID ? '#34C759' : '#FF9500',
-                          }}
-                        >
-                          {isUUID ? 'UUID Conforme' : 'Alias Rétro'}
-                        </span>
-                      </td>
+                     
                     
                     </tr>
                   );
@@ -984,87 +936,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
       {/* =========================================================================
           9. TAB CONTENT: SANTÉ TECHNIQUE & SERVICES BACKEND
           ========================================================================= */}
-      {activeTab === 'integrity' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: 'var(--radius-card)',
-              border: '1px solid var(--color-border)',
-              padding: '24px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div>
-                <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-muted)', letterSpacing: '0.6px' }}>
-                  Matrice de Disponibilité & Services Backend Django 5.2
-                </div>
-                <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-text-primary)', margin: '4px 0 0 0' }}>
-                  Diagnostic d'Exécution & Intégrité Système
-                </h3>
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '6px 14px',
-                  borderRadius: '20px',
-                  backgroundColor: 'rgba(52, 199, 89, 0.12)',
-                  color: '#34C759',
-                  fontSize: '13px',
-                  fontWeight: 700,
-                }}
-              >
-                <CheckCircle2 size={16} />
-                <span>Tous les services sont opérationnels</span>
-              </div>
-            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-              <div style={{ padding: '16px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Serveur API REST</div>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '4px' }}>
-                  Django 5.2 / Port 8000
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                  Latence moyenne : &lt; 2 ms • Session CSRF sécurisée
-                </div>
-              </div>
-
-              <div style={{ padding: '16px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Base de Données</div>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '4px' }}>
-                  SQLite Unifiée (WAL Mode)
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                  Verrouillage ACID • 0 collision transactionnelle
-                </div>
-              </div>
-
-              <div style={{ padding: '16px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Relais Contentieux GELEC</div>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '4px' }}>
-                  Passerelle Active
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                  Transmission signée • Preuves conformes
-                </div>
-              </div>
-
-              <div style={{ padding: '16px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Contrats de Sérialisation</div>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '4px' }}>
-                  100% DRF Conforme
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                  Zéro catch silencieux • Erreurs explicites
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* =========================================================================
           10. MODALE FORMULAIRE STRICT : EXPORT DU REGISTRE D'AUDIT

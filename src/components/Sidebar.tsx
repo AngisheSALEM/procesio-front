@@ -61,23 +61,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       id: 'admin-supervision',
       label: 'Administration Système',
-      icon: <ShieldCheck size={25} strokeWidth={1.8} />,
-    },
-    {
-      id: 'mon-travail',
-      label: 'Tous les Dossiers',
-      icon: <Briefcase size={25} strokeWidth={1.8} />,
-    },
-    {
-      id: 'renseignements',
-      label: 'Renseignements',
-      icon: <Radio size={25} strokeWidth={1.8} />,
-    },
-    {
-      id: 'rapports-stats',
-      label: 'Supervision & Stats',
       icon: <LayoutDashboard size={25} strokeWidth={1.8} />,
     },
+   
     {
       id: 'parametres',
       label: 'Paramètres',
