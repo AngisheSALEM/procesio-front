@@ -719,7 +719,7 @@ export const DecisionsGelecSection: React.FC<DecisionsGelecSectionProps> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-            <FileText size={16} color="var(--color-accent)" />
+          
             <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
               {latest ? 'Proposer une nouvelle orientation ou un remplacement' : 'Proposer une orientation pour ce dossier'}
             </h3>
@@ -739,7 +739,7 @@ export const DecisionsGelecSection: React.FC<DecisionsGelecSectionProps> = ({
                     padding: '8px 12px',
                     fontSize: '13px',
                     backgroundColor: 'var(--color-surface-elevated)',
-                    border: '1px solid var(--color-border)',
+                    border: 'none',
                     borderRadius: '8px',
                     color: 'var(--color-text-primary)',
                   }}
@@ -764,7 +764,7 @@ export const DecisionsGelecSection: React.FC<DecisionsGelecSectionProps> = ({
                     padding: '8px 12px',
                     fontSize: '13px',
                     backgroundColor: 'var(--color-surface-elevated)',
-                    border: '1px solid var(--color-border)',
+                    border: 'none',
                     borderRadius: '8px',
                     color: 'var(--color-text-primary)',
                   }}
@@ -801,7 +801,7 @@ export const DecisionsGelecSection: React.FC<DecisionsGelecSectionProps> = ({
                   padding: '10px 14px',
                   fontSize: '13px',
                   backgroundColor: 'var(--color-surface-elevated)',
-                  border: '1px solid var(--color-border)',
+                  border: 'none',
                   borderRadius: '8px',
                   color: 'var(--color-text-primary)',
                   outline: 'none',
