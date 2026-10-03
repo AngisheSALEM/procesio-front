@@ -6,7 +6,8 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
-  LogOut
+  LogOut,
+  ShieldCheck
 } from 'lucide-react';
 import type { UserAccount } from '../types';
 
@@ -39,7 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Supervision',
       icon: <LayoutDashboard size={25} strokeWidth={1.8} />,
     },
-        {
+    {
       id: 'renseignements',
       label: 'Renseignements',
       icon: <Radio size={25} strokeWidth={1.8} />,
@@ -49,7 +50,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Tous les Dossiers',
       icon: <Briefcase size={25} strokeWidth={1.8} />,
     },
+    {
+      id: 'parametres',
+      label: 'Paramètres',
+      icon: <Settings size={25} strokeWidth={1.8} />,
+    },
+  ];
 
+  const adminNavItems: NavItem[] = [
+    {
+      id: 'admin-supervision',
+      label: 'Administration Système',
+      icon: <ShieldCheck size={25} strokeWidth={1.8} />,
+    },
+    {
+      id: 'mon-travail',
+      label: 'Tous les Dossiers',
+      icon: <Briefcase size={25} strokeWidth={1.8} />,
+    },
+    {
+      id: 'renseignements',
+      label: 'Renseignements',
+      icon: <Radio size={25} strokeWidth={1.8} />,
+    },
+    {
+      id: 'rapports-stats',
+      label: 'Supervision & Stats',
+      icon: <LayoutDashboard size={25} strokeWidth={1.8} />,
+    },
     {
       id: 'parametres',
       label: 'Paramètres',
@@ -63,21 +91,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: "Dossiers d'enquetes",
       icon: <Briefcase size={25} strokeWidth={1.8} />,
     },
-    // {
-    //   id: 'components',
-    //   label: 'Lab Tableaux UX',
-    //   icon: <Table size={25} strokeWidth={1.8} />,
-    // },
     {
       id: 'renseignements',
       label: 'Renseignements',
       icon: <Radio size={25} strokeWidth={1.8} />,
     },
-    // {
-    //   id: 'documents-modeles',
-    //   label: 'Modèles d’actes',
-    //   icon: <FileCheck size={25} strokeWidth={1.8} />,
-    // },
     {
       id: 'parametres',
       label: 'Paramètres',
@@ -85,7 +103,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ];
 
-  const items = user.role === 'director' ? directorNavItems : enqueteurNavItems;
+  const items = user.role === 'admin' ? adminNavItems : user.role === 'director' ? directorNavItems : enqueteurNavItems;
 
   const handleItemClick = (itemId: string) => {
     onSelectNav(itemId);
@@ -318,7 +336,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     textOverflow: 'ellipsis',
                   }}
                 >
-                  {user.role === 'director' ? 'directeur' : 'Enquêteur'}
+                  {user.role === 'admin' ? 'Administrateur' : user.role === 'director' ? 'Directeur' : 'Enquêteur'}
                 </div>
               </div>
             )}

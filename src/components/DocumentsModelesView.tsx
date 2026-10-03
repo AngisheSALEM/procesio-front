@@ -1,5 +1,6 @@
-import React from 'react';
-import { Download } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, Eye } from 'lucide-react';
+import { PdfPreviewModal } from './common/PdfPreviewModal';
 
 export const DocumentsModelesView: React.FC = () => {
   const modeles = [
@@ -44,6 +45,14 @@ export const DocumentsModelesView: React.FC = () => {
       format: 'DOCX'
     },
   ];
+
+  const [selectedPreview, setSelectedPreview] = useState<{
+    titre: string;
+    code: string;
+    version: string;
+    description: string;
+    dateApplication: string;
+  } | null>(null);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -136,30 +145,77 @@ export const DocumentsModelesView: React.FC = () => {
                   {m.dateApplication}
                 </td>
                 <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                  <button
-                    onClick={() => alert(`Téléchargement du canevas officiel ${m.code}`)}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: 'var(--color-surface-elevated)',
-                      border: '1px solid var(--color-border)',
-                      color: 'var(--color-accent)',
-                      fontSize: '11px',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
-                  >
-                    <Download size={12} strokeWidth={2} />
-                    <span>Télécharger</span>
-                  </button>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPreview(m)}
+                      title={`Consulter le modèle ${m.code}`}
+                      style={{
+                        padding: '5px 10px',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: 'var(--color-surface-elevated)',
+                        border: '1px solid var(--color-accent)',
+                        color: 'var(--color-accent)',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                      }}
+                    >
+                      <Eye size={12} strokeWidth={2} />
+                      <span>Consulter</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPreview(m)}
+                      title={`Télécharger ${m.code}`}
+                      style={{
+                        padding: '5px 8px',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: 'var(--color-surface-elevated)',
+                        border: '1px solid var(--color-border)',
+                        color: 'var(--color-text-secondary)',
+                        fontSize: '11px',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Download size={12} strokeWidth={2} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {selectedPreview && (
+        <PdfPreviewModal
+          isOpen={Boolean(selectedPreview)}
+          onClose={() => setSelectedPreview(null)}
+          title={`${selectedPreview.code} — ${selectedPreview.titre}`}
+          metadata={{
+            reference: selectedPreview.code,
+            date: selectedPreview.dateApplication,
+            taille: 'Modèle officiel Procezo',
+          }}
+          mockContent={{
+            type: selectedPreview.titre,
+            objet: selectedPreview.description,
+            constats: [
+              `Version officielle certifiée : ${selectedPreview.version}`,
+              `Date d’entrée en vigueur : ${selectedPreview.dateApplication}`,
+              'Canevas réglementaire conforme aux instructions permanentes de la DGDA.',
+            ],
+            conclusions:
+              'Ce modèle type doit être respecté par l’ensemble des unités douanières pour tout acte de procédure contradictoire.',
+          }}
+        />
+      )}
     </div>
   );
 };

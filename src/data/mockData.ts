@@ -3,6 +3,7 @@ import type {
   DemandeCommunication,
   FeuilleObservation,
   UserAccount,
+  UserRole,
   TacheAgent,
   AlerteOperationnelle,
   EcheanceItem,
@@ -11,7 +12,7 @@ import type {
   RenseignementItem
 } from '../types';
 
-export const mockUsers: Record<'director' | 'enqueteur', UserAccount> = {
+export const mockUsers: Record<UserRole, UserAccount> = {
   director: {
     id: 'usr-director-01',
     nom: 'Mukendi',
@@ -22,6 +23,7 @@ export const mockUsers: Record<'director' | 'enqueteur', UserAccount> = {
     grade: 'Directeur Provincial / Chef de Division',
     unite: 'DRK Lubumbashi',
     avatarInitials: 'SM',
+    capabilities: ['case.create', 'case.read', 'case.update', 'case.assign', 'request.validate', 'request.sign', 'request.issue', 'decision.validate', 'gelec.transfer', 'intelligence.create', 'intelligence.read', 'intelligence.update', 'intelligence.distribute', 'source.read', 'source.write'],
   },
   enqueteur: {
     id: 'usr-enq-02',
@@ -33,12 +35,149 @@ export const mockUsers: Record<'director' | 'enqueteur', UserAccount> = {
     grade: 'Inspecteur Vérificateur',
     unite: 'DRK Lubumbashi',
     avatarInitials: 'MK',
+    capabilities: ['case.read', 'case.update', 'intelligence.create', 'intelligence.read', 'intelligence.update'],
+  },
+  admin: {
+    id: 'usr-admin-03',
+    nom: 'Mbombo',
+    prenom: 'Alain',
+    email: 'admin.tech@dgda.cd',
+    matricule: 'DGDA-SYS-001',
+    role: 'admin',
+    grade: 'Administrateur Système & Contrôleur d’Audit',
+    unite: 'Cellule Nationale d’Audit & Supervision (DGA)',
+    avatarInitials: 'AM',
+    capabilities: ['audit.read', 'case.read', 'case.update', 'intelligence.read'],
   },
 };
 
+export const mockAuditEvents: import('../types').AuditEventItem[] = [
+  {
+    id: 'evt-001',
+    occurredAt: '2026-10-03 01:11:45',
+    acteurNom: 'Alain Mbombo',
+    acteurMatricule: 'DGDA-SYS-001',
+    acteurId: 7,
+    uniteCode: 'DGA-AUDIT',
+    uniteNom: 'Cellule Nationale d’Audit & Supervision',
+    classification: 1,
+    action: 'audit.read',
+    actionLabel: 'Consultation du journal d’audit cryptographique',
+    resourceType: 'audit_event',
+    resourceId: 'global',
+    requestId: 'fb4760e3-7d70-4230-a084-f1605f6cb8c6',
+    statut: 'SUCCES',
+    details: { scope: 'cross_units', total_records: 1428, integrity_hash: 'sha256-verified' },
+  },
+  {
+    id: 'evt-002',
+    occurredAt: '2026-10-02 16:45:10',
+    acteurNom: 'Salem Mukendi',
+    acteurMatricule: 'DGDA-DIR-089',
+    acteurId: 1,
+    uniteCode: 'DRK',
+    uniteNom: 'Direction Provinciale Katanga',
+    classification: 0,
+    action: 'gelec.transfer',
+    actionLabel: 'Transmission contentieuse vers le relais GELEC',
+    resourceType: 'gelec_transfer',
+    resourceId: 'BORD-GELEC/2026/019',
+    requestId: '9a72df10-8b31-4e12-b883-4a11c828e104',
+    statut: 'SUCCES',
+    details: { bordereau: 'BORD-GELEC/2026/019', destination: 'Division Contentieuse DRK & Parquet', pieces_jointes_count: 3 },
+  },
+  {
+    id: 'evt-003',
+    occurredAt: '2026-10-02 14:20:30',
+    acteurNom: 'Salem Mukendi',
+    acteurMatricule: 'DGDA-DIR-089',
+    acteurId: 1,
+    uniteCode: 'DRK',
+    uniteNom: 'Direction Provinciale Katanga',
+    classification: 0,
+    action: 'decision.validate',
+    actionLabel: 'Validation hiérarchique d’une suite contentieuse',
+    resourceType: 'decision',
+    resourceId: 'dec-2026-0842-01',
+    requestId: '5c12ef88-2940-42b7-a367-9c988b43f112',
+    statut: 'SUCCES',
+    details: { type: 'PV_INFRACTION', montant_litigieux_usd: 82000, case: 'ab7b92d2-1659-4e3f-8768-4deb13686c93' },
+  },
+  {
+    id: 'evt-004',
+    occurredAt: '2026-10-01 11:30:15',
+    acteurNom: 'Marc Kabamba',
+    acteurMatricule: 'DGDA-INSP-2041',
+    acteurId: 3,
+    uniteCode: 'DRK',
+    uniteNom: 'Direction Provinciale Katanga',
+    classification: 0,
+    action: 'sheet.create',
+    actionLabel: 'Création d’une feuille d’observation contradictoire',
+    resourceType: 'sheet',
+    resourceId: 'fo-2026-018',
+    requestId: '3b890a41-1552-47da-8109-17d4e3209cb1',
+    statut: 'SUCCES',
+    details: { reference: 'DGDA/DRK/FO/2026/018', observations_count: 2, recipient: 'CONGO MINING & CHEMICAL LOGISTICS SAS' },
+  },
+  {
+    id: 'evt-005',
+    occurredAt: '2026-09-30 09:15:00',
+    acteurNom: 'Marc Kabamba',
+    acteurMatricule: 'DGDA-INSP-2041',
+    acteurId: 3,
+    uniteCode: 'DRK',
+    uniteNom: 'Direction Provinciale Katanga',
+    classification: 0,
+    action: 'request.issue',
+    actionLabel: 'Constat d’émission et notification d’une demande',
+    resourceType: 'request',
+    resourceId: 'demande-042',
+    requestId: '2e147d99-8801-46bb-9321-7f8e34a198c2',
+    statut: 'SUCCES',
+    details: { reference: 'DGDA/DRK/ENQ/DC/2026/042', mode: 'generated', target_name: 'TRUST MERCHANT BANK SA' },
+  },
+  {
+    id: 'evt-006',
+    occurredAt: '2026-09-28 15:05:40',
+    acteurNom: 'Jean-Paul Tshilumba',
+    acteurMatricule: 'DGDA-INSP-1092',
+    acteurId: 5,
+    uniteCode: 'DRK',
+    uniteNom: 'Direction Provinciale Katanga',
+    classification: 0,
+    action: 'case.assign',
+    actionLabel: 'Affectation et prise en charge d’un dossier d’enquête',
+    resourceType: 'case',
+    resourceId: '0fbb5f41-f387-4228-b695-f0f67d8b7019',
+    requestId: '4a091e32-9118-49ee-8431-2947df83c914',
+    statut: 'SUCCES',
+    details: { case_reference: 'DGDA/DRK/DIR-ENQ/2026/0843', reason: 'Contrôle à posteriori des assays de laboratoire CEEC' },
+  },
+  {
+    id: 'evt-007',
+    occurredAt: '2026-09-26 10:22:18',
+    acteurNom: 'Alain Mbombo',
+    acteurMatricule: 'DGDA-SYS-001',
+    acteurId: 7,
+    uniteCode: 'DGA-AUDIT',
+    uniteNom: 'Cellule Nationale d’Audit & Supervision',
+    classification: 1,
+    action: 'security.check',
+    actionLabel: 'Vérification d’intégrité des signatures et hash DRF',
+    resourceType: 'system',
+    resourceId: 'integrity_monitor',
+    requestId: '87710712-12e0-41ef-82c5-20452ac94f44',
+    statut: 'SUCCES',
+    details: { total_cases_checked: 7, zero_tampering_detected: true, rbac_enforcement: 'active' },
+  },
+];
+
+export const PRIMARY_BACKEND_CASE_UUID = 'ab7b92d2-1659-4e3f-8768-4deb13686c93';
+
 export const mockDossiers: DossierEnquete[] = [
   {
-    id: 'dossier-0842',
+    id: PRIMARY_BACKEND_CASE_UUID,
     reference: 'DGDA/DRK/DIR-ENQ/2026/0842',
     objet: 'Contrôle a posteriori   Régularité de la valeur en douane déclarée sur réactifs miniers et fret CIF',
     perimetre: 'Importations et exportations réalisées via le poste frontalier de Kasumbalesa (Exercices 2024-2025)',
@@ -873,7 +1012,12 @@ export const mockDemandesParDossier: Record<string, DemandeCommunication> = {
   },
 };
 
-export const mockDemandeCommunication: DemandeCommunication = mockDemandesParDossier['dossier-0842'];
+mockDemandesParDossier[PRIMARY_BACKEND_CASE_UUID] = {
+  ...mockDemandesParDossier['dossier-0842'],
+  dossierId: PRIMARY_BACKEND_CASE_UUID,
+};
+
+export const mockDemandeCommunication: DemandeCommunication = mockDemandesParDossier[PRIMARY_BACKEND_CASE_UUID];
 
 export const mockFeuillesParDossier: Record<string, FeuilleObservation> = {
   'dossier-0842': {
@@ -1092,6 +1236,11 @@ export const mockFeuillesParDossier: Record<string, FeuilleObservation> = {
   },
 };
 
+mockFeuillesParDossier[PRIMARY_BACKEND_CASE_UUID] = {
+  ...mockFeuillesParDossier['dossier-0842'],
+  dossierId: PRIMARY_BACKEND_CASE_UUID,
+};
+
 export const mockPvsParDossier: Record<string, import('../types').PvDetail[]> = {
   'dossier-0842': [
     {
@@ -1170,7 +1319,9 @@ export const mockPvsParDossier: Record<string, import('../types').PvDetail[]> = 
   ],
 };
 
-export const mockFeuilleObservation: FeuilleObservation = mockFeuillesParDossier['dossier-0842'];
+mockPvsParDossier[PRIMARY_BACKEND_CASE_UUID] = mockPvsParDossier['dossier-0842'];
+
+export const mockFeuilleObservation: FeuilleObservation = mockFeuillesParDossier[PRIMARY_BACKEND_CASE_UUID];
 
 export const mockDocumentsParDossier: Record<string, DocumentItem[]> = {
   'dossier-0842': [
@@ -1277,6 +1428,8 @@ export const mockDocumentsParDossier: Record<string, DocumentItem[]> = {
     },
   ],
 };
+
+mockDocumentsParDossier[PRIMARY_BACKEND_CASE_UUID] = mockDocumentsParDossier['dossier-0842'];
 
 export const mockHistoriqueParDossier: Record<string, AuditLogEntry[]> = {
   'dossier-0842': [
@@ -1396,6 +1549,8 @@ export const mockHistoriqueParDossier: Record<string, AuditLogEntry[]> = {
     },
   ],
 };
+
+mockHistoriqueParDossier[PRIMARY_BACKEND_CASE_UUID] = mockHistoriqueParDossier['dossier-0842'];
 
 export const mockTachesAgent: TacheAgent[] = [
   {

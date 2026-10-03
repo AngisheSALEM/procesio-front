@@ -21,6 +21,7 @@ import { SupervisionFeuillesView } from './supervision/SupervisionFeuillesView';
 import { SupervisionClassementsView } from './supervision/SupervisionClassementsView';
 import { SupervisionPvView } from './supervision/SupervisionPvView';
 import { SupervisionRenseignementsView } from './supervision/SupervisionRenseignementsView';
+import type { WorkspaceData } from '../api/workspace';
 
 export type SupervisionTabId =
   | 'overview'
@@ -38,6 +39,7 @@ interface RapportsStatsViewProps {
   feuillesParDossier?: Record<string, FeuilleObservation[]>;
   pvsParDossier?: Record<string, PvDetail[]>;
   renseignements?: RenseignementItem[];
+  workspace?: WorkspaceData;
 }
 
 export const RapportsStatsView: React.FC<RapportsStatsViewProps> = ({
@@ -61,6 +63,7 @@ export const RapportsStatsView: React.FC<RapportsStatsViewProps> = ({
   },
   pvsParDossier = mockPvsParDossier,
   renseignements = mockRenseignements,
+  workspace,
 }) => {
   const [activeTab, setActiveTab] = useState<SupervisionTabId>('overview');
 
@@ -161,6 +164,7 @@ export const RapportsStatsView: React.FC<RapportsStatsViewProps> = ({
             demandes={demandesParDossier}
             feuilles={feuillesParDossier}
             pvs={pvsParDossier}
+            workspace={workspace}
           />
         )}
 

@@ -12,27 +12,36 @@ import { DocumentsModelesView } from './components/DocumentsModelesView';
 import { RapportsStatsView } from './components/RapportsStatsView';
 import { ParametresView } from './components/ParametresView';
 import { ComponentsView } from './components/ComponentsView';
+import { AdministrationTechniqueView } from './components/AdministrationTechniqueView';
 import { LoginPage } from './components/LoginPage';
 import type {
   UserRole,
+  UserAccount,
   DossierEnquete,
   StatutDossier,
   DemandeCommunication,
   FeuilleObservation,
   DocumentItem,
   PvDetail,
-  RenseignementItem
+  RenseignementItem,
+  AuditEventItem,
 } from './types';
-import {
-  mockUsers,
-  mockDossiers,
-  mockDemandesParDossier,
-  mockFeuillesParDossier,
-  mockDocumentsParDossier,
-  mockPvsParDossier,
-  mockRenseignements
-} from './data/mockData';
+import { mockUsers, mockDossiers, mockDemandesParDossier, mockFeuillesParDossier, mockDocumentsParDossier, mockPvsParDossier, mockRenseignements, PRIMARY_BACKEND_CASE_UUID, mockAuditEvents } from './data/mockData';
 import { isAssignedToUser } from './utils/userUtils';
+import { getSession, login, logout, onSessionExpired, apiGet, fetchAuditEvents, type ApiUser } from './api/client';
+import { loadWorkspace, type WorkspaceData } from './api/workspace';
+import { userAccount } from './api/mappers';
+import {
+  createCase,
+  createRequest,
+  saveRequest,
+  createSheet,
+  saveSheet,
+  createIntelligence,
+  updateIntelligence,
+  proposeClassification
+} from './api/actions';
+import { useTechnicalDebt } from './hooks/useTechnicalDebt';
 
 // Storage keys for persistent state on refresh
 const STORAGE_THEME = 'procezo_theme';
@@ -49,16 +58,18 @@ export function App() {
     return saved === 'light' || saved === 'dark' ? saved : 'dark';
   });
 
-  // 2. Authentication persistence: restore login status
+  // 2. Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    const savedAuth = localStorage.getItem(STORAGE_AUTH);
-    return savedAuth !== null ? savedAuth === 'true' : true;
+    return localStorage.getItem(STORAGE_AUTH) === 'true';
   });
+  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
+  const [authError, setAuthError] = useState<string>('');
+  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
 
   // 3. Role & User persistence: defaults to 'enqueteur' (Agent de terrain)
   const [userRole, setUserRole] = useState<UserRole>(() => {
     const savedRole = localStorage.getItem(STORAGE_ROLE);
-    return savedRole === 'enqueteur' || savedRole === 'director' ? savedRole : 'enqueteur';
+    return savedRole === 'enqueteur' || savedRole === 'director' || savedRole === 'admin' ? savedRole : 'enqueteur';
   });
 
   // 4. Dossiers state (with creation support)
@@ -120,6 +131,57 @@ export function App() {
         commentairesInternes: 'Demande complémentaire de vérification',
       },
     ],
+    [PRIMARY_BACKEND_CASE_UUID]: [
+      mockDemandesParDossier[PRIMARY_BACKEND_CASE_UUID],
+      {
+        id: 'demande-043',
+        reference: 'DGDA/DRK/ENQ/DC/2026/043',
+        dossierId: PRIMARY_BACKEND_CASE_UUID,
+        redacteur: 'Inspecteur Marc Kabamba',
+        auteur: 'Inspecteur Marc Kabamba',
+        dateEmission: '2026-09-08',
+        echeanceReponse: '2026-09-22',
+        statut: 'REPONSE_COMPLETE',
+        objet: 'Communication complémentaire des factures de surestaries et fret maritime Kasumbalesa',
+        baseLegale: 'Code des douanes, Article 46',
+        destinataire: {
+          nom: 'CONGO MINING & CHEMICAL LOGISTICS SAS',
+          qualite: 'Entreprise contrôlée',
+          adresse: '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
+        },
+        elementsDemandes: [
+          {
+            id: 'EL-05',
+            libelle: 'Factures de transport ferroviaire et maritime',
+            periodeConcernee: 'Exercice 2025',
+            motifExigence: 'Contrôle du fret CIF',
+            statutRemise: 'FOURNI',
+          },
+        ],
+        reponsesRecues: [
+          {
+            id: 'REP-002',
+            dateReception: '2026-09-18',
+            referenceCourrier: 'CMCL/DG/2026/112',
+            auteur: 'Direction Financière CMCL',
+            elementsFournisIds: ['EL-05'],
+            elementsManquantsIds: [],
+            piecesJointes: ['Factures_Fret_Maritime_CMCL.pdf'],
+            analyseEnqueteur: 'Factures reçues et vérifiées',
+            appreciation: 'SATISFAISANTE',
+            prochaineAction: 'Clôture de la demande',
+          },
+        ],
+        reponsePdfNom: 'Factures_Fret_Maritime_CMCL.pdf',
+        reponsePdfDate: '2026-09-18',
+        reponsePdfRef: 'CMCL/DG/2026/112',
+        reponsePdfAuteur: 'Direction Financière CMCL',
+        signataireHabilite: 'Salem Mukendi (Directeur Provincial)',
+        gradeSignataire: 'Commandement de Division',
+        modaliteRemise: 'Transmission électronique et dépôt physique',
+        commentairesInternes: 'Demande complémentaire de vérification',
+      },
+    ],
     'dossier-0843': [mockDemandesParDossier['dossier-0843']],
     'dossier-0844': [mockDemandesParDossier['dossier-0844']],
     'dossier-0845': [mockDemandesParDossier['dossier-0845']],
@@ -130,6 +192,7 @@ export function App() {
   // Feuilles d'observation (par dossier) : Tableau de feuilles
   const [feuillesParDossier, setFeuillesParDossier] = useState<Record<string, FeuilleObservation[]>>({
     'dossier-0842': [mockFeuillesParDossier['dossier-0842']],
+    [PRIMARY_BACKEND_CASE_UUID]: [mockFeuillesParDossier[PRIMARY_BACKEND_CASE_UUID]],
     'dossier-0843': [mockFeuillesParDossier['dossier-0843']],
     'dossier-0844': [mockFeuillesParDossier['dossier-0844']],
     'dossier-0845': [mockFeuillesParDossier['dossier-0845']],
@@ -144,6 +207,133 @@ export function App() {
   // Documents et PV du dossier
   const [documentsParDossier, setDocumentsParDossier] = useState<Record<string, DocumentItem[]>>(mockDocumentsParDossier);
 
+  // État de connexion avec l'API Django
+  const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
+  const [backendUser, setBackendUser] = useState<ApiUser | null>(null);
+  const [workspaceData, setWorkspaceData] = useState<WorkspaceData | null>(null);
+  const [auditEvents, setAuditEvents] = useState<AuditEventItem[]>(mockAuditEvents);
+
+  const refreshBackend = useCallback(async () => {
+    if (backendUser) {
+      try {
+        const ws = await loadWorkspace(backendUser);
+        setWorkspaceData(ws);
+        if (ws.dossiers && ws.dossiers.length > 0) {
+          setDossiers(ws.dossiers);
+        }
+        if (ws.demandesParDossier) {
+          setDemandesParDossier((prev) => ({ ...prev, ...ws.demandesParDossier }));
+        }
+        if (ws.feuillesParDossier) {
+          setFeuillesParDossier((prev) => ({ ...prev, ...ws.feuillesParDossier }));
+        }
+        if (ws.renseignements) {
+          setRenseignements(ws.renseignements);
+        }
+        if (backendUser.memberships.some((m) => m.role === 'auditor' || m.capabilities?.includes('audit.read'))) {
+          try {
+            const unitId = backendUser.memberships[0]?.unit.id;
+            const remoteAudits = await fetchAuditEvents(unitId);
+            if (remoteAudits.length > 0) {
+              setAuditEvents(remoteAudits.map((a) => ({
+                id: a.id,
+                occurredAt: a.occurred_at.slice(0, 19).replace('T', ' '),
+                acteurNom: a.actor_name || `Agent #${a.actor}`,
+                acteurMatricule: `DGDA-AGT-${a.actor}`,
+                acteurId: a.actor,
+                uniteCode: a.unit_name || a.unit,
+                classification: a.classification,
+                action: a.action,
+                actionLabel: a.action,
+                resourceType: a.resource_type,
+                resourceId: a.resource_id,
+                requestId: a.request_id,
+                statut: 'SUCCES',
+                details: a.details,
+              })));
+            }
+          } catch {
+            // keep current events
+          }
+        }
+      } catch (err) {
+        console.warn('[App] Échec du rafraîchissement backend:', err);
+      }
+    }
+  }, [backendUser]);
+
+  // Connexion transparente au backend Django et vérification de session active
+  useEffect(() => {
+    let isMounted = true;
+    async function initBackend() {
+      try {
+        const session = await getSession();
+        if (!isMounted) return;
+        if (session.authenticated) {
+          const me = await apiGet<ApiUser>('/me/');
+          if (!isMounted) return;
+          const ws = await loadWorkspace(me);
+          if (!isMounted) return;
+          setBackendUser(me);
+          setWorkspaceData(ws);
+          setIsBackendConnected(true);
+          const isAuditor = me.memberships.some((m) => m.role === 'auditor') || me.username === 'mbombo' || me.username === 'demo_auditor';
+          const isManager = me.memberships.some((m) => m.role === 'manager');
+          const role: UserRole = isAuditor ? 'admin' : isManager ? 'director' : 'enqueteur';
+          setUserRole(role);
+          setIsAuthenticated(true);
+          localStorage.setItem(STORAGE_AUTH, 'true');
+          localStorage.setItem(STORAGE_ROLE, role);
+          if (ws.dossiers && ws.dossiers.length > 0) {
+            setDossiers(ws.dossiers);
+            setSelectedDossierId((prev) => {
+              const exists = ws.dossiers.some((d) => d.id === prev);
+              if (exists) return prev;
+              localStorage.setItem(STORAGE_SELECTED_DOSSIER, ws.dossiers[0].id);
+              return ws.dossiers[0].id;
+            });
+          }
+          if (ws.demandesParDossier && Object.keys(ws.demandesParDossier).length > 0) {
+            setDemandesParDossier((prev) => ({ ...prev, ...ws.demandesParDossier }));
+          }
+          if (ws.feuillesParDossier && Object.keys(ws.feuillesParDossier).length > 0) {
+            setFeuillesParDossier((prev) => ({ ...prev, ...ws.feuillesParDossier }));
+          }
+          if (ws.renseignements && ws.renseignements.length > 0) {
+            setRenseignements(ws.renseignements);
+          }
+        } else {
+          setIsAuthenticated(false);
+          localStorage.removeItem(STORAGE_AUTH);
+        }
+      } catch {
+        if (isMounted) {
+          setIsBackendConnected(false);
+          const savedAuth = localStorage.getItem(STORAGE_AUTH);
+          if (savedAuth === 'true') {
+            setIsAuthenticated(true);
+          }
+        }
+      } finally {
+        if (isMounted) setIsCheckingAuth(false);
+      }
+    }
+    void initBackend();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Détection d'expiration de session serveur
+  useEffect(() => {
+    const unsubscribe = onSessionExpired(() => {
+      setBackendUser(null);
+      setWorkspaceData(null);
+      setIsAuthenticated(false);
+      localStorage.removeItem(STORAGE_AUTH);
+      setAuthError('Votre session a expiré. Veuillez vous reconnecter.');
+    });
+    return () => unsubscribe();
+  }, []);
+
   const dossiersRef = useRef(dossiers);
   useEffect(() => {
     dossiersRef.current = dossiers;
@@ -152,6 +342,10 @@ export function App() {
   // 5. Selected Dossier persistence (garantit qu'un enquêteur n'accède qu'à un dossier qui lui est assigné)
   const [selectedDossierId, setSelectedDossierId] = useState<string>(() => {
     const saved = localStorage.getItem(STORAGE_SELECTED_DOSSIER);
+    if (saved === 'dossier-0842') {
+      localStorage.setItem(STORAGE_SELECTED_DOSSIER, PRIMARY_BACKEND_CASE_UUID);
+      return PRIMARY_BACKEND_CASE_UUID;
+    }
     const initialUser = mockUsers[userRole];
     const allowed = mockDossiers.filter((d) => isAssignedToUser(d.responsable, d.equipe, initialUser));
     if (saved && (mockDossiers.some((d) => d.id === saved || d.reference === saved) || saved.startsWith('dossier-'))) {
@@ -177,9 +371,12 @@ export function App() {
         setSelectedDossierId(dId);
         return 'dossier-detail';
       }
-      return role === 'director' ? 'rapports-stats' : 'mon-travail';
+      const defaultNav = role === 'admin' ? 'admin-supervision' : role === 'director' ? 'rapports-stats' : 'mon-travail';
+      return defaultNav;
     }
+    const defaultNav = role === 'admin' ? 'admin-supervision' : role === 'director' ? 'rapports-stats' : 'mon-travail';
     const validRoutes = [
+      'admin-supervision',
       'dossiers-enquete',
       'dossier-detail',
       'mon-travail',
@@ -196,7 +393,7 @@ export function App() {
     if (savedNav && validRoutes.includes(savedNav)) {
       return savedNav === 'dossiers-enquete' ? 'dossier-detail' : savedNav;
     }
-    return role === 'director' ? 'rapports-stats' : 'mon-travail';
+    return defaultNav;
   }, []);
 
   const [activeNav, setActiveNav] = useState<string>(() => getNavFromHash(userRole, dossiers));
@@ -259,42 +456,88 @@ export function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  const currentUser = mockUsers[userRole];
+  const currentUser: UserAccount = useMemo(() => {
+    if (backendUser) {
+      const isAuditor = backendUser.memberships.some((m) => m.role === 'auditor') || backendUser.username === 'mbombo' || backendUser.username === 'demo_auditor';
+      const isManager = backendUser.memberships.some((m) => m.role === 'manager');
+      return userAccount(backendUser, isAuditor ? 'auditor' : isManager ? 'manager' : 'investigator');
+    }
+    return mockUsers[userRole];
+  }, [backendUser, userRole]);
 
-  // Dossiers visibles selon le rôle : l'directeur voit tous les dossiers, l'enquêteur ne voit que ceux qui lui sont assignés
+  // Dossiers visibles selon le rôle : le directeur et l'admin voient tous les dossiers, l'enquêteur ne voit que ceux qui lui sont assignés
   const visibleDossiers = useMemo(() => {
+    if (currentUser.role === 'director' || currentUser.role === 'admin') return dossiers;
     return dossiers.filter((d) => isAssignedToUser(d.responsable, d.equipe, currentUser));
   }, [dossiers, currentUser]);
 
-  // Renseignements visibles selon le rôle : l'directeur voit tous les renseignements, l'enquêteur ne voit que ceux qui lui sont assignés
+  // Renseignements visibles selon le rôle : le directeur et l'admin voient tous les renseignements, l'enquêteur ne voit que ceux qui lui sont assignés
   const visibleRenseignements = useMemo(() => {
+    if (currentUser.role === 'director' || currentUser.role === 'admin') return renseignements;
     return renseignements.filter((r) => isAssignedToUser(r.coteA, null, currentUser));
   }, [renseignements, currentUser]);
 
-  const handleLogin = (role: UserRole) => {
-    setUserRole(role);
-    setIsAuthenticated(true);
-    localStorage.setItem(STORAGE_AUTH, 'true');
-    localStorage.setItem(STORAGE_ROLE, role);
-
-    const defaultRoute = role === 'director' ? 'rapports-stats' : 'mon-travail';
-    setActiveNav(defaultRoute);
-    window.location.hash = `#/${defaultRoute}`;
-
-    // S'assurer que le dossier sélectionné par défaut appartient bien à l'utilisateur
-    if (role === 'enqueteur') {
-      const enqUser = mockUsers.enqueteur;
-      const firstAllowed = dossiers.find((d) => isAssignedToUser(d.responsable, d.equipe, enqUser));
-      if (firstAllowed) {
-        setSelectedDossierId(firstAllowed.id);
-        localStorage.setItem(STORAGE_SELECTED_DOSSIER, firstAllowed.id);
+  const handleLogin = async (username: string, password: string) => {
+    setIsLoggingIn(true);
+    setAuthError('');
+    try {
+      await login(username, password);
+      const me = await apiGet<ApiUser>('/me/');
+      const ws = await loadWorkspace(me);
+      setBackendUser(me);
+      setWorkspaceData(ws);
+      setIsBackendConnected(true);
+      const isAuditor = me.memberships.some((m) => m.role === 'auditor') || me.username === 'mbombo' || me.username === 'demo_auditor';
+      const isManager = me.memberships.some((m) => m.role === 'manager');
+      const role: UserRole = isAuditor ? 'admin' : isManager ? 'director' : 'enqueteur';
+      setUserRole(role);
+      setIsAuthenticated(true);
+      localStorage.setItem(STORAGE_AUTH, 'true');
+      localStorage.setItem(STORAGE_ROLE, role);
+      if (ws.dossiers && ws.dossiers.length > 0) {
+        setDossiers(ws.dossiers);
+        setSelectedDossierId(ws.dossiers[0].id);
       }
+      if (ws.demandesParDossier) {
+        setDemandesParDossier((prev) => ({ ...prev, ...ws.demandesParDossier }));
+      }
+      if (ws.feuillesParDossier) {
+        setFeuillesParDossier((prev) => ({ ...prev, ...ws.feuillesParDossier }));
+      }
+      if (ws.renseignements) {
+        setRenseignements(ws.renseignements);
+      }
+      const defaultRoute = role === 'admin' ? 'admin-supervision' : role === 'director' ? 'rapports-stats' : 'mon-travail';
+      setActiveNav(defaultRoute);
+      window.location.hash = `#/${defaultRoute}`;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Identifiants invalides ou serveur indisponible.';
+      setAuthError(msg);
+      throw err;
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
-  const handleLogout = () => {
+  const handleOfflineDemo = () => {
+    setIsAuthenticated(true);
+    localStorage.setItem(STORAGE_AUTH, 'true');
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (err) {
+      console.warn('[App] Échec de la déconnexion backend:', err);
+    }
+    setBackendUser(null);
+    setWorkspaceData(null);
     setIsAuthenticated(false);
-    localStorage.setItem(STORAGE_AUTH, 'false');
+    localStorage.removeItem(STORAGE_AUTH);
+    localStorage.removeItem(STORAGE_ROLE);
+    localStorage.removeItem(STORAGE_NAV);
+    localStorage.removeItem(STORAGE_TAB);
+    localStorage.removeItem(STORAGE_SELECTED_DOSSIER);
     window.location.hash = '';
   };
 
@@ -327,13 +570,14 @@ export function App() {
   };
 
   const handleBackToDashboard = () => {
-    setActiveNav('mon-travail');
-    window.location.hash = '#/mon-travail';
+    const defaultRoute = currentUser.role === 'admin' ? 'admin-supervision' : currentUser.role === 'director' ? 'rapports-stats' : 'mon-travail';
+    setActiveNav(defaultRoute);
+    window.location.hash = `#/${defaultRoute}`;
   };
 
   // Résolution du dossier actif : strictement restreint aux dossiers autorisés
   const currentDossier = useMemo(() => {
-    const list = currentUser.role === 'director' ? dossiers : visibleDossiers;
+    const list = (currentUser.role === 'director' || currentUser.role === 'admin') ? dossiers : visibleDossiers;
     return (
       list.find((d) => d.id === selectedDossierId || d.reference === selectedDossierId) ||
       dossiers.find((d) => d.id === selectedDossierId || d.reference === selectedDossierId) ||
@@ -342,6 +586,21 @@ export function App() {
       mockDossiers[0]
     );
   }, [dossiers, visibleDossiers, selectedDossierId, currentUser.role]);
+
+  // Hook d'analyse et de diagnostic en temps réel de la dette technique
+  const technicalDebt = useTechnicalDebt({
+    workspace: workspaceData,
+    currentDossier,
+    currentUser,
+    demandesParDossier,
+    feuillesParDossier,
+    documentsParDossier,
+  });
+
+  if (typeof window !== 'undefined') {
+    (window as unknown as { __technicalDebt?: typeof technicalDebt }).__technicalDebt = technicalDebt;
+  }
+
   const currentDemandes = demandesParDossier[currentDossier.id] || [];
   const currentFeuilles = feuillesParDossier[currentDossier.id] || [];
   const currentPvs = pvsParDossier[currentDossier.id] || [];
@@ -351,17 +610,42 @@ export function App() {
   const hasPv = currentPvs.length > 0;
 
   // Handle adding a new Demande de communication
-  const handleAddDemande = (newDemande: DemandeCommunication) => {
-    const dId = newDemande.dossierId || currentDossier.id;
+  const handleAddDemande = async (newDemande: DemandeCommunication, file?: File) => {
+    const targetCaseId = newDemande.dossierId || currentDossier.id;
+    const validatedDemande = { ...newDemande, dossierId: targetCaseId };
+    if (workspaceData) {
+      try {
+        await createRequest(validatedDemande, file);
+        await refreshBackend();
+        return;
+      } catch (err) {
+        console.error('[App] Erreur création demande backend:', err);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        alert(`Échec de création de la demande en base : ${errMsg}`);
+        return;
+      }
+    }
     setDemandesParDossier((prev) => ({
       ...prev,
-      [dId]: [...(prev[dId] || []), newDemande],
+      [targetCaseId]: [...(prev[targetCaseId] || []), validatedDemande],
     }));
   };
 
   // Handle classifying without further action (Clôture sans suite)
-  const handleCloturerSansSuite = (motif: string, dId?: string) => {
+  const handleCloturerSansSuite = async (motif: string, dId?: string) => {
     const targetId = dId || currentDossier.id;
+    if (workspaceData) {
+      try {
+        await proposeClassification(workspaceData, targetId, motif);
+        await refreshBackend();
+        return;
+      } catch (err) {
+        console.error('[App] Erreur proposition classement backend:', err);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        alert(`Échec de la proposition de classement sans suite : ${errMsg}`);
+        return;
+      }
+    }
     const today = new Date().toISOString().split('T')[0];
     setDossiers((prev) =>
       prev.map((d) => {
@@ -401,21 +685,34 @@ export function App() {
   };
 
   // Handle saving/updating a Demande de communication
-  const handleSaveDemande = (updatedDemande: DemandeCommunication) => {
-    const dId = updatedDemande.dossierId || currentDossier.id;
+  const handleSaveDemande = async (updatedDemande: DemandeCommunication, file?: File) => {
+    const targetCaseId = updatedDemande.dossierId || currentDossier.id;
+    const validatedDemande = { ...updatedDemande, dossierId: targetCaseId };
+    if (workspaceData) {
+      try {
+        await saveRequest(workspaceData, validatedDemande, file);
+        await refreshBackend();
+        return;
+      } catch (err) {
+        console.error('[App] Erreur enregistrement demande backend:', err);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        alert(`Échec de l'enregistrement de la demande : ${errMsg}`);
+        return;
+      }
+    }
     setDemandesParDossier((prev) => {
-      const list = prev[dId] || [];
-      const exists = list.some((d) => d.id === updatedDemande.id);
+      const list = prev[targetCaseId] || [];
+      const exists = list.some((d) => d.id === validatedDemande.id);
       return {
         ...prev,
-        [dId]: exists
-          ? list.map((d) => (d.id === updatedDemande.id ? updatedDemande : d))
-          : [...list, updatedDemande],
+        [targetCaseId]: exists
+          ? list.map((d) => (d.id === validatedDemande.id ? validatedDemande : d))
+          : [...list, validatedDemande],
       };
     });
 
-    if (updatedDemande.evaluationReponse === 'SATISFAISANTE' && updatedDemande.motifSatisfaction) {
-      handleCloturerSansSuite(updatedDemande.motifSatisfaction, dId);
+    if (validatedDemande.evaluationReponse === 'SATISFAISANTE' && validatedDemande.motifSatisfaction) {
+      handleCloturerSansSuite(validatedDemande.motifSatisfaction, targetCaseId);
     }
   };
 
@@ -444,30 +741,56 @@ export function App() {
   };
 
   // Handle adding a new Feuille d'observation
-  const handleAddFeuille = (newFeuille: FeuilleObservation) => {
-    const dId = newFeuille.dossierId || currentDossier.id;
+  const handleAddFeuille = async (newFeuille: FeuilleObservation, file?: File) => {
+    const targetCaseId = newFeuille.dossierId || currentDossier.id;
+    const validatedFeuille = { ...newFeuille, dossierId: targetCaseId };
+    if (workspaceData) {
+      try {
+        await createSheet(validatedFeuille, file);
+        await refreshBackend();
+        return;
+      } catch (err) {
+        console.error('[App] Erreur création feuille backend:', err);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        alert(`Échec de création de la feuille d'observation en base : ${errMsg}`);
+        return;
+      }
+    }
     setFeuillesParDossier((prev) => ({
       ...prev,
-      [dId]: [...(prev[dId] || []), newFeuille],
+      [targetCaseId]: [...(prev[targetCaseId] || []), validatedFeuille],
     }));
   };
 
   // Handle saving/updating a Feuille d'observation
-  const handleSaveFeuille = (updatedFeuille: FeuilleObservation) => {
-    const dId = updatedFeuille.dossierId || currentDossier.id;
+  const handleSaveFeuille = async (updatedFeuille: FeuilleObservation, file?: File) => {
+    const targetCaseId = updatedFeuille.dossierId || currentDossier.id;
+    const validatedFeuille = { ...updatedFeuille, dossierId: targetCaseId };
+    if (workspaceData) {
+      try {
+        await saveSheet(workspaceData, validatedFeuille, file);
+        await refreshBackend();
+        return;
+      } catch (err) {
+        console.error('[App] Erreur enregistrement feuille backend:', err);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        alert(`Échec d'enregistrement de la feuille en base : ${errMsg}`);
+        return;
+      }
+    }
     setFeuillesParDossier((prev) => {
-      const list = prev[dId] || [];
-      const exists = list.some((f) => f.id === updatedFeuille.id);
+      const list = prev[targetCaseId] || [];
+      const exists = list.some((f) => f.id === validatedFeuille.id);
       return {
         ...prev,
-        [dId]: exists
-          ? list.map((f) => (f.id === updatedFeuille.id ? updatedFeuille : f))
-          : [...list, updatedFeuille],
+        [targetCaseId]: exists
+          ? list.map((f) => (f.id === validatedFeuille.id ? validatedFeuille : f))
+          : [...list, validatedFeuille],
       };
     });
 
     if (updatedFeuille.decisionFinale === 'CLASSE_SANS_SUITE' && updatedFeuille.motifSatisfaction) {
-      handleCloturerSansSuite(updatedFeuille.motifSatisfaction, dId);
+      handleCloturerSansSuite(updatedFeuille.motifSatisfaction, targetCaseId);
     }
   };
 
@@ -608,7 +931,26 @@ export function App() {
   };
 
   // Handle creating a new dossier with precise timestamp (and optional intelligence link)
-  const handleCreateDossier = (data: any, renseignementId?: string) => {
+  const handleCreateDossier = async (data: any, renseignementId?: string) => {
+    if (workspaceData && backendUser) {
+      try {
+        const created = await createCase(workspaceData, backendUser, data, renseignementId);
+        await refreshBackend();
+        setSelectedDossierId(created.id);
+        localStorage.setItem(STORAGE_SELECTED_DOSSIER, created.id);
+        setActiveDossierTab('vue-ensemble');
+        localStorage.setItem(STORAGE_TAB, 'vue-ensemble');
+        setActiveNav('dossier-detail');
+        window.location.hash = `#/dossier/${created.id}`;
+        return;
+      } catch (err) {
+        console.error('[App] Erreur création dossier backend:', err);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        alert(`Échec de création du dossier en base : ${errMsg}`);
+        throw err;
+      }
+    }
+
     const now = new Date();
     const timestamp = `${now.toISOString().split('T')[0]} ${now.toTimeString().split(' ')[0]}`;
     const newId = data.id || `dossier-${Date.now().toString().slice(-4)}`;
@@ -677,19 +1019,58 @@ export function App() {
     window.location.hash = `#/dossier/${newId}`;
   };
 
-  const handleAddRenseignement = (newR: RenseignementItem) => {
+  const handleAddRenseignement = async (newR: RenseignementItem, files?: File[], assigneeId?: number) => {
+    if (workspaceData && backendUser) {
+      try {
+        await createIntelligence(workspaceData, backendUser, newR, files, assigneeId);
+        await refreshBackend();
+        return;
+      } catch (err) {
+        console.error('[App] Erreur création renseignement backend:', err);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        alert(`Échec de création du renseignement en base : ${errMsg}`);
+        throw err;
+      }
+    }
     setRenseignements((prev) => [newR, ...prev]);
   };
 
-  const handleUpdateRenseignement = (updatedR: RenseignementItem) => {
+  const handleUpdateRenseignement = async (updatedR: RenseignementItem) => {
+    if (workspaceData && backendUser) {
+      try {
+        await updateIntelligence(workspaceData, backendUser, updatedR);
+        await refreshBackend();
+        return;
+      } catch (err) {
+        console.error('[App] Erreur mise à jour renseignement backend:', err);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        alert(`Échec de mise à jour du renseignement en base : ${errMsg}`);
+        return;
+      }
+    }
     setRenseignements((prev) => prev.map((r) => (r.id === updatedR.id ? updatedR : r)));
   };
 
 
 
+  if (isCheckingAuth) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', backgroundColor: 'var(--color-bg)', color: 'var(--color-text-secondary)', fontSize: '13px', fontWeight: 500 }}>
+        Vérification de la session en cours…
+      </div>
+    );
+  }
+
   // If not authenticated, render Login Page
   if (!isAuthenticated) {
-    return <LoginPage onLogin={handleLogin} />;
+    return (
+      <LoginPage
+        onLogin={handleLogin}
+        onOfflineDemo={handleOfflineDemo}
+        error={authError}
+        loading={isLoggingIn}
+      />
+    );
   }
 
   return (
@@ -757,6 +1138,23 @@ export function App() {
               }}
             />
             <span style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '0.6px' }}>PROCEZO</span>
+            {isBackendConnected && (
+              <span
+                style={{
+                  fontSize: '9px',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.4px',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--color-bg)',
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-text-muted)',
+                }}
+              >
+                API
+              </span>
+            )}
           </div>
         </header>
 
@@ -771,6 +1169,8 @@ export function App() {
             minWidth: 0,
           }}
         > 
+  
+
           {/* Route: Dossier Detail (Page de détail d'un dossier accédée depuis le tableau) */}
           {(activeNav === 'dossier-detail' || activeNav === 'dossiers-enquete') && (
             <div key={`dossier-wrapper-${currentDossier.id}`} className="view-transition"> <br />
@@ -804,6 +1204,8 @@ export function App() {
                     onSaveFeuille={handleSaveFeuille}
                     onCloturerSansSuite={handleCloturerSansSuite}
                     currentUser={currentUser}
+                    workspace={workspaceData}
+                    onRefresh={refreshBackend}
                   />
                 )}
 
@@ -811,10 +1213,13 @@ export function App() {
                 {activeDossierTab === 'actions-echanges' && (
                   <DemandeCommunicationView
                     key={currentDossier.id}
+                    dossierId={currentDossier.id}
                     demandes={currentDemandes}
                     initialDemande={currentDemandes[0] || null}
                     currentUser={currentUser}
                     dossierNom={currentDossier.entiteControlee.nom}
+                    workspace={workspaceData || undefined}
+                    onRefresh={refreshBackend}
                     onGoToFeuilleObservation={() => setActiveDossierTab('constats-defense')}
                     onUpdateDemande={handleSaveDemande}
                     onAddDemande={handleAddDemande}
@@ -830,10 +1235,13 @@ export function App() {
                 {activeDossierTab === 'constats-defense' && (
                   <FeuilleObservationView
                     key={currentDossier.id}
+                    dossierId={currentDossier.id}
                     feuilles={currentFeuilles}
                     initialFeuille={currentFeuilles[0] || null}
                     currentUser={currentUser}
                     dossierNom={currentDossier.entiteControlee.nom}
+                    workspace={workspaceData || undefined}
+                    onRefresh={refreshBackend}
                     onNavigateTab={(tab) => setActiveDossierTab(tab)}
                     onSaveFeuille={handleSaveFeuille}
                     onAddFeuille={handleAddFeuille}
@@ -862,6 +1270,25 @@ export function App() {
             </div>
           )}
 
+          {/* Route: Administration & Audit Système (Profil Admin Technique) */}
+          {activeNav === 'admin-supervision' && (
+            <div key="admin-supervision" className="view-container view-transition">
+              <AdministrationTechniqueView
+                onOpenDossier={handleOpenDossier}
+                dossiers={dossiers}
+                renseignements={renseignements}
+                demandesParDossier={demandesParDossier}
+                feuillesParDossier={feuillesParDossier}
+                pvsParDossier={pvsParDossier}
+                auditEvents={auditEvents}
+                currentUser={currentUser}
+                workspace={workspaceData || undefined}
+                backendUser={backendUser || undefined}
+                onRefresh={refreshBackend}
+              />
+            </div>
+          )}
+
           {/* Route: Mon travail (Tableau minimaliste des dossiers de l'agent) */}
           {activeNav === 'mon-travail' && (
             <div key="mon-travail" className="view-container view-transition">
@@ -870,6 +1297,9 @@ export function App() {
                 onOpenDossier={handleOpenDossier}
                 onCreateDossier={handleCreateDossier}
                 user={currentUser}
+                workspace={workspaceData || undefined}
+                workItems={workspaceData?.workItems}
+                validationItems={workspaceData?.validationItems}
               />
             </div>
           )}
@@ -880,6 +1310,9 @@ export function App() {
               <RenseignementsView
                 renseignements={visibleRenseignements}
                 currentUser={currentUser}
+                backendUser={backendUser || undefined}
+                workspace={workspaceData || undefined}
+                onRefresh={refreshBackend}
                 onOpenDossier={handleOpenDossier}
                 onCreateDossier={handleCreateDossier}
                 onAddRenseignement={handleAddRenseignement}
@@ -909,6 +1342,7 @@ export function App() {
                 demandesParDossier={demandesParDossier}
                 feuillesParDossier={feuillesParDossier}
                 pvsParDossier={pvsParDossier}
+                workspace={workspaceData || undefined}
               />
             </div>
           )}
@@ -927,6 +1361,7 @@ export function App() {
                 user={currentUser}
                 theme={theme}
                 onToggleTheme={toggleTheme}
+                technicalDebt={technicalDebt}
               />
             </div>
           )}

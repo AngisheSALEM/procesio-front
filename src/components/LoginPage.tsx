@@ -1,29 +1,82 @@
-import React, { useState } from 'react';
-import { Shield, Briefcase, Lock, Mail, ArrowRight, UserCheck } from 'lucide-react';
+import { useState } from 'react';
+import { Shield, Briefcase, ShieldCheck, Lock, Mail, ArrowRight, UserCheck } from 'lucide-react';
 import type { UserRole } from '../types';
-import { mockUsers } from '../data/mockData';
 
 interface LoginPageProps {
-  onLogin: (role: UserRole) => void;
+  onLogin: (username: string, password: string) => Promise<void> | void;
+  onOfflineDemo?: () => void;
+  error?: string;
+  loading?: boolean;
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
-  const [selectedRole, setSelectedRole] = useState<UserRole>('enqueteur');
-  const [email, setEmail] = useState('enqueteur@dgda.cd');
-  const [password, setPassword] = useState('••••••••••••');
+export const LoginPage: React.FC<LoginPageProps> = ({
+  onLogin,
+  onOfflineDemo,
+  error: externalError,
+  loading: externalLoading = false,
+}) => {
+  const [selectedRole, setSelectedRole] = useState<UserRole>('director');
+  const [username, setUsername] = useState('mukendi');
+  const [password, setPassword] = useState('dgda-procezo-2026');
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
 
   const handleSelectRole = (role: UserRole) => {
     setSelectedRole(role);
-    setEmail(mockUsers[role].email);
+    setFormError('');
+    if (role === 'director') {
+      setUsername('mukendi');
+      setPassword('dgda-procezo-2026');
+    } else if (role === 'admin') {
+      setUsername('mbombo');
+      setPassword('dgda-procezo-2026');
+    } else {
+      setUsername('kabamba');
+      setPassword('dgda-procezo-2026');
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin(selectedRole);
+    if (submitting || externalLoading) return;
+    setSubmitting(true);
+    setFormError('');
+    try {
+      await onLogin(username.trim(), password);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Échec de la connexion. Vérifiez vos identifiants.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const activeUser = mockUsers[selectedRole];
+  const activeUser = selectedRole === 'director'
+    ? {
+        prenom: 'Salem',
+        nom: 'Mukendi',
+        grade: 'Inspecteur Principal / Chef de Division',
+        unite: 'Direction des Recherches et Enquêtes (DRK)',
+        avatarInitials: 'SM',
+        matricule: 'DGDA-DIR-089',
+      }
+    : selectedRole === 'admin'
+    ? {
+        prenom: 'Alain',
+        nom: 'Mbombo',
+        grade: 'Administrateur Système & Contrôleur d’Audit',
+        unite: 'Cellule Nationale d’Audit & Supervision (DGA)',
+        avatarInitials: 'AM',
+        matricule: 'DGDA-SYS-001',
+      }
+    : {
+        prenom: 'Marc',
+        nom: 'Kabamba',
+        grade: 'Inspecteur Vérificateur de 1ère classe',
+        unite: 'Direction des Recherches et Enquêtes (DRK)',
+        avatarInitials: 'MK',
+        matricule: 'DGDA-INSP-2041',
+      };
 
   return (
     <div
@@ -118,7 +171,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           >
             Sélectionnez votre profil de connexion :
           </label>
-          <div className="form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div className="form-grid-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
             <button
               type="button"
               onClick={() => handleSelectRole('director')}
@@ -127,7 +180,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '14px 10px',
+                padding: '12px 6px',
                 borderRadius: '16px',
                 border: selectedRole === 'director'
                   ? '2px solid var(--color-accent)'
@@ -142,13 +195,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 transition: 'all var(--transition-fast)',
               }}
             >
-              <Shield size={20} strokeWidth={selectedRole === 'director' ? 2.2 : 1.8} />
+              <Shield size={18} strokeWidth={selectedRole === 'director' ? 2.2 : 1.8} />
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                  directeur
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                  Directeur
                 </div>
-                <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                  Supervision & Décision
+                <div style={{ fontSize: '9px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                  Supervision
                 </div>
               </div>
             </button>
@@ -161,7 +214,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '14px 10px',
+                padding: '12px 6px',
                 borderRadius: '16px',
                 border: selectedRole === 'enqueteur'
                   ? '2px solid var(--color-accent)'
@@ -176,13 +229,47 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 transition: 'all var(--transition-fast)',
               }}
             >
-              <Briefcase size={20} strokeWidth={selectedRole === 'enqueteur' ? 2.2 : 1.8} />
+              <Briefcase size={18} strokeWidth={selectedRole === 'enqueteur' ? 2.2 : 1.8} />
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
                   Enquêteur
                 </div>
-                <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                  Terrain & Instruction
+                <div style={{ fontSize: '9px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                  Instruction
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectRole('admin')}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 6px',
+                borderRadius: '16px',
+                border: selectedRole === 'admin'
+                  ? '2px solid var(--color-accent)'
+                  : '1px solid var(--glass-border)',
+                backgroundColor: selectedRole === 'admin'
+                  ? 'var(--glass-surface)'
+                  : 'transparent',
+                color: selectedRole === 'admin'
+                  ? 'var(--color-accent)'
+                  : 'var(--color-text-secondary)',
+                cursor: 'pointer',
+                transition: 'all var(--transition-fast)',
+              }}
+            >
+              <ShieldCheck size={18} strokeWidth={selectedRole === 'admin' ? 2.2 : 1.8} />
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                  Admin Tech
+                </div>
+                <div style={{ fontSize: '9px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                  Audit & Système
                 </div>
               </div>
             </button>
@@ -256,10 +343,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             >
               <Mail size={16} color="var(--color-text-muted)" />
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                name="username"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
+                placeholder="ex. mukendi, kabamba..."
                 style={{
                   background: 'transparent',
                   border: 'none',
@@ -302,6 +392,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               <Lock size={16} color="var(--color-text-muted)" />
               <input
                 type="password"
+                name="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -318,6 +410,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             </div>
           </div>
 
+          {(formError || externalError) && (
+            <div
+              role="alert"
+              style={{
+                fontSize: '12px',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                border: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-surface)',
+                color: 'var(--color-text-primary)',
+                lineHeight: 1.4,
+              }}
+            >
+              {formError || externalError}
+            </div>
+          )}
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <input
               type="checkbox"
@@ -333,6 +442,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
           <button
             type="submit"
+            disabled={submitting || externalLoading}
             style={{
               marginTop: '8px',
               display: 'flex',
@@ -346,13 +456,35 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               color: 'var(--color-on-accent)',
               fontSize: '14px',
               fontWeight: 700,
-              cursor: 'pointer',
+              cursor: submitting || externalLoading ? 'wait' : 'pointer',
+              opacity: submitting || externalLoading ? 0.75 : 1,
               transition: 'all var(--transition-fast)',
             }}
           >
-            <span>Se connecter en tant que {selectedRole === 'director' ? 'directeur' : 'Enquêteur'}</span>
+            <span>
+              {submitting || externalLoading
+                ? 'Connexion sécurisée en cours…'
+                : `Se connecter en tant que ${selectedRole === 'director' ? 'directeur' : 'Enquêteur'}`}
+            </span>
             <ArrowRight size={16} strokeWidth={2.2} />
           </button>
+
+          {onOfflineDemo && (
+            <button
+              type="button"
+              onClick={onOfflineDemo}
+              className="btn-ghost"
+              style={{
+                fontSize: '12px',
+                padding: '6px 10px',
+                color: 'var(--color-text-muted)',
+                cursor: 'pointer',
+                textAlign: 'center',
+              }}
+            >
+              Accéder en mode démonstration locale (hors-ligne)
+            </button>
+          )}
         </form>
 
         <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--color-text-muted)' }}>

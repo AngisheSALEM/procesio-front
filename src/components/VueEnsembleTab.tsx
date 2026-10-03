@@ -9,6 +9,8 @@ import {
 import type { DossierEnquete, DemandeCommunication, FeuilleObservation, UserAccount, PvDetail } from '../types';
 import { formatDate } from '../utils/dateUtils';
 import { ModalPortal } from './common/ModalPortal';
+import { DecisionsGelecSection } from './decisions/DecisionsGelecSection';
+import type { WorkspaceData } from '../api/workspace';
 
 interface VueEnsembleTabProps {
   dossier: DossierEnquete;
@@ -24,6 +26,9 @@ interface VueEnsembleTabProps {
   onSaveFeuille?: (feuille: FeuilleObservation) => void;
   onCloturerSansSuite?: (motif: string) => void;
   currentUser?: UserAccount;
+  workspace?: WorkspaceData | null;
+  onRefresh?: () => Promise<unknown>;
+  canUpdate?: boolean;
 }
 
 export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
@@ -40,6 +45,9 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
   onSaveFeuille,
   onCloturerSansSuite: _onCloturerSansSuite,
   currentUser,
+  workspace = null,
+  onRefresh,
+  canUpdate = true,
 }) => {
   const demandesList = (demandes && demandes.length > 0)
     ? demandes
@@ -572,6 +580,18 @@ export const VueEnsembleTab: React.FC<VueEnsembleTabProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* =========================================================================
+          5. SECTION DÉCISIONS ADMINISTRATIVES & RELAIS CONTENTIEUX GELEC
+          ========================================================================= */}
+      {workspace && (
+        <DecisionsGelecSection
+          caseId={dossier.id}
+          workspace={workspace}
+          onRefresh={onRefresh}
+          canUpdate={canUpdate}
+        />
       )}
 
       {/* =========================================================================

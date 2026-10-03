@@ -6,12 +6,14 @@ import {
   CheckCircle,
   Scale,
   Printer,
-  ArrowLeft
+  ArrowLeft,
+  Eye
 } from 'lucide-react';
 import type { DossierEnquete, FeuilleObservation, UserAccount, DocumentItem, PvDetail } from '../types';
 import type { DossierTabId } from './DossierHeader';
 import { formatDate } from '../utils/dateUtils';
 import { ModalPortal } from './common/ModalPortal';
+import { PdfPreviewModal } from './common/PdfPreviewModal';
 
 interface PvViewProps {
   dossier: DossierEnquete;
@@ -75,6 +77,13 @@ export const PvView: React.FC<PvViewProps> = ({
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('edit');
   const [showEditModal, setShowEditModal] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [previewPdfData, setPreviewPdfData] = useState<{
+    title: string;
+    metadata?: any;
+    mockContent?: any;
+    file?: File;
+    fileUrl?: string;
+  } | null>(null);
 
   // Formulaire modal avec référence, date, type, objet, inspecteurs, infractions, destination
   const [modalForm, setModalForm] = useState({
@@ -823,11 +832,45 @@ export const PvView: React.FC<PvViewProps> = ({
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <button
                   type="button"
                   className="btn-secondary"
-                  style={{ fontSize: '11px', padding: '6px 12px' }}
+                  style={{ fontSize: '11px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                  onClick={() =>
+                    setPreviewPdfData({
+                      title: pvData.pdfNom || 'PV_Infraction_Douaniere_Officiel.pdf',
+                      metadata: {
+                        reference: pvData.reference,
+                        auteur: Array.isArray(pvData.inspecteurs) ? pvData.inspecteurs.join(', ') : pvData.inspecteurs,
+                        date: pvData.date,
+                        taille: pvData.pdfTaille || '1.2 Mo',
+                        entite: pvData.destinataire,
+                      },
+                      mockContent: {
+                        type: 'PROCÈS-VERBAL D’INFRACTION DOUANIÈRE OFFICIEL',
+                        destinataire: pvData.destinataire,
+                        objet: pvData.motif,
+                        constats: pvData.infractions,
+                        observations: [
+                          `Droits éludés / compromis : ${pvData.droitsEludesUSD ? `${pvData.droitsEludesUSD.toLocaleString('fr-FR')} USD` : ''} ${pvData.droitsEludesCDF ? `${pvData.droitsEludesCDF.toLocaleString('fr-FR')} CDF` : ''}`,
+                          `Amende légale encourue : ${pvData.amendeUSD ? `${pvData.amendeUSD.toLocaleString('fr-FR')} USD` : 'Calcul légal en cours'}`,
+                          `Destination contentieuse : ${pvData.destination || 'Parquet près le TGI'}`,
+                        ],
+                        conclusions:
+                          'Acté contradictoirement par les verbalisateurs soussignés pour transmission aux instances compétentes.',
+                      },
+                    })
+                  }
+                  title="Consulter et prévisualiser le PV officiel PDF"
+                >
+                  <Eye size={13} />
+                  <span>Consulter</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ fontSize: '11px', padding: '6px 10px' }}
                   onClick={() => showToast('Téléchargement du procès-verbal d’infraction...')}
                   title="Télécharger le PV officiel"
                 >
@@ -999,6 +1042,19 @@ export const PvView: React.FC<PvViewProps> = ({
 
       {/* Modale d'édition / création */}
       {showEditModal && renderModal()}
+
+      {/* Modale de prévisualisation PDF */}
+      {previewPdfData && (
+        <PdfPreviewModal
+          isOpen={Boolean(previewPdfData)}
+          onClose={() => setPreviewPdfData(null)}
+          title={previewPdfData.title}
+          fileUrl={previewPdfData.fileUrl}
+          file={previewPdfData.file}
+          metadata={previewPdfData.metadata}
+          mockContent={previewPdfData.mockContent}
+        />
+      )}
     </div>
   );
 };

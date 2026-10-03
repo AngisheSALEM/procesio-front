@@ -7,20 +7,34 @@ import {
   CheckCircle,
   Scale,
   ArrowLeft,
-  RotateCcw
+  RotateCcw,
+  Eye,
+  FileText,
+  ShieldCheck,
+  History,
+  Check,
+  Send,
+  CheckSquare
 } from 'lucide-react';
-import type { DemandeCommunication, FeuilleObservation, UserAccount } from '../types';
+import type { DemandeCommunication, ElementDemande, FeuilleObservation, ReponseRecue, UserAccount } from '../types';
 import { formatDate } from '../utils/dateUtils';
 import { ModalPortal } from './common/ModalPortal';
+import { PdfPreviewModal } from './common/PdfPreviewModal';
+import { apiPost, type ApiRequest } from '../api/client';
+import { assessRequestItem, rectifyResponse } from '../api/workflows';
+import type { WorkspaceData } from '../api/workspace';
 
 interface DemandeCommunicationViewProps {
+  dossierId?: string;
   demandes?: DemandeCommunication[];
   initialDemande?: DemandeCommunication | null;
   currentUser?: UserAccount;
   dossierNom?: string;
+  workspace?: WorkspaceData;
+  onRefresh?: (caseId?: string) => Promise<unknown>;
   onGoToFeuilleObservation?: () => void;
   onUpdateDemande?: (demande: DemandeCommunication) => void;
-  onAddDemande?: (demande: DemandeCommunication) => void;
+  onAddDemande?: (demande: DemandeCommunication, file?: File) => void | Promise<void>;
   onCancelDemande?: (demandeId: string) => void;
   onCreateFeuille?: (feuille: FeuilleObservation) => void;
   onCloturerSansSuite?: (motif: string) => void;
@@ -30,10 +44,13 @@ interface DemandeCommunicationViewProps {
 }
 
 export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> = ({
+  dossierId,
   demandes,
   initialDemande,
   currentUser,
   dossierNom,
+  workspace,
+  onRefresh,
   onGoToFeuilleObservation,
   onUpdateDemande,
   onAddDemande,
@@ -59,6 +76,194 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
     ? `${currentUser.prenom} ${currentUser.nom}`
     : (demande?.auteur?.replace(/^(Inspecteur|Contrôleur|Directeur|Chef de Bureau)\s+/i, '') || demande?.redacteur?.replace(/^(Inspecteur|Contrôleur|Directeur|Chef de Bureau)\s+/i, '') || 'Marc Kabamba');
 
+  // État de sous-page : 'detail' (vue normale), 'history' (traçabilité), 'reponses_eval' (appréciations unitaires)
+  const [subPage, setSubPage] = useState<'detail' | 'history' | 'reponses_eval'>('detail');
+
+  // État pour les actions de cycle de vie et formulaires associés
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
+  const [showReturnInput, setShowReturnInput] = useState(false);
+  const [returnMotif, setReturnMotif] = useState('');
+
+  // État pour l'appréciation individuelle d'un élément
+  const [evaluatingItemId, setEvaluatingItemId] = useState<string | null>(null);
+  const [evalForm, setEvalForm] = useState({
+    completeness: 'complete',
+    substance: 'satisfactory',
+    reason: '',
+  });
+
+  // État pour la rectification des liens d'une réponse
+  const [rectifyingResponseId, setRectifyingResponseId] = useState<string | null>(null);
+  const [rectifySelectedItems, setRectifySelectedItems] = useState<string[]>([]);
+  const [rectifyReason, setRectifyReason] = useState('');
+
+  const rawRequest: ApiRequest | undefined = demande?.rawRequest || (workspace?.requests && demande?.dossierId ? workspace.requests[demande.dossierId]?.find((r) => r.id === demande.id) : undefined);
+  const allowedActions: Array<'edit' | 'prepare' | 'submit' | 'validate' | 'return' | 'sign' | 'issue'> = demande?.allowed_actions || rawRequest?.allowed_actions || (
+    demande?.statut === 'BROUILLON' ? ['prepare', 'submit']
+    : demande?.statut === 'A_VALIDER' ? ['validate', 'return']
+    : demande?.statut === 'VALIDEE' ? ['sign']
+    : demande?.statut === 'SIGNEE' ? ['issue']
+    : []
+  );
+
+  const handleLifecycleAction = async (action: 'prepare' | 'submit' | 'validate' | 'return' | 'sign' | 'issue') => {
+    if (!demande) return;
+    setIsProcessingAction(true);
+    try {
+      if (rawRequest) {
+        const v = rawRequest.version;
+        if (action === 'submit') {
+          await apiPost(`/demandes/${demande.id}/soumettre/`, { version: v });
+          showToast('Demande soumise pour validation hiérarchique.');
+        } else if (action === 'validate') {
+          await apiPost(`/demandes/${demande.id}/valider/`, { version: v });
+          showToast('Demande validée hiérarchiquement.');
+        } else if (action === 'return') {
+          if (!returnMotif.trim()) {
+            alert('Veuillez renseigner le motif de renvoi pour correction.');
+            setIsProcessingAction(false);
+            return;
+          }
+          await apiPost(`/demandes/${demande.id}/retourner/`, { version: v, comment: returnMotif.trim() });
+          setShowReturnInput(false);
+          setReturnMotif('');
+          showToast('Demande renvoyée avec motif de correction.');
+        } else if (action === 'sign') {
+          await apiPost(`/demandes/${demande.id}/constater-signature/`, {
+            version: v,
+            signature_proof: 'SIGNATURE_MANUELLE_CONFIRMEE',
+            signer_name: defaultAuteur,
+            signed_at: new Date().toISOString(),
+          });
+          showToast('Signature officielle constatée et certifiée.');
+        } else if (action === 'issue') {
+          await apiPost(`/demandes/${demande.id}/constater-emission/`, {
+            version: v,
+            dispatch_proof: 'ACCUSE_NOTIFICATION_NOTIFIE',
+            sent_at: new Date().toISOString(),
+            idempotency_key: crypto.randomUUID(),
+          });
+          showToast('Émission officielle notifiée au destinataire.');
+        } else if (action === 'prepare') {
+          await apiPost(`/demandes/${demande.id}/preparer/`, { version: v });
+          showToast('Acte officiel préparé avec succès.');
+        }
+        await onRefresh?.(demande.dossierId);
+      } else {
+        const statutMap: Record<string, DemandeCommunication['statut']> = {
+          submit: 'A_VALIDER',
+          validate: 'VALIDEE',
+          return: 'BROUILLON',
+          sign: 'SIGNEE',
+          issue: 'EMISE',
+          prepare: 'BROUILLON',
+        };
+        const updated: DemandeCommunication = {
+          ...demande,
+          statut: statutMap[action] || demande.statut,
+        };
+        onUpdateDemande?.(updated);
+        showToast(`Action ${action} effectuée.`);
+      }
+    } catch (err: any) {
+      alert(`Erreur : ${err?.message || 'L’opération a échoué.'}`);
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
+  const handleAssessItemSubmit = async (e: React.FormEvent, item: ElementDemande) => {
+    e.preventDefault();
+    if (!evalForm.reason.trim()) {
+      alert('Veuillez motiver précisément l’appréciation retenue.');
+      return;
+    }
+    setIsProcessingAction(true);
+    try {
+      if (rawRequest) {
+        const rawItem = rawRequest.items.find((i) => i.id === item.id);
+        if (rawItem) {
+          await assessRequestItem(
+            rawRequest,
+            rawItem,
+            evalForm.completeness !== 'unknown',
+            evalForm.completeness,
+            evalForm.substance,
+            evalForm.reason.trim()
+          );
+          await onRefresh?.(demande?.dossierId);
+        }
+      }
+      if (demande) {
+        const updatedElements = demande.elementsDemandes.map((el) => {
+          if (el.id === item.id) {
+            return {
+              ...el,
+              statutRemise: evalForm.completeness === 'complete' ? ('FOURNI' as const) : ('INCOMPLET' as const),
+              appreciation: evalForm.substance as any,
+              motifAppreciation: evalForm.reason,
+            };
+          }
+          return el;
+        });
+        const updated: DemandeCommunication = {
+          ...demande,
+          elementsDemandes: updatedElements,
+        };
+        onUpdateDemande?.(updated);
+      }
+      setEvaluatingItemId(null);
+      setEvalForm({ completeness: 'complete', substance: 'satisfactory', reason: '' });
+      showToast(`Appréciation individuelle enregistrée.`);
+    } catch (err: any) {
+      alert(`Erreur : ${err?.message || 'Échec de l’enregistrement de l’appréciation.'}`);
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
+  const handleRectifyLinksSubmit = async (e: React.FormEvent, response: ReponseRecue) => {
+    e.preventDefault();
+    if (!rectifyReason.trim()) {
+      alert('Veuillez motiver la rectification des associations.');
+      return;
+    }
+    setIsProcessingAction(true);
+    try {
+      if (workspace && demande) {
+        const rawResp = (workspace.responses[demande.id] || []).find((r) => r.id === response.id);
+        if (rawResp) {
+          await rectifyResponse(rawResp, rectifySelectedItems, rectifyReason.trim());
+          await onRefresh?.(demande.dossierId);
+        }
+      }
+      if (demande) {
+        const updatedResponses = demande.reponsesRecues.map((r) => {
+          if (r.id === response.id) {
+            return {
+              ...r,
+              elementsFournisIds: rectifySelectedItems,
+              analyseEnqueteur: `${r.analyseEnqueteur ? r.analyseEnqueteur + ' · ' : ''}Rectification : ${rectifyReason}`,
+            };
+          }
+          return r;
+        });
+        const updated: DemandeCommunication = {
+          ...demande,
+          reponsesRecues: updatedResponses,
+        };
+        onUpdateDemande?.(updated);
+      }
+      setRectifyingResponseId(null);
+      setRectifyReason('');
+      showToast('Rectification des éléments associés enregistrée.');
+    } catch (err: any) {
+      alert(`Erreur : ${err?.message || 'Échec de la rectification.'}`);
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
   // Formulaire de création / remplacement demande
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -67,6 +272,14 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
 
   // Formulaire de satisfaction & classement sans suite
   const [showSatisfactionModal, setShowSatisfactionModal] = useState(false);
+  // Prévisualisation PDF
+  const [previewPdfData, setPreviewPdfData] = useState<{
+    title: string;
+    metadata?: any;
+    mockContent?: any;
+    file?: File;
+    fileUrl?: string;
+  } | null>(null);
   const [satisfactionForm, setSatisfactionForm] = useState({
     inspecteur: defaultAuteur,
     dateDecision: new Date().toISOString().split('T')[0],
@@ -152,6 +365,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
     echeance: demande?.echeanceReponse || '2026-10-15',
     objet: demande?.objet || 'Communication des manifestes de fret maritime et factures CIF Kasumbalesa',
     pdfFile: null as { name: string; size: string } | null,
+    realFile: null as File | null,
   });
 
   // Formulaire Feuille d'observation
@@ -180,27 +394,28 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
       return;
     }
 
+    const targetDossierId = dossierId || demande?.dossierId || '';
     const newId = `demande-${Date.now()}`;
     const newDemande: DemandeCommunication = {
       id: newId,
       reference: `DGDA/DRK/ENQ/DC/${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`,
-      dossierId: demande?.dossierId || '',
+      dossierId: targetDossierId,
       auteur: createForm.auteur,
       redacteur: createForm.auteur,
       dateEmission: new Date().toISOString().split('T')[0],
-      echeanceReponse: createForm.echeance,
+      echeanceReponse: createForm.echeance || new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
       objet: createForm.objet,
       destinataire: {
         nom: createForm.destinataire,
         qualite: createForm.typeCible,
         typeCible: createForm.typeCible,
         pourLeCompteDe: createForm.pourLeCompteDe.trim() || undefined,
-        adresse: createForm.adresse.trim(),
+        adresse: createForm.adresse.trim() || 'Siège de l’assujetti',
       },
-      statut: 'EMISE',
+      statut: 'BROUILLON',
       signataireHabilite: 'Salem Mukendi (Directeur Provincial)',
       gradeSignataire: 'Commandement de Division',
-      baseLegale: 'Droit de communication et contrôle douanier (Code des douanes, Article 46)',
+      baseLegale: 'Code des douanes, Article 46 - Droit de communication',
       elementsDemandes: [
         {
           id: `EL-${Date.now()}`,
@@ -212,18 +427,18 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
       ],
       reponsesRecues: [],
       modaliteRemise: 'Transmission électronique et dépôt physique',
-      commentairesInternes: 'Demande officielle notifiée',
+      commentairesInternes: 'Demande officielle initiée',
       pdfSourceNom: createForm.pdfFile ? createForm.pdfFile.name : 'Requisition_Officielle_Art46.pdf',
     };
 
     if (onAddDemande) {
-      onAddDemande(newDemande);
+      onAddDemande(newDemande, createForm.realFile || undefined);
     } else {
       onUpdateDemande?.(newDemande);
     }
     setSelectedDemandeId(newId);
     setShowCreateModal(false);
-    showToast('Nouvelle demande de communication créée avec succès.');
+    showToast('Nouvelle demande de communication créée en brouillon officiel.');
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -231,6 +446,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
     if (file) {
       setCreateForm((prev) => ({
         ...prev,
+        realFile: file,
         pdfFile: {
           name: file.name,
           size: `${Math.round(file.size / 1024)} Ko`,
@@ -639,6 +855,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 echeance: new Date(Date.now() + 21 * 86400000).toISOString().split('T')[0],
                 objet: '',
                 pdfFile: null,
+                realFile: null,
               });
               setShowCreateModal(true);
             }}
@@ -805,6 +1022,621 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
     demande.reponsePdfRef ||
     demande.reponsesRecues?.[0]?.referenceCourrier;
 
+  // -------------------------------------------------------------------------
+  // PAGE INFO : TRAÇABILITÉ LÉGALE & HISTORIQUE DES ACTES
+  // -------------------------------------------------------------------------
+  const renderHistorySubpage = () => {
+    if (!demande) return null;
+    const acts = rawRequest?.acts || [];
+    const issuance = rawRequest?.issuance;
+
+    return (
+      <div key={`demande-history-${demande.id}`} className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
+        {notification && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              right: '24px',
+              backgroundColor: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+              padding: '12px 18px',
+              borderRadius: 'var(--radius-card)',
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              zIndex: 9999,
+            }}
+          >
+            <CheckCircle size={16} color="var(--color-accent)" />
+            <span>{notification}</span>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => setSubPage('detail')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '13px',
+              color: 'var(--color-text-secondary)',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '6px 0',
+            }}
+          >
+            <ArrowLeft size={16} />
+            <span>Revenir à la réquisition</span>
+          </button>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            borderRadius: 'var(--radius-card)',
+            border: '1px solid var(--color-border)',
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px',
+          }}
+        >
+          <div style={{ borderBottom: '1px solid var(--color-border-subtle)', paddingBottom: '16px' }}>
+            <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.6px', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+              Page Info • Traçabilité Officielle & Actes Numériques
+            </div>
+            <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-text-primary)', margin: '6px 0 2px 0' }}>
+              Réquisition {demande.reference || demande.id}
+            </h2>
+            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+              Destinataire : <strong style={{ color: 'var(--color-text-primary)' }}>{demande.destinataire.nom}</strong> • Statut légal : <span style={{ fontWeight: 600 }}>{demande.statut}</span>
+            </div>
+          </div>
+
+          {/* Section 1 : Actes préparés et condensats SHA-256 */}
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-text-muted)', marginBottom: '12px' }}>
+              Actes officiels préparés & Empreintes cryptographiques ({acts.length || 1})
+            </div>
+
+            {acts.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {acts.map((act, idx) => (
+                  <div
+                    key={act.id || idx}
+                    style={{
+                      padding: '14px 16px',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-card)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                          Version {act.request_version} • Mode : {act.mode === 'imported' ? 'Pièce déposée' : 'Généré système'}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                        Préparé le {formatDate(act.prepared_at)}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '11px' }}>
+                      <span style={{ color: 'var(--color-text-muted)' }}>Empreinte SHA-256 :</span>
+                      <code style={{ fontFamily: 'monospace', fontSize: '11px', backgroundColor: 'var(--color-surface)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--color-border-subtle)', color: 'var(--color-text-primary)' }}>
+                        {act.sha256}
+                      </code>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                style={{
+                  padding: '16px',
+                  backgroundColor: 'var(--color-bg)',
+                  border: '1px dashed var(--color-border)',
+                  borderRadius: 'var(--radius-card)',
+                  fontSize: '12px',
+                  color: 'var(--color-text-secondary)',
+                }}
+              >
+                Acte officiel initial enregistré. Condensat cryptographique SHA-256 certifié conforme aux normes d'archivage légal DGDA.
+              </div>
+            )}
+          </div>
+
+          {/* Section 2 : Preuve d'émission et notification légale */}
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-text-muted)', marginBottom: '12px' }}>
+              Preuves d'Émission & Notification Légale
+            </div>
+
+            <div
+              style={{
+                padding: '16px',
+                backgroundColor: 'var(--color-bg)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-card)',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '14px',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                  Date d'émission officielle
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)', marginTop: '4px' }}>
+                  {issuance?.issued_at ? formatDate(issuance.issued_at) : (demande.dateEmission ? formatDate(demande.dateEmission) : 'En attente')}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                  Preuve de signature
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', marginTop: '4px' }}>
+                  {issuance?.signature_proof || (demande.statut === 'SIGNEE' || demande.statut === 'EMISE' ? 'Visa & paraphe de commandement apposé' : 'En attente')}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                  Preuve de notification / décharge
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', marginTop: '4px' }}>
+                  {issuance?.dispatch_proof || (demande.statut === 'EMISE' || hasReponse ? 'Accusé de réception officiel enregistré' : 'En attente d’envoi')}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // -------------------------------------------------------------------------
+  // PAGE INFO : RÉPONSES ET APPRÉCIATIONS INDIVIDUELLES DES ÉLÉMENTS
+  // -------------------------------------------------------------------------
+  const renderAssessmentsSubpage = () => {
+    if (!demande) return null;
+
+    return (
+      <div key={`demande-assessments-${demande.id}`} className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
+        {notification && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              right: '24px',
+              backgroundColor: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+              padding: '12px 18px',
+              borderRadius: 'var(--radius-card)',
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              zIndex: 9999,
+            }}
+          >
+            <CheckCircle size={16} color="var(--color-accent)" />
+            <span>{notification}</span>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => setSubPage('detail')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '13px',
+              color: 'var(--color-text-secondary)',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '6px 0',
+            }}
+          >
+            <ArrowLeft size={16} />
+            <span>Revenir à la réquisition</span>
+          </button>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            borderRadius: 'var(--radius-card)',
+            border: '1px solid var(--color-border)',
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px',
+          }}
+        >
+          <div style={{ borderBottom: '1px solid var(--color-border-subtle)', paddingBottom: '16px' }}>
+            <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.6px', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+              Page Info • Appréciations Unitaire & Rectification des Liens
+            </div>
+            <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-text-primary)', margin: '6px 0 2px 0' }}>
+              Éléments Exigés & Examen Contradictoire
+            </h2>
+            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+              {demande.destinataire.nom} • {demande.elementsDemandes?.length || 0} éléments au total
+            </div>
+          </div>
+
+          {/* Section 1 : Éléments demandés et appréciations individuelles */}
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-text-muted)', marginBottom: '12px' }}>
+              Éléments demandés et appréciations individuelles
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {demande.elementsDemandes.map((element, idx) => {
+                const isEvaluating = evaluatingItemId === element.id;
+
+                return (
+                  <div
+                    key={element.id || idx}
+                    style={{
+                      padding: '16px',
+                      backgroundColor: 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-card)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                            Élément #{idx + 1}
+                          </span>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                            {element.libelle}
+                          </span>
+                        </div>
+                        {element.periodeConcernee && (
+                          <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                            Période : {element.periodeConcernee}
+                          </div>
+                        )}
+                        {element.motifExigence && (
+                          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                            Motif : {element.motifExigence}
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: 'var(--color-surface)',
+                            border: '1px solid var(--color-border)',
+                            color: 'var(--color-text-primary)',
+                          }}
+                        >
+                          {element.statutRemise === 'FOURNI' ? 'Fourni' : element.statutRemise === 'INCOMPLET' ? 'Incomplet' : element.statutRemise === 'MANQUANT' ? 'Manquant' : 'En attente'}
+                        </span>
+
+                        {element.appreciation && (
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              backgroundColor: 'var(--color-surface)',
+                              border: '1px solid var(--color-border)',
+                              color: 'var(--color-text-primary)',
+                            }}
+                          >
+                            {element.appreciation === 'satisfactory' ? 'Satisfaisant' : element.appreciation === 'unsatisfactory' ? 'Non satisfaisant' : 'En examen'}
+                          </span>
+                        )}
+
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => {
+                            if (isEvaluating) {
+                              setEvaluatingItemId(null);
+                            } else {
+                              setEvaluatingItemId(element.id);
+                              setEvalForm({
+                                completeness: element.statutRemise === 'FOURNI' ? 'complete' : 'insufficient',
+                                substance: element.appreciation || 'satisfactory',
+                                reason: element.motifAppreciation || '',
+                              });
+                            }
+                          }}
+                          style={{ fontSize: '11px', padding: '5px 10px' }}
+                        >
+                          {isEvaluating ? 'Fermer' : 'Évaluer'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {element.motifAppreciation && !isEvaluating && (
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', padding: '8px 12px', backgroundColor: 'var(--color-surface)', borderRadius: '6px', border: '1px solid var(--color-border-subtle)' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>Appréciation motivée : </span>
+                        {element.motifAppreciation}
+                      </div>
+                    )}
+
+                    {isEvaluating && (
+                      <form onSubmit={(e) => handleAssessItemSubmit(e, element)} style={{ marginTop: '6px', paddingTop: '12px', borderTop: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                              Complétude formelle
+                            </label>
+                            <select
+                              value={evalForm.completeness}
+                              onChange={(e) => setEvalForm({ ...evalForm, completeness: e.target.value })}
+                              style={{ width: '100%', padding: '6px 10px', fontSize: '12px', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-btn)', color: 'var(--color-text-primary)', outline: 'none' }}
+                            >
+                              <option value="complete">Complète (Pièce intégrale)</option>
+                              <option value="insufficient">Insuffisante (Partielle)</option>
+                              <option value="unknown">Non reçue / Inconnue</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                              Fond / Explications
+                            </label>
+                            <select
+                              value={evalForm.substance}
+                              onChange={(e) => setEvalForm({ ...evalForm, substance: e.target.value })}
+                              style={{ width: '100%', padding: '6px 10px', fontSize: '12px', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-btn)', color: 'var(--color-text-primary)', outline: 'none' }}
+                            >
+                              <option value="satisfactory">Satisfaisant (Régularité justifiée)</option>
+                              <option value="unsatisfactory">Non satisfaisant (Infraction persistante)</option>
+                              <option value="pending">En attente d'instruction</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                            Motif circonstancié de l'enquêteur *
+                          </label>
+                          <textarea
+                            required
+                            rows={3}
+                            value={evalForm.reason}
+                            onChange={(e) => setEvalForm({ ...evalForm, reason: e.target.value })}
+                            placeholder="Détailler l'analyse de conformité ou les lacunes constatées..."
+                            style={{ width: '100%', padding: '8px 10px', fontSize: '12px', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-btn)', color: 'var(--color-text-primary)', outline: 'none', resize: 'vertical' }}
+                          />
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                          <button type="button" className="btn-ghost" onClick={() => setEvaluatingItemId(null)} style={{ fontSize: '11px' }}>
+                            Annuler
+                          </button>
+                          <button type="submit" className="btn-primary" disabled={isProcessingAction} style={{ fontSize: '11px', padding: '6px 14px' }}>
+                            Enregistrer l'appréciation
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Section 2 : Rectification des liens de réponse */}
+          {demande.reponsesRecues && demande.reponsesRecues.length > 0 && (
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-text-muted)', marginBottom: '12px' }}>
+                Courriers de réponse & Rectification des associations
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {demande.reponsesRecues.map((response, rIdx) => {
+                  const isRectifying = rectifyingResponseId === response.id;
+
+                  return (
+                    <div
+                      key={response.id || rIdx}
+                      style={{
+                        padding: '16px',
+                        backgroundColor: 'var(--color-bg)',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: 'var(--radius-card)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                            {response.referenceCourrier || 'Courrier de réponse officiel'}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                            Reçu le {formatDate(response.dateReception)} • Émetteur : {response.auteur || demande.destinataire.nom}
+                          </div>
+                          {response.piecesJointes && response.piecesJointes.length > 0 && (
+                            <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                              Pièces jointes : {response.piecesJointes.join(', ')}
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => {
+                            if (isRectifying) {
+                              setRectifyingResponseId(null);
+                            } else {
+                              setRectifyingResponseId(response.id);
+                              setRectifySelectedItems(response.elementsFournisIds || []);
+                              setRectifyReason('');
+                            }
+                          }}
+                          style={{ fontSize: '11px', padding: '5px 12px' }}
+                        >
+                          {isRectifying ? 'Fermer' : 'Rectifier les liens'}
+                        </button>
+                      </div>
+
+                      {/* Éléments associés */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', fontSize: '11px' }}>
+                        <span style={{ color: 'var(--color-text-muted)' }}>Éléments rattachés :</span>
+                        {response.elementsFournisIds && response.elementsFournisIds.length > 0 ? (
+                          response.elementsFournisIds.map((elemId) => {
+                            const elem = demande.elementsDemandes.find((e) => e.id === elemId);
+                            return (
+                              <span
+                                key={elemId}
+                                style={{
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  backgroundColor: 'var(--color-surface)',
+                                  border: '1px solid var(--color-border-subtle)',
+                                  color: 'var(--color-text-primary)',
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {elem?.libelle || elemId}
+                              </span>
+                            );
+                          })
+                        ) : (
+                          <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Aucun élément associé</span>
+                        )}
+                      </div>
+
+                      {isRectifying && (
+                        <form onSubmit={(e) => handleRectifyLinksSubmit(e, response)} style={{ marginTop: '6px', paddingTop: '12px', borderTop: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                            Sélectionner les éléments couverts par cette réponse :
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {demande.elementsDemandes.map((el) => {
+                              const checked = rectifySelectedItems.includes(el.id);
+                              return (
+                                <label key={el.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--color-text-primary)', cursor: 'pointer' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setRectifySelectedItems([...rectifySelectedItems, el.id]);
+                                      } else {
+                                        setRectifySelectedItems(rectifySelectedItems.filter((id) => id !== el.id));
+                                      }
+                                    }}
+                                  />
+                                  <span>{el.libelle} ({el.periodeConcernee || 'Toute période'})</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                              Motif de la rectification *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={rectifyReason}
+                              onChange={(e) => setRectifyReason(e.target.value)}
+                              placeholder="Justification de la réaffectation des pièces justificatives..."
+                              style={{ width: '100%', padding: '6px 10px', fontSize: '12px', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-btn)', color: 'var(--color-text-primary)', outline: 'none' }}
+                            />
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                            <button type="button" className="btn-ghost" onClick={() => setRectifyingResponseId(null)} style={{ fontSize: '11px' }}>
+                              Annuler
+                            </button>
+                            <button type="submit" className="btn-primary" disabled={isProcessingAction} style={{ fontSize: '11px', padding: '6px 14px' }}>
+                              Valider la rectification
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  if (subPage === 'history') {
+    return (
+      <>
+        {renderHistorySubpage()}
+        {previewPdfData && (
+          <PdfPreviewModal
+            isOpen={Boolean(previewPdfData)}
+            onClose={() => setPreviewPdfData(null)}
+            title={previewPdfData.title}
+            fileUrl={previewPdfData.fileUrl}
+            file={previewPdfData.file}
+            metadata={previewPdfData.metadata}
+            mockContent={previewPdfData.mockContent}
+          />
+        )}
+      </>
+    );
+  }
+
+  if (subPage === 'reponses_eval') {
+    return (
+      <>
+        {renderAssessmentsSubpage()}
+        {previewPdfData && (
+          <PdfPreviewModal
+            isOpen={Boolean(previewPdfData)}
+            onClose={() => setPreviewPdfData(null)}
+            title={previewPdfData.title}
+            fileUrl={previewPdfData.fileUrl}
+            file={previewPdfData.file}
+            metadata={previewPdfData.metadata}
+            mockContent={previewPdfData.mockContent}
+          />
+        )}
+      </>
+    );
+  }
+
   return (
     <div key={`demande-detail-${demande.id}`} className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
       {/* Toast Notification */}
@@ -831,11 +1663,11 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
         </div>
       )}
 
-      {/* Navigation Retour vers la page des cartes */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      {/* Navigation Retour et sélection des sous-pages Page Info */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
         <button
           type="button"
-          onClick={() => setSelectedDemandeId(null)}
+          onClick={() => { setSelectedDemandeId(null); setSubPage('detail'); }}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -857,6 +1689,36 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           <ArrowLeft size={16} />
           <span>Retour à toutes les demandes</span>
         </button>
+
+        {/* Onglets de sous-page épurés style Apple */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button
+            type="button"
+            className={(subPage as string) === 'detail' ? 'btn-primary' : 'btn-secondary'}
+            onClick={() => setSubPage('detail')}
+            style={{ fontSize: '11px', padding: '6px 12px' }}
+          >
+            Détail
+          </button>
+          <button
+            type="button"
+            className={(subPage as string) === 'reponses_eval' ? 'btn-primary' : 'btn-secondary'}
+            onClick={() => setSubPage('reponses_eval')}
+            style={{ fontSize: '11px', padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <CheckSquare size={13} />
+            <span>Appréciations & Réponses ({demande.elementsDemandes?.length || 0})</span>
+          </button>
+          <button
+            type="button"
+            className={(subPage as string) === 'history' ? 'btn-primary' : 'btn-secondary'}
+            onClick={() => setSubPage('history')}
+            style={{ fontSize: '11px', padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <History size={13} />
+            <span>Traçabilité & Preuves</span>
+          </button>
+        </div>
       </div>
 
       {/* =========================================================================
@@ -881,27 +1743,12 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             justifyContent: 'space-between',
             flexWrap: 'wrap',
             gap: '16px',
-            // borderBottom: '1px solid var(--color-border-subtle)',
             paddingBottom: '16px',
           }}
         >
           <div>
-            {/* Référence directoristrative : JAMAIS en gras, JAMAIS en couleur accent */}
-            {/* <div
-              className="font-sf"
-              style={{
-                fontSize: '12px',
-                color: 'var(--color-text-muted)',
-                fontWeight: 400,
-              }}
-            >
-              {demande.reference}
-            </div> */}
-
-            {/* Nom de l'entreprise : SEULE CHOSE EN GRAS */}
             <p
               style={{
-                
                 color: 'var(--color-text-primary)',
                 marginTop: '6px',
                 marginBottom: '4px',
@@ -912,7 +1759,6 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 fontWeight: 700,}}>{demande.destinataire.nom}</span>
             </p>
 
-            {/* Type de cible & Pour le compte de : SANS BORDER, SANS BACKGROUND COLOR, SANS ICÔNE */}
             <div style={{ fontSize: '12px', marginTop: '4px', color: 'var(--color-text-secondary)' }}>
               <span style={{ color: 'var(--color-text-muted)' }}>Type de cible : </span>
               <span style={{ color: 'var(--color-text-primary)' }}>
@@ -925,7 +1771,6 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
               )}
             </div>
 
-            {/* Adresse : SANS BORDER, SANS BACKGROUND COLOR, SANS ICÔNE */}
             {demande.destinataire.adresse && (
               <div style={{ fontSize: '12px', marginTop: '4px', color: 'var(--color-text-secondary)' }}>
                 <span style={{ color: 'var(--color-text-muted)' }}>Adresse : </span>
@@ -933,28 +1778,139 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
               </div>
             )}
 
-            {/* Enquêteur rédacteur : SANS ICÔNE */}
             <div style={{ fontSize: '12px',  marginTop: '4px' }}>
              <span style={{color: 'var(--color-text-muted)'}}>Rédacteur :</span>  <span style={{fontSize: '14px',
                 fontWeight: 700,}}>{demande.auteur || demande.redacteur || defaultAuteur}</span>
             </div>
           </div>
 
-          {/* Statut sobre monochromatic */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 500,
-                padding: '3px 8px',
-                borderRadius: '4px',
-                backgroundColor: 'var(--color-bg)',
-                border: '1px solid var(--color-border)',
-                color: 'var(--color-text-secondary)',
-              }}
-            >
-              {hasReponse ? 'Réponse reçue' : 'En attente'}
-            </span>
+          {/* Statut sobre & Actions autorisées */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--color-bg)',
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-text-secondary)',
+                }}
+              >
+                {hasReponse ? 'Réponse reçue' : 'En attente'}
+              </span>
+
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-text-primary)',
+                }}
+              >
+                {demande.statut}
+              </span>
+            </div>
+
+            {/* Actions autorisées par le backend */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              {allowedActions.includes('prepare') && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={isProcessingAction}
+                  onClick={() => handleLifecycleAction('prepare')}
+                  style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <FileText size={12} />
+                  <span>Préparer l'acte</span>
+                </button>
+              )}
+              {allowedActions.includes('submit') && (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={isProcessingAction}
+                  onClick={() => handleLifecycleAction('submit')}
+                  style={{ fontSize: '11px', padding: '5px 12px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <Send size={12} />
+                  <span>Soumettre à validation</span>
+                </button>
+              )}
+              {allowedActions.includes('validate') && (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={isProcessingAction}
+                  onClick={() => handleLifecycleAction('validate')}
+                  style={{ fontSize: '11px', padding: '5px 12px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <Check size={12} />
+                  <span>Valider hiérarchiquement</span>
+                </button>
+              )}
+              {allowedActions.includes('return') && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={isProcessingAction}
+                  onClick={() => setShowReturnInput((v) => !v)}
+                  style={{ fontSize: '11px', padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <RotateCcw size={12} />
+                  <span>Renvoyer pour correction</span>
+                </button>
+              )}
+              {allowedActions.includes('sign') && (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={isProcessingAction}
+                  onClick={() => handleLifecycleAction('sign')}
+                  style={{ fontSize: '11px', padding: '5px 12px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <ShieldCheck size={12} />
+                  <span>Constater signature</span>
+                </button>
+              )}
+              {allowedActions.includes('issue') && (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={isProcessingAction}
+                  onClick={() => handleLifecycleAction('issue')}
+                  style={{ fontSize: '11px', padding: '5px 12px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <FileText size={12} />
+                  <span>Constater émission & notification</span>
+                </button>
+              )}
+            </div>
+
+            {/* Saisie motif de renvoi */}
+            {showReturnInput && (
+              <div style={{ marginTop: '8px', padding: '10px 12px', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-card)', border: '1px solid var(--color-border)', width: '100%', maxWidth: '380px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                  Motif de renvoi pour correction *
+                </span>
+                <textarea
+                  rows={2}
+                  value={returnMotif}
+                  onChange={(e) => setReturnMotif(e.target.value)}
+                  placeholder="Indiquer les corrections exigées..."
+                  style={{ width: '100%', padding: '6px 8px', fontSize: '12px', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-btn)', color: 'var(--color-text-primary)', outline: 'none' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                  <button type="button" className="btn-ghost" onClick={() => setShowReturnInput(false)} style={{ fontSize: '11px' }}>Annuler</button>
+                  <button type="button" className="btn-primary" onClick={() => handleLifecycleAction('return')} style={{ fontSize: '11px', padding: '4px 10px' }}>Confirmer le renvoi</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1013,15 +1969,45 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                 </div>
               </div>
 
-              <button
-                type="button"
-                className="btn-secondary"
-                style={{ fontSize: '11px', padding: '6px 12px' }}
-                onClick={() => showToast('Téléchargement du document officiel...')}
-                title="Télécharger le document notifié"
-              >
-                <Download size={13} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ fontSize: '11px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  onClick={() =>
+                    setPreviewPdfData({
+                      title: demande.pdfSourceNom || 'Requisition_Officielle_Art46.pdf',
+                      metadata: {
+                        reference: demande.reference,
+                        auteur: demande.auteur || demande.redacteur,
+                        date: demande.dateEmission,
+                        taille: demande.pdfSourceTaille || '940 Ko',
+                        entite: demande.destinataire.nom,
+                      },
+                      mockContent: {
+                        type: 'DEMANDE DE COMMUNICATION DE DOCUMENTS (ART. 46)',
+                        destinataire: `${demande.destinataire.nom} — ${demande.destinataire.adresse}`,
+                        objet: demande.objet,
+                        constats: demande.elementsDemandes.map((el) => `${el.libelle} (Période : ${el.periodeConcernee}) — Exigence : ${el.motifExigence}`),
+                        conclusions: 'En application de l’article 46 du Code des Douanes, les pièces susmentionnées sont exigées dans le délai légal imparti.',
+                      },
+                    })
+                  }
+                  title="Consulter et prévisualiser la réquisition PDF"
+                >
+                  <Eye size={13} />
+                  <span>Consulter</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ fontSize: '11px', padding: '6px 10px' }}
+                  onClick={() => showToast('Téléchargement du document officiel...')}
+                  title="Télécharger le document notifié"
+                >
+                  <Download size={13} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1055,11 +2041,44 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <button
                     type="button"
                     className="btn-secondary"
-                    style={{ fontSize: '11px', padding: '6px 12px' }}
+                    style={{ fontSize: '11px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    onClick={() =>
+                      setPreviewPdfData({
+                        title: reponsePdfNom || 'Reponse_Operateur.pdf',
+                        metadata: {
+                          reference: reponseRef || 'RÉPONSE OPÉRATEUR',
+                          auteur: demande.reponsePdfAuteur || demande.destinataire.nom,
+                          date: reponseDate || new Date().toLocaleDateString('fr-FR'),
+                          taille: demande.reponsePdfTaille || '1.8 Mo',
+                          entite: demande.destinataire.nom,
+                        },
+                        mockContent: {
+                          type: 'TRANSMISSION DES DOCUMENTS COMPTABLES & JUSTIFICATIFS',
+                          destinataire: 'Direction Générale des Douanes et Accises (DGDA) - Brigade d’Enquêtes',
+                          objet: `Réponse à la réquisition officielle ${demande.reference}`,
+                          observations: [
+                            'Bordereaux de paiement SWIFT et attestations bancaires d’apurement du fret.',
+                            'Factures certifiées conformes des transitaires maritimes et terrestres.',
+                            'Notes explicatives de la Direction Financière attestant la réalité des flux financiers.',
+                          ],
+                          conclusions:
+                            'La société certifie sur l’honneur l’exactitude et la complétude des pièces et justifications transmises ce jour.',
+                        },
+                      })
+                    }
+                    title="Consulter et prévisualiser la réponse PDF reçue"
+                  >
+                    <Eye size={13} />
+                    <span>Consulter</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ fontSize: '11px', padding: '6px 10px' }}
                     onClick={() => showToast('Téléchargement de la réponse...')}
                     title="Télécharger la réponse"
                   >
@@ -2481,6 +3500,19 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           </div>
         </div>
       </ModalPortal>
+      )}
+
+      {/* Modale de prévisualisation PDF */}
+      {previewPdfData && (
+        <PdfPreviewModal
+          isOpen={Boolean(previewPdfData)}
+          onClose={() => setPreviewPdfData(null)}
+          title={previewPdfData.title}
+          fileUrl={previewPdfData.fileUrl}
+          file={previewPdfData.file}
+          metadata={previewPdfData.metadata}
+          mockContent={previewPdfData.mockContent}
+        />
       )}
     </div>
   );

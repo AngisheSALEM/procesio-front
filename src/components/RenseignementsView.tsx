@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Search,
   Plus,
@@ -7,7 +7,11 @@ import {
   X,
   CheckCircle,
   FolderPlus,
-  Upload
+  Upload,
+  Share2,
+  Lock,
+  Unlock,
+  Link2
 } from 'lucide-react';
 import type {
   RenseignementItem,
@@ -24,11 +28,17 @@ import {
 } from '../data/mockData';
 import { TablePagination } from './common/TablePagination';
 import { isAssignedToUser } from '../utils/userUtils';
+import { formatDate } from '../utils/dateUtils';
 import { ModalPortal } from './common/ModalPortal';
+import { apiGet, apiPost, apiPatch, type ApiUser, type ApiDissemination } from '../api/client';
+import type { WorkspaceData } from '../api/workspace';
 
 interface RenseignementsViewProps {
   renseignements?: RenseignementItem[];
   currentUser: UserAccount;
+  backendUser?: ApiUser;
+  workspace?: WorkspaceData;
+  onRefresh?: (caseId?: string) => Promise<unknown>;
   onOpenDossier: (dossierId: string) => void;
   onCreateDossier: (dossierData: any, renseignementId?: string) => void;
   onAddRenseignement?: (item: RenseignementItem) => void;
@@ -42,6 +52,9 @@ interface RenseignementsViewProps {
 export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   renseignements = mockRenseignements,
   currentUser,
+  backendUser,
+  workspace,
+  onRefresh,
   onOpenDossier,
   onCreateDossier,
   onAddRenseignement,
@@ -72,14 +85,23 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   };
 
   // Inspecteurs disponibles pour affectation
-  const inspecteursDisponibles = [
-    'Inspecteur Marc Kabamba (Chef de brigade)',
-    'Inspecteur Patrick Kalonji (Vérificateur)',
-    'Inspecteur Sarah Mutombo (Vérificateur)',
-    'Inspecteur Jean-Paul Ilunga (Enquêteur senior)',
-    'Inspecteur Adjoint Mireille Kabamba (Vérificateur)',
-    'Contrôleur David Mwamba (Section Exonérations)',
-  ];
+  const inspecteursDisponibles = useMemo(() => {
+    if (workspace?.users && workspace.users.length > 0) {
+      const candidates = workspace.users.filter((u) =>
+        u.memberships?.some((m) => m.role === 'investigator') ||
+        (workspace.assignableAgentIds && workspace.assignableAgentIds.includes(u.id))
+      );
+      if (candidates.length > 0) {
+        return candidates.map((u) => `${u.first_name} ${u.last_name}`.trim() || u.username);
+      }
+      return workspace.users.map((u) => `${u.first_name} ${u.last_name}`.trim() || u.username);
+    }
+    return [
+      'Marc Kabamba',
+      'Alain Tshilumba',
+      'Salem Mukendi',
+    ];
+  }, [workspace]);
 
   // Formulaire de Nouveau Renseignement (source, objet, pièces disponibles avec upload, priorité, affectation à qui)
   const [formSource, setFormSource] = useState('Douane');
@@ -88,6 +110,12 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   const [formUploadedFiles, setFormUploadedFiles] = useState<{ name: string; size: string }[]>([]);
   const [formAffectation, setFormAffectation] = useState(inspecteursDisponibles[0]);
   const [formInstructions, setFormInstructions] = useState('');
+
+  useEffect(() => {
+    if (inspecteursDisponibles.length > 0 && !inspecteursDisponibles.includes(formAffectation)) {
+      setFormAffectation(inspecteursDisponibles[0]);
+    }
+  }, [inspecteursDisponibles, formAffectation]);
 
   // Formulaire de Création de Dossier
   const [dossierNom, setDossierNom] = useState('');
@@ -104,6 +132,38 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
     const d = new Date();
     d.setDate(d.getDate() + 30);
     return d.toISOString().split('T')[0];
+  });
+
+  // Navigation Page Info (zéro modale pour les diffusions)
+  const [subPage, setSubPage] = useState<'detail' | 'diffusions'>('detail');
+
+  // Source protégée
+  const [protectedSourceRevealed, setProtectedSourceRevealed] = useState<string | null>(null);
+  const [isLoadingSource, setIsLoadingSource] = useState(false);
+
+  // Rattachement à un dossier existant
+  const [showLinkDossier, setShowLinkDossier] = useState(false);
+  const [selectedCaseToLink, setSelectedCaseToLink] = useState('');
+  const [isLinkingCase, setIsLinkingCase] = useState(false);
+
+  // Cotation hiérarchique managériale
+  const [isSavingRating, setIsSavingRating] = useState(false);
+  const [ratingData, setRatingData] = useState({
+    reliability: 'B',
+    priority: 'normal',
+    rating_instruction: '',
+    rating_deadline_days: 15,
+  });
+
+  // Diffusions
+  const [disseminations, setDisseminations] = useState<ApiDissemination[]>([]);
+  const [isLoadingDiffusions, setIsLoadingDiffusions] = useState(false);
+  const [showCreateDiffusionForm, setShowCreateDiffusionForm] = useState(false);
+  const [diffusionForm, setDiffusionForm] = useState({
+    recipient_unit: '',
+    channel: 'Courrier confidentiel DGDA',
+    reference: '',
+    expected_action: 'Information et réquisition coordonnée',
   });
 
   // Détermination précise du statut procédural du renseignement
@@ -198,7 +258,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   };
 
   // Création d'une nouvelle demande de renseignement
-  const handleCreateRenseignementSubmit = (e: React.FormEvent) => {
+  const handleCreateRenseignementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formObjet.trim()) return;
 
@@ -222,7 +282,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
       resume: formObjet.trim(),
       piecesDisponibles: piecesArray,
       niveauAcces: 'Diffusion Restreinte',
-      serviceDestinataire: 'Division des Recherches & Enquêtes Douanières',
+      serviceDestinataire: 'Direction des Recherches et Enquêtes Douanières',
       statut: 'Enregistré & Affecté',
       dossiersLies: [],
       cotePar: `${currentUser.prenom} ${currentUser.nom}`,
@@ -259,19 +319,26 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
       ],
     };
 
-    setItems((prev) => [newItem, ...prev]);
-    onAddRenseignement?.(newItem);
-    setShowCreateRenseignementModal(false);
+    try {
+      if (onAddRenseignement) {
+        await onAddRenseignement(newItem);
+      } else {
+        setItems((prev) => [newItem, ...prev]);
+      }
+      setShowCreateRenseignementModal(false);
 
-    // Réinitialiser le formulaire
-    setFormObjet('');
-    setFormPiecesDisponibles('');
-    setFormUploadedFiles([]);
-    setFormInstructions('');
+      // Réinitialiser le formulaire
+      setFormObjet('');
+      setFormPiecesDisponibles('');
+      setFormUploadedFiles([]);
+      setFormInstructions('');
 
-    // Basculer directement sur la page de détail du nouveau renseignement
-    setSelectedId(newItem.id);
-    showToast(`Renseignement ${newItem.reference} enregistré et affecté.`);
+      // Basculer directement sur la page de détail du nouveau renseignement
+      setSelectedId(newItem.id);
+      showToast(`Renseignement ${newItem.reference} enregistré et affecté.`);
+    } catch {
+      // L'erreur est notifiée, l'état local n'est pas pollué par une fausse insertion
+    }
   };
 
   // Vérifie si l'utilisateur courant est formellement l'inspecteur désigné (coteA)
@@ -360,10 +427,508 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
     onCreateDossier(newDossierData, selectedRenseignement.id);
   };
 
+  // Résolution du renseignement backend
+  const rawIntelligence = workspace && selectedRenseignement
+    ? (workspace.intelligence || []).find((i) => i.id === selectedRenseignement.id || i.reference === selectedRenseignement.reference)
+    : null;
+
+  const isManager = Boolean(
+    currentUser.role === 'director' ||
+    backendUser?.memberships?.some((m) => m.role === 'manager')
+  );
+
+  const canReadSource = Boolean(
+    currentUser.role === 'director' ||
+    backendUser?.memberships?.some((m) => m.capabilities?.includes('source.read'))
+  );
+
+  const handleFetchProtectedSource = async () => {
+    if (protectedSourceRevealed) {
+      setProtectedSourceRevealed(null);
+      return;
+    }
+    if (!canReadSource) {
+      alert('Habilitation restreinte : vous ne disposez pas des droits de lecture de source protégée (source.read).');
+      return;
+    }
+    setIsLoadingSource(true);
+    try {
+      if (workspace && selectedRenseignement) {
+        const res = await apiGet<{ identity: string }>(`/renseignements/${selectedRenseignement.id}/source/`);
+        setProtectedSourceRevealed(res.identity);
+      } else {
+        setProtectedSourceRevealed('Source confidentielle enregistrée sous scellé (S-7721)');
+      }
+      showToast('Identité de la source confidentielle déverrouillée.');
+    } catch (err: any) {
+      alert(`Erreur : ${err?.message || 'Impossible de consulter la source protégée.'}`);
+    } finally {
+      setIsLoadingSource(false);
+    }
+  };
+
+  const handleLinkToCaseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCaseToLink) {
+      alert('Veuillez sélectionner un dossier d’enquête existant.');
+      return;
+    }
+    setIsLinkingCase(true);
+    try {
+      if (workspace && selectedRenseignement) {
+        await apiPost(`/renseignements/${selectedRenseignement.id}/dossiers/`, {
+          case: selectedCaseToLink,
+          version: rawIntelligence?.version || 1,
+        });
+        await onRefresh?.(selectedCaseToLink);
+      }
+      if (selectedRenseignement) {
+        const targetDossier = dossiers.find((d) => d.id === selectedCaseToLink);
+        const updated: RenseignementItem = {
+          ...selectedRenseignement,
+          statut: 'Dossier d’enquête ouvert',
+          effetProduit: 'ENQUETE_EN_COURS',
+          dossiersLies: Array.from(new Set([...(selectedRenseignement.dossiersLies || []), selectedCaseToLink, targetDossier?.reference || ''])),
+        };
+        onUpdateRenseignement?.(updated);
+        setItems((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      }
+      showToast('Renseignement rattaché au dossier d’enquête avec succès.');
+      setShowLinkDossier(false);
+      setSelectedCaseToLink('');
+    } catch (err: any) {
+      alert(`Erreur de rattachement : ${err?.message || 'Échec de la liaison.'}`);
+    } finally {
+      setIsLinkingCase(false);
+    }
+  };
+
+  const handleSaveRatingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingRating(true);
+    try {
+      if (workspace && selectedRenseignement) {
+        await apiPatch(`/renseignements/${selectedRenseignement.id}/`, {
+          version: rawIntelligence?.version || 1,
+          priority: ratingData.priority,
+          reliability: ratingData.reliability,
+          rating_instruction: ratingData.rating_instruction,
+          rating_deadline_days: Number(ratingData.rating_deadline_days),
+        });
+        await onRefresh?.();
+      }
+      if (selectedRenseignement) {
+        const updated: RenseignementItem = {
+          ...selectedRenseignement,
+          priorite: (ratingData.priority === 'urgent' ? 'URGENTE' : ratingData.priority === 'flagged' ? 'FLAGGED' : 'NORMALE') as any,
+          instructionCotation: ratingData.rating_instruction || selectedRenseignement.instructionCotation,
+          delaiPrescritJours: Number(ratingData.rating_deadline_days) || selectedRenseignement.delaiPrescritJours,
+        };
+        onUpdateRenseignement?.(updated);
+        setItems((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      }
+      showToast('Cotation hiérarchique enregistrée avec succès.');
+    } catch (err: any) {
+      alert(`Erreur : ${err?.message || 'Échec de l’enregistrement de la cotation.'}`);
+    } finally {
+      setIsSavingRating(false);
+    }
+  };
+
+  const handleLoadDiffusions = async () => {
+    if (!selectedRenseignement) return;
+    setIsLoadingDiffusions(true);
+    try {
+      if (workspace) {
+        const res = await apiGet<{ results?: ApiDissemination[] } | ApiDissemination[]>(`/renseignements/${selectedRenseignement.id}/diffusions/`);
+        const list = Array.isArray(res) ? res : (res.results || []);
+        setDisseminations(list);
+      } else {
+        setDisseminations([
+          {
+            id: 'diff-01',
+            intelligence: selectedRenseignement.id,
+            recipient_unit: 'Brigade Nationale des Recherches (BNR)',
+            channel: 'Courrier confidentiel DGDA',
+            reference: 'DGDA/DRK/DIFF/2026/042',
+            expected_action: 'Vérification terrain et surveillance douanière',
+            sent_at: '2026-10-02T10:30:00Z',
+            created_at: '2026-10-02T09:00:00Z',
+          },
+        ]);
+      }
+    } catch (err) {
+      console.warn('Impossible de charger les diffusions:', err);
+    } finally {
+      setIsLoadingDiffusions(false);
+    }
+  };
+
+  const handleCreateDiffusionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!diffusionForm.recipient_unit) {
+      alert('Veuillez préciser le service ou l’unité destinataire.');
+      return;
+    }
+    try {
+      if (workspace && selectedRenseignement) {
+        const newObj = await apiPost<ApiDissemination>(`/renseignements/${selectedRenseignement.id}/diffusions/`, {
+          recipient_unit: diffusionForm.recipient_unit,
+          channel: diffusionForm.channel,
+          reference: diffusionForm.reference || `DIFF-${Date.now().toString().slice(-4)}`,
+          expected_action: diffusionForm.expected_action,
+          sent_at: new Date().toISOString(),
+          idempotency_key: `diff-${selectedRenseignement.id}-${Date.now()}`,
+        });
+        setDisseminations((prev) => [newObj, ...prev]);
+      } else {
+        const mockDiff: ApiDissemination = {
+          id: `diff-${Date.now()}`,
+          intelligence: selectedRenseignement?.id || '',
+          recipient_unit: diffusionForm.recipient_unit,
+          channel: diffusionForm.channel,
+          reference: diffusionForm.reference || `DGDA/DIFF/${Date.now().toString().slice(-4)}`,
+          expected_action: diffusionForm.expected_action,
+          sent_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        };
+        setDisseminations((prev) => [mockDiff, ...prev]);
+      }
+      showToast('Diffusion extérieure enregistrée et transmise.');
+      setShowCreateDiffusionForm(false);
+      setDiffusionForm({
+        recipient_unit: '',
+        channel: 'Courrier confidentiel DGDA',
+        reference: '',
+        expected_action: 'Information et coordination opérationnelle',
+      });
+    } catch (err: any) {
+      alert(`Erreur : ${err?.message || 'Échec de la diffusion.'}`);
+    }
+  };
+
+  const handleConfirmDiffusion = async (diffId: string) => {
+    try {
+      if (workspace) {
+        await apiPost(`/diffusions/${diffId}/confirmer/`, {
+          sent_at: new Date().toISOString(),
+        });
+      }
+      setDisseminations((prev) =>
+        prev.map((d) => (d.id === diffId ? { ...d, sent_at: new Date().toISOString() } : d))
+      );
+      showToast('Transmission de la diffusion confirmée avec succès.');
+    } catch (err: any) {
+      alert(`Erreur : ${err?.message || 'Échec de la confirmation.'}`);
+    }
+  };
+
+  // Page Info: Diffusions Extérieures
+  const renderDiffusionsSubpage = () => {
+    if (!selectedRenseignement) return null;
+    return (
+      <div key="renseignement-diffusions-subpage" className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
+        {toastMessage && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              right: '24px',
+              backgroundColor: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+              padding: '12px 18px',
+              borderRadius: 'var(--radius-card)',
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              zIndex: 9999,
+            }}
+          >
+            <CheckCircle size={16} color="var(--color-accent)" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => setSubPage('detail')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '13px',
+              color: 'var(--color-text-secondary)',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '6px 0',
+            }}
+          >
+            <ArrowLeft size={16} />
+            <span>Revenir à la fiche de renseignement</span>
+          </button>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            borderRadius: 'var(--radius-card)',
+            border: '1px solid var(--color-border)',
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid var(--color-border-subtle)', paddingBottom: '16px' }}>
+            <div>
+              <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.6px', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+                Page Info • Diffusions Extérieures & Coopérations
+              </div>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-text-primary)', margin: '4px 0 0 0' }}>
+                Partage institutionnel & Transmissions opérationnelles
+              </h2>
+              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                Renseignement réf. <strong className="font-sf">{selectedRenseignement.reference}</strong> • Objet : <strong style={{ color: 'var(--color-text-primary)' }}>{selectedRenseignement.objet}</strong>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className={showCreateDiffusionForm ? 'btn-secondary' : 'btn-primary'}
+              onClick={() => setShowCreateDiffusionForm((prev) => !prev)}
+              style={{ fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Plus size={14} />
+              <span>{showCreateDiffusionForm ? 'Fermer le formulaire' : 'Nouvelle diffusion extérieure'}</span>
+            </button>
+          </div>
+
+          {/* Formulaire de création de diffusion */}
+          {showCreateDiffusionForm && (
+            <form
+              onSubmit={handleCreateDiffusionSubmit}
+              style={{
+                backgroundColor: 'var(--color-bg)',
+                borderRadius: '8px',
+                border: '1px solid var(--color-border)',
+                padding: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+              }}
+            >
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                Émettre une nouvelle diffusion vers une unité ou autorité tierce
+              </div>
+
+              <div className="form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    Service ou Unité destinataire *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex : Brigade Nationale des Recherches, Parquet, DGRAD..."
+                    value={diffusionForm.recipient_unit}
+                    onChange={(e) => setDiffusionForm({ ...diffusionForm, recipient_unit: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-btn)',
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '12px',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    Canal de transmission officiel
+                  </label>
+                  <select
+                    value={diffusionForm.channel}
+                    onChange={(e) => setDiffusionForm({ ...diffusionForm, channel: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-btn)',
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '12px',
+                    }}
+                  >
+                    <option value="Courrier confidentiel DGDA">Courrier confidentiel DGDA</option>
+                    <option value="Transmission électronique chiffrée GELEC">Transmission électronique chiffrée GELEC</option>
+                    <option value="Bordereau sous scellé judiciaire">Bordereau sous scellé judiciaire</option>
+                    <option value="Messagerie de commandement">Messagerie de commandement</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    Référence de la transmission
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={`DGDA/DIFF/${new Date().getFullYear()}/...`}
+                    value={diffusionForm.reference}
+                    onChange={(e) => setDiffusionForm({ ...diffusionForm, reference: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-btn)',
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '12px',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    Action opérationnelle attendue *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex : Vérification aux frontières, coordination contentieuse..."
+                    value={diffusionForm.expected_action}
+                    onChange={(e) => setDiffusionForm({ ...diffusionForm, expected_action: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-btn)',
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '12px',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowCreateDiffusionForm(false)}
+                  style={{ fontSize: '12px' }}
+                >
+                  Annuler
+                </button>
+                <button type="submit" className="btn-primary" style={{ fontSize: '12px' }}>
+                  Enregistrer et transmettre
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Liste des diffusions enregistrées */}
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
+              Diffusions actives ({disseminations.length})
+            </div>
+
+            {isLoadingDiffusions ? (
+              <div style={{ padding: '16px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                Chargement des diffusions...
+              </div>
+            ) : disseminations.length === 0 ? (
+              <div
+                style={{
+                  padding: '16px',
+                  backgroundColor: 'var(--color-bg)',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  color: 'var(--color-text-muted)',
+                }}
+              >
+                Aucune diffusion extérieure n'a encore été effectuée pour cette fiche de renseignement.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {disseminations.map((diff, idx) => (
+                  <div
+                    key={diff.id}
+                    style={{
+                      padding: '14px 18px',
+                      backgroundColor: 'var(--color-bg)',
+                      borderRadius: '8px',
+                      border: '1px solid var(--color-border-subtle)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '12px',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                          Diffusion n°{idx + 1} vers {diff.recipient_unit}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: 'var(--color-surface)',
+                            border: '1px solid var(--color-border)',
+                            color: diff.sent_at ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                          }}
+                        >
+                          {diff.sent_at ? 'Transmis' : 'En attente d’envoi'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '3px' }}>
+                        Canal : {diff.channel} • Réf : <code style={{ fontSize: '11px', fontFamily: 'monospace' }}>{diff.reference || 'Non spécifiée'}</code> • Émis le : {formatDate(diff.created_at)}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                        Action attendue : <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{diff.expected_action}</span>
+                      </div>
+                    </div>
+
+                    {!diff.sent_at && (
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => handleConfirmDiffusion(diff.id)}
+                        style={{ fontSize: '11px', padding: '5px 12px' }}
+                      >
+                        Confirmer l’envoi
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // =========================================================================
   // 1. PAGE DÉTAIL DÉDIÉE DU RENSEIGNEMENT (PAS DE MODAL)
   // =========================================================================
   if (selectedRenseignement) {
+    if (subPage === 'diffusions') {
+      return renderDiffusionsSubpage();
+    }
+
     const hasDossier = selectedRenseignement.dossiersLies && selectedRenseignement.dossiersLies.length > 0;
     const pieces = selectedRenseignement.piecesDisponibles || [];
 
@@ -470,7 +1035,21 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setSubPage('diffusions');
+                  void handleLoadDiffusions();
+                }}
+                style={{ fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                title="Consulter et émettre des diffusions extérieures"
+              >
+                <Share2 size={13} />
+                <span>Diffusions ({disseminations.length})</span>
+              </button>
+
               {hasDossier ? (
                 <button
                   type="button"
@@ -495,41 +1074,128 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                   <span>Consulter le dossier d’enquête rattaché</span>
                   <ExternalLink size={13} />
                 </button>
-              ) : isAssignedInspector ? (
-                <button
-                  type="button"
-                  onClick={handleOpenCreateDossierModal}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '9px 18px',
-                    borderRadius: 'var(--radius-btn)',
-                    backgroundColor: 'var(--color-accent)',
-                    color: 'var(--color-on-accent)',
-                    border: 'none',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <FolderPlus size={15} />
-                  <span>Créer un dossier</span>
-                </button>
-              ) : null}
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setShowLinkDossier((prev) => !prev)}
+                    style={{ fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    title="Lier cette fiche à un dossier d'enquête déjà ouvert"
+                  >
+                    <Link2 size={14} />
+                    <span>Lier à un dossier existant</span>
+                  </button>
+
+                  {isAssignedInspector && (
+                    <button
+                      type="button"
+                      onClick={handleOpenCreateDossierModal}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '9px 18px',
+                        borderRadius: 'var(--radius-btn)',
+                        backgroundColor: 'var(--color-accent)',
+                        color: 'var(--color-on-accent)',
+                        border: 'none',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <FolderPlus size={15} />
+                      <span>Créer un dossier</span>
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           </div>
+
+          {/* Panneau de liaison à un dossier d'enquête existant */}
+          {showLinkDossier && (
+            <div
+              style={{
+                backgroundColor: 'var(--color-bg)',
+                borderRadius: '8px',
+                border: '1px solid var(--color-border)',
+                padding: '16px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              }}
+            >
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                Rattacher à un dossier d'enquête ouvert
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <select
+                  value={selectedCaseToLink}
+                  onChange={(e) => setSelectedCaseToLink(e.target.value)}
+                  style={{
+                    flex: 1,
+                    minWidth: '260px',
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-btn)',
+                    backgroundColor: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    color: 'var(--color-text-primary)',
+                    fontSize: '12px',
+                  }}
+                >
+                  <option value="">Sélectionner un dossier d'enquête...</option>
+                  {dossiers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.reference} — {d.entiteControlee.nom} ({d.statut})
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={!selectedCaseToLink || isLinkingCase}
+                  onClick={handleLinkToCaseSubmit}
+                  style={{ fontSize: '12px', padding: '8px 16px' }}
+                >
+                  {isLinkingCase ? 'Liaison en cours...' : 'Valider le rattachement'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowLinkDossier(false)}
+                  style={{ fontSize: '12px', padding: '8px 16px' }}
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Section 1 : Origine & Affectation */}
           <div style={{ gap: '16px' }}>
             <div style={{ backgroundColor: 'none', border: 'none', padding: '16px' }}>
               <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-                Source d’origine
+                Source d’origine & Confidentialité
               </div>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '6px' }}>
-                {selectedRenseignement.origine}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                  {protectedSourceRevealed || (canReadSource ? '•••••••• (Source protégée sous scellé)' : selectedRenseignement.origine)}
+                </span>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={isLoadingSource || (!protectedSourceRevealed && !canReadSource)}
+                  onClick={handleFetchProtectedSource}
+                  title={!canReadSource ? 'Habilitation source.read requise' : 'Déverrouiller l’identité de la source'}
+                  style={{ fontSize: '11px', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                >
+                  {protectedSourceRevealed ? <Lock size={12} /> : <Unlock size={12} />}
+                  <span>{isLoadingSource ? 'Chargement...' : protectedSourceRevealed ? 'Masquer' : 'Déverrouiller la source'}</span>
+                </button>
               </div>
-            
             </div>
 
             <div style={{ backgroundColor: 'none', border: 'none', padding: '16px' }}>
@@ -545,12 +1211,140 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
             </div>
 
             <div style={{ backgroundColor: 'none', border: 'none', padding: '16px' }}>
-              
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
                 Délai d’instruction prescrit : {selectedRenseignement.delaiPrescritJours || 15} jours
               </div>
             </div>
           </div>
+
+          {/* Cotation hiérarchique managériale */}
+          {isManager && (
+            <div
+              style={{
+                backgroundColor: 'var(--color-bg)',
+                borderRadius: '8px',
+                border: '1px solid var(--color-border)',
+                padding: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Cotation & Instructions de Commandement (Manager)
+                </div>
+              </div>
+
+              <div className="form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                    Degré de fiabilité de la source
+                  </label>
+                  <select
+                    value={ratingData.reliability}
+                    onChange={(e) => setRatingData({ ...ratingData, reliability: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-btn)',
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '12px',
+                    }}
+                  >
+                    <option value="A">A — Complètement fiable (certifiée)</option>
+                    <option value="B">B — Généralement fiable</option>
+                    <option value="C">C — Assez fiable</option>
+                    <option value="D">D — Peu fiable</option>
+                    <option value="E">E — Non fiable</option>
+                    <option value="F">F — Fiabilité non évaluable</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                    Priorité & Traitement
+                  </label>
+                  <select
+                    value={ratingData.priority}
+                    onChange={(e) => setRatingData({ ...ratingData, priority: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-btn)',
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '12px',
+                    }}
+                  >
+                    <option value="normal">Normale (Instruction ordinaire)</option>
+                    <option value="urgent">Urgente (Priorité opérationnelle)</option>
+                    <option value="flagged">Signalée (Surveillance spéciale)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                    Délai prescrit (jours)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={ratingData.rating_deadline_days}
+                    onChange={(e) => setRatingData({ ...ratingData, rating_deadline_days: Number(e.target.value) })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-btn)',
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '12px',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                    Instruction formelle de cotation
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Procéder à l'ouverture immédiate d'une réquisition de pièces..."
+                    value={ratingData.rating_instruction}
+                    onChange={(e) => setRatingData({ ...ratingData, rating_instruction: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-btn)',
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: '12px',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={isSavingRating}
+                  onClick={handleSaveRatingSubmit}
+                  style={{ fontSize: '12px', padding: '8px 16px' }}
+                >
+                  {isSavingRating ? 'Enregistrement...' : 'Enregistrer la cotation hiérarchique'}
+                </button>
+              </div>
+            </div>
+          )}
 
           
 
@@ -1394,7 +2188,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                     outline: 'none',
                   }}
                 >
-                  {inspecteursDisponibles.map((insp) => (
+                  {inspecteursDisponibles.map((insp: string) => (
                     <option key={insp} value={insp}>
                       {insp}
                     </option>

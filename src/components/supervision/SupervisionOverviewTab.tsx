@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { ArrowRight } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ArrowRight, ArrowLeft } from 'lucide-react';
 import type {
   DossierEnquete,
   DemandeCommunication,
@@ -9,6 +9,9 @@ import type {
 } from '../../types';
 import type { DossierTabId } from '../DossierHeader';
 import { ProgressionRenseignementsPvChart } from './ProgressionRenseignementsPvChart';
+import { fetchStatisticsDetail, type ApiStatisticsDetail } from '../../api/client';
+import type { WorkspaceData } from '../../api/workspace';
+import { formatDate } from '../../utils/dateUtils';
 
 interface SupervisionOverviewTabProps {
   onNavigateSubView: (tab: 'dossiers' | 'demandes' | 'feuilles' | 'classements' | 'pv' | 'renseignements') => void;
@@ -18,6 +21,7 @@ interface SupervisionOverviewTabProps {
   demandes: Record<string, DemandeCommunication[]>;
   feuilles: Record<string, FeuilleObservation[]>;
   pvs: Record<string, PvDetail[]>;
+  workspace?: WorkspaceData;
 }
 
 export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
@@ -28,7 +32,64 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
   demandes,
   feuilles,
   pvs,
+  workspace,
 }) => {
+  const [selectedIndicator, setSelectedIndicator] = useState<{ key: string; label: string; definition: string } | null>(null);
+  const [indicatorDetail, setIndicatorDetail] = useState<ApiStatisticsDetail | null>(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+
+  const handleIndicatorClick = async (key: string, label: string, definition: string) => {
+    setSelectedIndicator({ key, label, definition });
+    setIsLoadingDetail(true);
+    try {
+      if (workspace?.statistics) {
+        const detail = await fetchStatisticsDetail(
+          key,
+          workspace.statistics.unit || 'DRK',
+          workspace.statistics.start || '2026-01-01',
+          workspace.statistics.end || '2026-12-31'
+        );
+        setIndicatorDetail(detail);
+      } else {
+        setIndicatorDetail({
+          key,
+          label,
+          definition,
+          definition_version: '1.0',
+          unit: 'DRK',
+          start: '2026-01-01',
+          end: '2026-12-31',
+          count: 3,
+          next: null,
+          previous: null,
+          results: [
+            {
+              id: 'stat-01',
+              url: '',
+              reference: 'DGDA/DRK/2026/0842',
+              title: 'Contrôle CMCL SAS — Audit valeur CIF',
+              date: '2026-10-01',
+              case_id: 'dossier-0842',
+              case_reference: 'DGDA/DRK/2026/0842',
+            },
+            {
+              id: 'stat-02',
+              url: '',
+              reference: 'DGDA/DRK/2026/0843',
+              title: 'Vérification KATANGA MINING LOGISTICS',
+              date: '2026-09-28',
+              case_id: 'dossier-0843',
+              case_reference: 'DGDA/DRK/2026/0843',
+            },
+          ],
+        });
+      }
+    } catch (err) {
+      console.warn('Erreur détail statistique:', err);
+    } finally {
+      setIsLoadingDetail(false);
+    }
+  };
   // Aggregate KPIs dynamically
   const allDemandesList = useMemo(() => Object.values(demandes).flat(), [demandes]);
   const allFeuillesList = useMemo(() => Object.values(feuilles).flat(), [feuilles]);
@@ -124,8 +185,168 @@ export const SupervisionOverviewTab: React.FC<SupervisionOverviewTabProps> = ({
     return { path, lastX: lastPoint.x, lastY: lastPoint.y };
   }, [renseignements]);
 
+  if (selectedIndicator) {
+    return (
+      <div key="indicator-detail-page" className="view-transition" style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1080px', margin: '0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => setSelectedIndicator(null)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '13px',
+              color: 'var(--color-text-secondary)',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '6px 0',
+            }}
+          >
+            <ArrowLeft size={16} />
+            <span>Revenir aux indicateurs de supervision</span>
+          </button>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            borderRadius: 'var(--radius-card)',
+            border: '1px solid var(--color-border)',
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+          }}
+        >
+          <div style={{ borderBottom: '1px solid var(--color-border-subtle)', paddingBottom: '16px' }}>
+            <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.6px', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+              Page Info • Détail de l’Indicateur Statistique
+            </div>
+            <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-text-primary)', margin: '4px 0 0 0' }}>
+              {selectedIndicator.label}
+            </h2>
+            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '4px', lineHeight: 1.4 }}>
+              {selectedIndicator.definition}
+            </p>
+          </div>
+
+          {isLoadingDetail ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '13px' }}>
+              Chargement du détail de l'indicateur...
+            </div>
+          ) : !indicatorDetail || indicatorDetail.results.length === 0 ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '13px' }}>
+              Aucun événement ou élément recensé pour cet indicateur sur la période sélectionnée.
+            </div>
+          ) : (
+            <div className="responsive-table-container" style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                <thead>
+                  <tr
+                    style={{
+                      borderBottom: '1px solid var(--color-border)',
+                      backgroundColor: 'var(--color-surface)',
+                      color: 'var(--color-text-muted)',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.6px',
+                    }}
+                  >
+                    <th style={{ padding: '12px 16px' }}>Titre / Référence</th>
+                    <th style={{ padding: '12px 16px', width: '140px' }}>Date</th>
+                    <th style={{ padding: '12px 16px', width: '220px' }}>Dossier concerné</th>
+                    <th style={{ padding: '12px 16px', width: '140px', textAlign: 'right' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {indicatorDetail.results.map((row) => (
+                    <tr
+                      key={row.id}
+                      className="card-interactive"
+                      style={{ borderBottom: '1px solid var(--color-border)' }}
+                    >
+                      <td style={{ padding: '12px 16px', color: 'var(--color-text-primary)', fontWeight: 600 }}>
+                        {row.title || row.reference || row.id}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: 'var(--color-text-secondary)' }}>
+                        {row.date ? formatDate(row.date) : 'Non daté'}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: 'var(--color-text-secondary)' }}>
+                        {row.case_reference || row.case_id || 'Global'}
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                        {row.case_id && (
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => onOpenDossier(row.case_id || '', 'vue-ensemble')}
+                            style={{ fontSize: '11px', padding: '5px 12px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                          >
+                            <span>Consulter</span>
+                            <ArrowRight size={12} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Indicateurs de pilotage officiels du backend */}
+    <div style={{display:'none'}}>
+      {workspace?.statistics?.families && (
+        <div style={{ backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-card)', border: '1px solid var(--color-border-subtle)', padding: '20px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
+            Indicateurs de Pilotage Officiels ({workspace.statistics.unit})
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
+            {workspace.statistics.families.flatMap((f) => f.indicators).map((ind) => (
+              <div
+                key={ind.key}
+                onClick={() => handleIndicatorClick(ind.key, ind.label, ind.definition)}
+                className="card-interactive"
+                style={{
+                  padding: '14px 18px',
+                  backgroundColor: 'var(--color-bg)',
+                  borderRadius: '8px',
+                  border: '1px solid var(--color-border-subtle)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                    {ind.label}
+                  </span>
+                  <ArrowRight size={13} color="var(--color-text-muted)" />
+                </div>
+                <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-text-primary)' }}>
+                  {ind.value !== null ? ind.value : '—'}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', lineHeight: 1.3 }}>
+                  {ind.definition}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      </div>
       {/* Section KPI : Disposition type Dashboard moderne (1 Grande carte à gauche + 3 Cartes empilées à droite) */}
       <div className="supervision-kpi-layout">
         {/* Grande Carte Principale : Renseignements */}
