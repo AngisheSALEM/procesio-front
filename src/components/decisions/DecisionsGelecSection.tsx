@@ -3,7 +3,6 @@ import {
   Send,
   CheckCircle2,
   AlertCircle,
-  FileText,
   ArrowLeft,
   Clock,
   ShieldCheck,

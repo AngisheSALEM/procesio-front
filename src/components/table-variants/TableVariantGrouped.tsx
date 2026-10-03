@@ -7,7 +7,7 @@ import {
   CheckCircle2,
   FolderOpen
 } from 'lucide-react';
-import type { EnqueteDataRow } from './mockTableData';
+import type { EnqueteDataRow } from './types';
 import {
   TableContainer,
   TableToolbar,

@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import {
-  ShieldCheck,
   ArrowRight,
   ArrowLeft,
   Search,
@@ -41,15 +40,12 @@ interface AdministrationTechniqueViewProps {
 type AdminTab = 'audit' | 'cases' | 'agents' | 'integrity';
 
 export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewProps> = ({
-  currentUser,
   dossiers,
   demandesParDossier,
   feuillesParDossier,
   pvsParDossier,
   workspace,
-  technicalDebt,
   auditEvents,
-  onOpenDossier,
   onRefresh,
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('audit');
@@ -72,11 +68,6 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
   const allFeuilles = useMemo(() => Object.values(feuillesParDossier).flat(), [feuillesParDossier]);
   const allPvs = useMemo(() => Object.values(pvsParDossier).flat(), [pvsParDossier]);
   const totalAuditEvents = auditEvents.length;
-
-  const validUUIDCases = useMemo(() => {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    return dossiers.filter((d) => uuidRegex.test(d.id)).length;
-  }, [dossiers]);
 
   const allAgents = useMemo(() => {
     return workspace?.users || [
@@ -211,11 +202,11 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
                   <path
                     d="M 5 28 Q 30 18 55 24 T 105 12 T 125 8"
                     fill="none"
-                    stroke="var(--color-text-secondary)"
+                    stroke="var(--color-accent)"
                     strokeWidth="2.5"
                     strokeLinecap="round"
                   />
-                  <circle cx="125" cy="8" r="3" fill="var(--color-text-primary)" />
+                  <circle cx="125" cy="8" r="3" fill="var(--color-accent)" />
                 </svg>
               </div>
             </div>
@@ -381,7 +372,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
           style={{
             backgroundColor: 'var(--color-surface)',
             borderRadius: 'var(--radius-card)',
-            border: '1px solid var(--color-border)',
+            border: 'none',
             padding: '24px',
             display: 'flex',
             flexDirection: 'column',
@@ -426,7 +417,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
 
           {/* Metadata Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-            <div style={{ padding: '14px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+            <div style={{ padding: '14px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: 'none' }}>
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Acteur Responsable</div>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '4px' }}>
                 {selectedEvent.acteurNom}
@@ -436,7 +427,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
               </div>
             </div>
 
-            <div style={{ padding: '14px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+            <div style={{ padding: '14px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: 'none' }}>
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Unité & Habilitation</div>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '4px' }}>
                 {selectedEvent.uniteCode}
@@ -446,7 +437,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
               </div>
             </div>
 
-            <div style={{ padding: '14px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+            <div style={{ padding: '14px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: 'none' }}>
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Ressource Cible</div>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '4px' }}>
                 {selectedEvent.resourceType}
@@ -456,7 +447,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
               </div>
             </div>
 
-            <div style={{ padding: '14px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+            <div style={{ padding: '14px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: 'none' }}>
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Horodatage Immuable</div>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '4px' }}>
                 {selectedEvent.occurredAt}
@@ -467,27 +458,10 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
             </div>
           </div>
 
-          {/* Request ID Trace */}
-          <div style={{ padding: '14px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
-              Identifiant Unique de Requête Cryptographique (X-Request-ID)
-            </div>
-            <code style={{ fontSize: '13px', color: 'var(--color-text-primary)', wordBreak: 'break-all' }}>
-              {selectedEvent.requestId}
-            </code>
-          </div>
+   
 
           {/* Raw Payload Inspection */}
-          {selectedEvent.details && (
-            <div style={{ padding: '16px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
-                Charge Utile / Données d'Audit Associées (JSON)
-              </div>
-              <pre style={{ margin: 0, fontSize: '12px', color: 'var(--color-text-primary)', overflowX: 'auto', fontFamily: 'monospace' }}>
-                {JSON.stringify(selectedEvent.details, null, 2)}
-              </pre>
-            </div>
-          )}
+  
         </div>
       )}
 
@@ -499,7 +473,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
           style={{
             backgroundColor: 'var(--color-surface)',
             borderRadius: 'var(--radius-card)',
-            border: '1px solid var(--color-border)',
+            border: 'none',
             padding: '24px',
             display: 'flex',
             flexDirection: 'column',
@@ -517,15 +491,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
               <span>Revenir à la liste des dossiers</span>
             </button>
 
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => onOpenDossier(selectedCaseDetail.id)}
-              style={{ fontSize: '12px', padding: '6px 14px' }}
-            >
-              <span>Ouvrir l’interface complète du dossier</span>
-              <ArrowRight size={14} />
-            </button>
+         
           </div>
 
           <div>
@@ -541,7 +507,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-            <div style={{ padding: '14px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+            <div style={{ padding: '14px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: 'none' }}>
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Responsable</div>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '4px' }}>
                 {selectedCaseDetail.responsable}
@@ -551,7 +517,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
               </div>
             </div>
 
-            <div style={{ padding: '14px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+            <div style={{ padding: '14px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: 'none' }}>
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Statut Procédural</div>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '4px' }}>
                 {selectedCaseDetail.statut}
@@ -561,7 +527,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
               </div>
             </div>
 
-            <div style={{ padding: '14px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+            <div style={{ padding: '14px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: 'none' }}>
               <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Échéance & Prochaine Action</div>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text-primary)', marginTop: '4px' }}>
                 {selectedCaseDetail.echeance ? formatDate(selectedCaseDetail.echeance) : 'Non définie'}
@@ -572,7 +538,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
             </div>
           </div>
 
-          <div style={{ padding: '16px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+          <div style={{ padding: '16px', borderRadius: 'var(--radius-card)', backgroundColor: 'var(--color-bg)', border: 'none' }}>
             <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
               Objet & Périmètre de l'enquête
             </div>
@@ -591,7 +557,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
           style={{
             backgroundColor: 'var(--color-surface)',
             borderRadius: 'var(--radius-card)',
-            border: '1px solid var(--color-border)',
+            border: 'none',
             overflow: 'hidden',
           }}
         >
@@ -607,7 +573,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
                   padding: '7px 12px',
                   borderRadius: 'var(--radius-card)',
                   backgroundColor: 'var(--color-bg)',
-                  border: '1px solid var(--color-border)',
+                  border: 'none',
                 }}
               >
                 <Search size={14} color="var(--color-text-muted)" />
@@ -742,7 +708,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
           style={{
             backgroundColor: 'var(--color-surface)',
             borderRadius: 'var(--radius-card)',
-            border: '1px solid var(--color-border)',
+            border: 'none',
             overflow: 'hidden',
           }}
         >
@@ -771,7 +737,6 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
               </thead>
               <tbody>
                 {dossiers.map((dossier) => {
-                  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dossier.id);
                   return (
                     <tr
                       key={dossier.id}
@@ -828,7 +793,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
           style={{
             backgroundColor: 'var(--color-surface)',
             borderRadius: 'var(--radius-card)',
-            border: '1px solid var(--color-border)',
+            border: 'none',
             overflow: 'hidden',
           }}
         >
@@ -914,7 +879,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
                                 padding: '2px 6px',
                                 borderRadius: '4px',
                                 backgroundColor: 'var(--color-bg)',
-                                border: '1px solid var(--color-border)',
+                                border: 'none',
                                 color: 'var(--color-text-secondary)',
                                 fontFamily: 'monospace',
                               }}
@@ -960,7 +925,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
             style={{
               backgroundColor: 'var(--color-surface)',
               borderRadius: 'var(--radius-card)',
-              border: '1px solid var(--color-border)',
+              border: 'none',
               width: '100%',
               maxWidth: '520px',
               padding: '24px',
@@ -1014,7 +979,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
                       padding: '8px 12px',
                       borderRadius: 'var(--radius-card)',
                       backgroundColor: 'var(--color-bg)',
-                      border: '1px solid var(--color-border)',
+                      border: 'none',
                       color: 'var(--color-text-primary)',
                       fontSize: '13px',
                     }}
@@ -1039,7 +1004,7 @@ export const AdministrationTechniqueView: React.FC<AdministrationTechniqueViewPr
                         padding: '8px 12px',
                         borderRadius: 'var(--radius-card)',
                         backgroundColor: 'var(--color-bg)',
-                        border: '1px solid var(--color-border)',
+                        border: 'none',
                         color: 'var(--color-text-primary)',
                         fontSize: '13px',
                       }}

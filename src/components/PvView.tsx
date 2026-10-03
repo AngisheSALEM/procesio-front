@@ -80,7 +80,7 @@ export const PvView: React.FC<PvViewProps> = ({
   const [previewPdfData, setPreviewPdfData] = useState<{
     title: string;
     metadata?: any;
-    mockContent?: any;
+    documentContent?: any;
     file?: File;
     fileUrl?: string;
   } | null>(null);
@@ -847,7 +847,7 @@ export const PvView: React.FC<PvViewProps> = ({
                         taille: pvData.pdfTaille || '1.2 Mo',
                         entite: pvData.destinataire,
                       },
-                      mockContent: {
+                      documentContent: {
                         type: 'PROCÈS-VERBAL D’INFRACTION DOUANIÈRE OFFICIEL',
                         destinataire: pvData.destinataire,
                         objet: pvData.motif,
@@ -1052,7 +1052,7 @@ export const PvView: React.FC<PvViewProps> = ({
           fileUrl={previewPdfData.fileUrl}
           file={previewPdfData.file}
           metadata={previewPdfData.metadata}
-          mockContent={previewPdfData.mockContent}
+          documentContent={previewPdfData.documentContent}
         />
       )}
     </div>

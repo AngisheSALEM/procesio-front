@@ -64,7 +64,7 @@ export function isValidUUID(value: unknown): value is string {
  * useTechnicalDebt
  *
  * Hook de diagnostic en temps réel de la dette technique Frontend / Backend.
- * Analyse les ruptures de contrats DRF, les écarts d'identifiants (UUID vs slugs mockés),
+ * Analyse les ruptures de contrats DRF, les écarts d'identifiants (UUID vs chaînes temporaires),
  * l'absence d'habilitations RBAC ('case.update'), la non-conformité des charges utiles
  * (champs obligatoires, tableaux non vides) et le masquage silencieux d'erreurs par fallback local.
  */
@@ -245,17 +245,17 @@ export function useTechnicalDebt({
       feuilleBlockers.push('Aucun dossier sélectionné');
     } else if (!isCaseUUID) {
       issues.push({
-        id: 'case-mock-id',
+        id: 'case-invalid-id',
         category: 'UUID_COMPLIANCE',
         severity: 'CRITICAL',
-        title: `Identifiant de dossier factice (non-UUID): '${activeCaseId}'`,
-        detail: `Le dossier sélectionné possède l'identifiant slug '${activeCaseId}'. Django DRF rejette immédiatement tout POST vers /demandes/ ou /feuilles/ car le modèle Case exige un UUIDv4 strict.`,
-        recommendation: 'Basculez sur un dossier réel chargé depuis le backend (ex: ab7b92d2-1659-4e3f-8768-4deb13686c93).',
+        title: `Identifiant de dossier non conforme (non-UUID): '${activeCaseId}'`,
+        detail: `Le dossier sélectionné possède l'identifiant '${activeCaseId}'. Django DRF rejette immédiatement tout POST vers /demandes/ ou /feuilles/ car le modèle Case exige un UUIDv4 strict.`,
+        recommendation: 'Basculez sur un dossier réel chargé depuis le backend.',
         affectedEntity: activeCaseId,
         contractEndpoint: '/api/v1/dossiers/',
       });
-      demandeBlockers.push(`Dossier courant est un mock slug ('${activeCaseId}')`);
-      feuilleBlockers.push(`Dossier courant est un mock slug ('${activeCaseId}')`);
+      demandeBlockers.push(`Dossier courant avec identifiant non-UUID ('${activeCaseId}')`);
+      feuilleBlockers.push(`Dossier courant avec identifiant non-UUID ('${activeCaseId}')`);
     } else if (workspace) {
       const caseExistsInBackend = workspace.cases.some((c) => c.id === activeCaseId);
       if (!caseExistsInBackend) {
@@ -299,8 +299,8 @@ export function useTechnicalDebt({
     let unsyncedDemandes = 0;
 
     currentDemandes.forEach((demande) => {
-      const isMockDemande = !isValidUUID(demande.id) || demande.id.startsWith('demande-');
-      if (isMockDemande) {
+      const isDraftDemande = !isValidUUID(demande.id) || demande.id.startsWith('demande-');
+      if (isDraftDemande) {
         unsyncedDemandes++;
       }
 
@@ -317,7 +317,7 @@ export function useTechnicalDebt({
         });
       }
 
-      if (demande.statut === 'EMISE' && isMockDemande) {
+      if (demande.statut === 'EMISE' && isDraftDemande) {
         issues.push({
           id: `demande-invalid-status-${demande.id}`,
           category: 'CONTRACT_VALIDATION',
@@ -347,8 +347,8 @@ export function useTechnicalDebt({
     let unsyncedFeuilles = 0;
 
     currentFeuilles.forEach((feuille) => {
-      const isMockFeuille = !isValidUUID(feuille.id) || feuille.id.startsWith('fo-');
-      if (isMockFeuille) {
+      const isDraftFeuille = !isValidUUID(feuille.id) || feuille.id.startsWith('fo-');
+      if (isDraftFeuille) {
         unsyncedFeuilles++;
       }
 

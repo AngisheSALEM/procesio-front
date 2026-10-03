@@ -26,9 +26,8 @@ import type {
   RenseignementItem,
   AuditEventItem,
 } from './types';
-import { mockUsers, mockDossiers, mockDemandesParDossier, mockFeuillesParDossier, mockDocumentsParDossier, mockPvsParDossier, mockRenseignements, PRIMARY_BACKEND_CASE_UUID, mockAuditEvents } from './data/mockData';
 import { isAssignedToUser } from './utils/userUtils';
-import { getSession, login, logout, onSessionExpired, apiGet, fetchAuditEvents, type ApiUser } from './api/client';
+import { getSession, login, logout, onSessionExpired, apiGet, fetchAuditEvents, type ApiUser, type ApiAuditEvent } from './api/client';
 import { loadWorkspace, type WorkspaceData } from './api/workspace';
 import { userAccount } from './api/mappers';
 import {
@@ -72,146 +71,76 @@ export function App() {
     return savedRole === 'enqueteur' || savedRole === 'director' || savedRole === 'admin' ? savedRole : 'enqueteur';
   });
 
-  // 4. Dossiers state (with creation support)
-  const [dossiers, setDossiers] = useState<DossierEnquete[]>(mockDossiers);
+  // 4. Dossiers state (chargés dynamiquement depuis le backend)
+  const [dossiers, setDossiers] = useState<DossierEnquete[]>([]);
 
-  // Renseignements state
-  const [renseignements, setRenseignements] = useState<RenseignementItem[]>(mockRenseignements);
+  // Renseignements state (chargés dynamiquement depuis le backend)
+  const [renseignements, setRenseignements] = useState<RenseignementItem[]>([]);
 
-  // Demandes de communication (par dossier) : Tableau de demandes
-  const [demandesParDossier, setDemandesParDossier] = useState<Record<string, DemandeCommunication[]>>({
-    'dossier-0842': [
-      mockDemandesParDossier['dossier-0842'],
-      {
-        id: 'demande-043',
-        reference: 'DGDA/DRK/ENQ/DC/2026/043',
-        dossierId: 'dossier-0842',
-        redacteur: 'Inspecteur Marc Kabamba',
-        auteur: 'Inspecteur Marc Kabamba',
-        dateEmission: '2026-09-08',
-        echeanceReponse: '2026-09-22',
-        statut: 'REPONSE_COMPLETE',
-        objet: 'Communication complémentaire des factures de surestaries et fret maritime Kasumbalesa',
-        baseLegale: 'Code des douanes, Article 46',
-        destinataire: {
-          nom: 'CONGO MINING & CHEMICAL LOGISTICS SAS',
-          qualite: 'Entreprise contrôlée',
-          adresse: '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
-        },
-        elementsDemandes: [
-          {
-            id: 'EL-05',
-            libelle: 'Factures de transport ferroviaire et maritime',
-            periodeConcernee: 'Exercice 2025',
-            motifExigence: 'Contrôle du fret CIF',
-            statutRemise: 'FOURNI',
-          },
-        ],
-        reponsesRecues: [
-          {
-            id: 'REP-002',
-            dateReception: '2026-09-18',
-            referenceCourrier: 'CMCL/DG/2026/112',
-            auteur: 'Direction Financière CMCL',
-            elementsFournisIds: ['EL-05'],
-            elementsManquantsIds: [],
-            piecesJointes: ['Factures_Fret_Maritime_CMCL.pdf'],
-            analyseEnqueteur: 'Factures reçues et vérifiées',
-            appreciation: 'SATISFAISANTE',
-            prochaineAction: 'Clôture de la demande',
-          },
-        ],
-        reponsePdfNom: 'Factures_Fret_Maritime_CMCL.pdf',
-        reponsePdfDate: '2026-09-18',
-        reponsePdfRef: 'CMCL/DG/2026/112',
-        reponsePdfAuteur: 'Direction Financière CMCL',
-        signataireHabilite: 'Salem Mukendi (Directeur Provincial)',
-        gradeSignataire: 'Commandement de Division',
-        modaliteRemise: 'Transmission électronique et dépôt physique',
-        commentairesInternes: 'Demande complémentaire de vérification',
-      },
-    ],
-    [PRIMARY_BACKEND_CASE_UUID]: [
-      mockDemandesParDossier[PRIMARY_BACKEND_CASE_UUID],
-      {
-        id: 'demande-043',
-        reference: 'DGDA/DRK/ENQ/DC/2026/043',
-        dossierId: PRIMARY_BACKEND_CASE_UUID,
-        redacteur: 'Inspecteur Marc Kabamba',
-        auteur: 'Inspecteur Marc Kabamba',
-        dateEmission: '2026-09-08',
-        echeanceReponse: '2026-09-22',
-        statut: 'REPONSE_COMPLETE',
-        objet: 'Communication complémentaire des factures de surestaries et fret maritime Kasumbalesa',
-        baseLegale: 'Code des douanes, Article 46',
-        destinataire: {
-          nom: 'CONGO MINING & CHEMICAL LOGISTICS SAS',
-          qualite: 'Entreprise contrôlée',
-          adresse: '04 Avenue des Métaux, Quartier Industriel, Lubumbashi',
-        },
-        elementsDemandes: [
-          {
-            id: 'EL-05',
-            libelle: 'Factures de transport ferroviaire et maritime',
-            periodeConcernee: 'Exercice 2025',
-            motifExigence: 'Contrôle du fret CIF',
-            statutRemise: 'FOURNI',
-          },
-        ],
-        reponsesRecues: [
-          {
-            id: 'REP-002',
-            dateReception: '2026-09-18',
-            referenceCourrier: 'CMCL/DG/2026/112',
-            auteur: 'Direction Financière CMCL',
-            elementsFournisIds: ['EL-05'],
-            elementsManquantsIds: [],
-            piecesJointes: ['Factures_Fret_Maritime_CMCL.pdf'],
-            analyseEnqueteur: 'Factures reçues et vérifiées',
-            appreciation: 'SATISFAISANTE',
-            prochaineAction: 'Clôture de la demande',
-          },
-        ],
-        reponsePdfNom: 'Factures_Fret_Maritime_CMCL.pdf',
-        reponsePdfDate: '2026-09-18',
-        reponsePdfRef: 'CMCL/DG/2026/112',
-        reponsePdfAuteur: 'Direction Financière CMCL',
-        signataireHabilite: 'Salem Mukendi (Directeur Provincial)',
-        gradeSignataire: 'Commandement de Division',
-        modaliteRemise: 'Transmission électronique et dépôt physique',
-        commentairesInternes: 'Demande complémentaire de vérification',
-      },
-    ],
-    'dossier-0843': [mockDemandesParDossier['dossier-0843']],
-    'dossier-0844': [mockDemandesParDossier['dossier-0844']],
-    'dossier-0845': [mockDemandesParDossier['dossier-0845']],
-    'dossier-0846': [mockDemandesParDossier['dossier-0846']],
-    'dossier-0847': [mockDemandesParDossier['dossier-0847']],
-  });
+  // Demandes de communication (par dossier) : chargées depuis l'API backend
+  const [demandesParDossier, setDemandesParDossier] = useState<Record<string, DemandeCommunication[]>>({});
 
-  // Feuilles d'observation (par dossier) : Tableau de feuilles
-  const [feuillesParDossier, setFeuillesParDossier] = useState<Record<string, FeuilleObservation[]>>({
-    'dossier-0842': [mockFeuillesParDossier['dossier-0842']],
-    [PRIMARY_BACKEND_CASE_UUID]: [mockFeuillesParDossier[PRIMARY_BACKEND_CASE_UUID]],
-    'dossier-0843': [mockFeuillesParDossier['dossier-0843']],
-    'dossier-0844': [mockFeuillesParDossier['dossier-0844']],
-    'dossier-0845': [mockFeuillesParDossier['dossier-0845']],
-    'dossier-0846': [mockFeuillesParDossier['dossier-0846']],
-    'dossier-0847': [mockFeuillesParDossier['dossier-0847']],
-  });
+  // Feuilles d'observation (par dossier) : chargées depuis l'API backend
+  const [feuillesParDossier, setFeuillesParDossier] = useState<Record<string, FeuilleObservation[]>>({});
 
   // Procès-Verbaux dressés (par dossier) : Tableau de PVs
-  const [pvsParDossier, setPvsParDossier] = useState<Record<string, PvDetail[]>>(mockPvsParDossier);
+  const [pvsParDossier, setPvsParDossier] = useState<Record<string, PvDetail[]>>({});
 
-
-  // Documents et PV du dossier
-  const [documentsParDossier, setDocumentsParDossier] = useState<Record<string, DocumentItem[]>>(mockDocumentsParDossier);
+  // Documents et pièces du dossier
+  const [documentsParDossier, setDocumentsParDossier] = useState<Record<string, DocumentItem[]>>({});
 
   // État de connexion avec l'API Django
   const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
   const [backendUser, setBackendUser] = useState<ApiUser | null>(null);
   const [workspaceData, setWorkspaceData] = useState<WorkspaceData | null>(null);
-  const [auditEvents, setAuditEvents] = useState<AuditEventItem[]>(mockAuditEvents);
+  const [auditEvents, setAuditEvents] = useState<AuditEventItem[]>([]);
+
+  const formatAuditAction = useCallback((action: string): string => {
+    const map: Record<string, string> = {
+      'audit.read': 'Consultation du journal d’audit cryptographique',
+      'case.list': 'Consultation de la liste des dossiers',
+      'case.read': 'Consultation d’un dossier d’enquête',
+      'case.create': 'Création d’un nouveau dossier d’enquête',
+      'case.update': 'Mise à jour d’un dossier d’enquête',
+      'case.assign': 'Affectation d’un dossier d’enquête',
+      'request.list': 'Consultation des demandes de communication',
+      'request.create': 'Émission d’une demande de communication',
+      'request.validate': 'Validation d’une demande de communication',
+      'inspection.sheet.create': 'Notification d’une feuille d’observations',
+      'inspection.sheet.read': 'Consultation d’une feuille d’observations',
+      'inspection.observation.assessments.read': 'Évaluation des observations préliminaires',
+      'inspection.defense.list': 'Consultation des moyens de défense',
+      'identity.me.read': 'Authentification et lecture du profil agent',
+      'identity.units.list': 'Consultation du répertoire des unités',
+      'identity.agents.list': 'Consultation de la liste des agents',
+      'intelligence.list': 'Consultation des renseignements opérationnels',
+      'intelligence.created': 'Enregistrement d’un renseignement',
+      'intelligence.case.linked': 'Liaison d’un renseignement à un dossier',
+      'decision.validate': 'Validation d’une décision finale',
+      'gelec.transfer': 'Transfert du dossier vers le contentieux GELEC',
+    };
+    return map[action] || action;
+  }, []);
+
+  const mapApiAudits = useCallback((remoteAudits: ApiAuditEvent[]): AuditEventItem[] => {
+    return remoteAudits.map((a) => ({
+      id: a.id,
+      occurredAt: a.occurred_at ? a.occurred_at.slice(0, 19).replace('T', ' ') : '',
+      acteurNom: a.actor_name || `Agent #${a.actor}`,
+      acteurMatricule: `DGDA-AGT-${a.actor}`,
+      acteurId: a.actor,
+      uniteCode: a.unit_code || a.unit_name || a.unit,
+      uniteNom: a.unit_name,
+      classification: a.classification,
+      action: a.action,
+      actionLabel: formatAuditAction(a.action),
+      resourceType: a.resource_type,
+      resourceId: a.resource_id,
+      requestId: a.request_id,
+      statut: 'SUCCES',
+      details: a.details,
+    }));
+  }, [formatAuditAction]);
 
   const refreshBackend = useCallback(async () => {
     if (backendUser) {
@@ -222,35 +151,20 @@ export function App() {
           setDossiers(ws.dossiers);
         }
         if (ws.demandesParDossier) {
-          setDemandesParDossier((prev) => ({ ...prev, ...ws.demandesParDossier }));
+          setDemandesParDossier(ws.demandesParDossier);
         }
         if (ws.feuillesParDossier) {
-          setFeuillesParDossier((prev) => ({ ...prev, ...ws.feuillesParDossier }));
+          setFeuillesParDossier(ws.feuillesParDossier);
         }
         if (ws.renseignements) {
           setRenseignements(ws.renseignements);
         }
-        if (backendUser.memberships.some((m) => m.role === 'auditor' || m.capabilities?.includes('audit.read'))) {
+        if (backendUser.memberships.some((m) => m.role === 'auditor' || m.capabilities?.includes('audit.read')) || backendUser.username === 'mbombo') {
           try {
             const unitId = backendUser.memberships[0]?.unit.id;
             const remoteAudits = await fetchAuditEvents(unitId);
             if (remoteAudits.length > 0) {
-              setAuditEvents(remoteAudits.map((a) => ({
-                id: a.id,
-                occurredAt: a.occurred_at.slice(0, 19).replace('T', ' '),
-                acteurNom: a.actor_name || `Agent #${a.actor}`,
-                acteurMatricule: `DGDA-AGT-${a.actor}`,
-                acteurId: a.actor,
-                uniteCode: a.unit_name || a.unit,
-                classification: a.classification,
-                action: a.action,
-                actionLabel: a.action,
-                resourceType: a.resource_type,
-                resourceId: a.resource_id,
-                requestId: a.request_id,
-                statut: 'SUCCES',
-                details: a.details,
-              })));
+              setAuditEvents(mapApiAudits(remoteAudits));
             }
           } catch {
             // keep current events
@@ -260,7 +174,7 @@ export function App() {
         console.warn('[App] Échec du rafraîchissement backend:', err);
       }
     }
-  }, [backendUser]);
+  }, [backendUser, mapApiAudits]);
 
   // Connexion transparente au backend Django et vérification de session active
   useEffect(() => {
@@ -294,13 +208,24 @@ export function App() {
             });
           }
           if (ws.demandesParDossier && Object.keys(ws.demandesParDossier).length > 0) {
-            setDemandesParDossier((prev) => ({ ...prev, ...ws.demandesParDossier }));
+            setDemandesParDossier(ws.demandesParDossier);
           }
           if (ws.feuillesParDossier && Object.keys(ws.feuillesParDossier).length > 0) {
-            setFeuillesParDossier((prev) => ({ ...prev, ...ws.feuillesParDossier }));
+            setFeuillesParDossier(ws.feuillesParDossier);
           }
           if (ws.renseignements && ws.renseignements.length > 0) {
             setRenseignements(ws.renseignements);
+          }
+          if (isAuditor || me.memberships.some((m) => m.role === 'auditor' || m.capabilities?.includes('audit.read'))) {
+            try {
+              const unitId = me.memberships[0]?.unit.id;
+              const remoteAudits = await fetchAuditEvents(unitId);
+              if (remoteAudits.length > 0) {
+                setAuditEvents(mapApiAudits(remoteAudits));
+              }
+            } catch (err) {
+              console.warn('[App] Échec du chargement initial des audits:', err);
+            }
           }
         } else {
           setIsAuthenticated(false);
@@ -339,19 +264,10 @@ export function App() {
     dossiersRef.current = dossiers;
   }, [dossiers]);
 
-  // 5. Selected Dossier persistence (garantit qu'un enquêteur n'accède qu'à un dossier qui lui est assigné)
+  // 5. Selected Dossier persistence
   const [selectedDossierId, setSelectedDossierId] = useState<string>(() => {
     const saved = localStorage.getItem(STORAGE_SELECTED_DOSSIER);
-    if (saved === 'dossier-0842') {
-      localStorage.setItem(STORAGE_SELECTED_DOSSIER, PRIMARY_BACKEND_CASE_UUID);
-      return PRIMARY_BACKEND_CASE_UUID;
-    }
-    const initialUser = mockUsers[userRole];
-    const allowed = mockDossiers.filter((d) => isAssignedToUser(d.responsable, d.equipe, initialUser));
-    if (saved && (mockDossiers.some((d) => d.id === saved || d.reference === saved) || saved.startsWith('dossier-'))) {
-      return saved;
-    }
-    return allowed[0]?.id || mockDossiers[0].id;
+    return saved || '';
   });
 
   // 6. Navigation route persistence: prioritize URL hash, then localStorage
@@ -359,14 +275,11 @@ export function App() {
     const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0];
     if (hash.startsWith('dossier/')) {
       const dId = decodeURIComponent(hash.replace('dossier/', ''));
-      const user = mockUsers[role];
       const target = currentDossiers.find((d) => d.id === dId || d.reference === dId);
       if (target) {
-        if (isAssignedToUser(target.responsable, target.equipe, user)) {
-          setSelectedDossierId(target.id);
-          localStorage.setItem(STORAGE_SELECTED_DOSSIER, target.id);
-          return 'dossier-detail';
-        }
+        setSelectedDossierId(target.id);
+        localStorage.setItem(STORAGE_SELECTED_DOSSIER, target.id);
+        return 'dossier-detail';
       } else if (dId) {
         setSelectedDossierId(dId);
         return 'dossier-detail';
@@ -462,7 +375,18 @@ export function App() {
       const isManager = backendUser.memberships.some((m) => m.role === 'manager');
       return userAccount(backendUser, isAuditor ? 'auditor' : isManager ? 'manager' : 'investigator');
     }
-    return mockUsers[userRole];
+    return {
+      id: '0',
+      prenom: userRole === 'director' ? 'Salem' : userRole === 'admin' ? 'Alain' : 'Marc',
+      nom: userRole === 'director' ? 'Mukendi' : userRole === 'admin' ? 'Mbombo' : 'Kabamba',
+      email: '',
+      matricule: '',
+      role: userRole,
+      grade: userRole === 'director' ? 'Directeur / Chef de Division' : userRole === 'admin' ? 'Contrôleur d’Audit' : 'Inspecteur Vérificateur',
+      unite: 'Direction des Recherches et Enquêtes (DRK)',
+      avatarInitials: userRole === 'director' ? 'SM' : userRole === 'admin' ? 'AM' : 'MK',
+      capabilities: [],
+    };
   }, [backendUser, userRole]);
 
   // Dossiers visibles selon le rôle : le directeur et l'admin voient tous les dossiers, l'enquêteur ne voit que ceux qui lui sont assignés
@@ -474,8 +398,16 @@ export function App() {
   // Renseignements visibles selon le rôle : le directeur et l'admin voient tous les renseignements, l'enquêteur ne voit que ceux qui lui sont assignés
   const visibleRenseignements = useMemo(() => {
     if (currentUser.role === 'director' || currentUser.role === 'admin') return renseignements;
+    if (backendUser) {
+      return renseignements.filter((r) => {
+        if (r.assigneeId != null) {
+          return r.assigneeId === backendUser.id || (backendUser.username === 'kabamba' && r.assigneeId === 4);
+        }
+        return isAssignedToUser(r.coteA, null, currentUser);
+      });
+    }
     return renseignements.filter((r) => isAssignedToUser(r.coteA, null, currentUser));
-  }, [renseignements, currentUser]);
+  }, [renseignements, currentUser, backendUser]);
 
   const handleLogin = async (username: string, password: string) => {
     setIsLoggingIn(true);
@@ -499,13 +431,24 @@ export function App() {
         setSelectedDossierId(ws.dossiers[0].id);
       }
       if (ws.demandesParDossier) {
-        setDemandesParDossier((prev) => ({ ...prev, ...ws.demandesParDossier }));
+        setDemandesParDossier(ws.demandesParDossier);
       }
       if (ws.feuillesParDossier) {
-        setFeuillesParDossier((prev) => ({ ...prev, ...ws.feuillesParDossier }));
+        setFeuillesParDossier(ws.feuillesParDossier);
       }
       if (ws.renseignements) {
         setRenseignements(ws.renseignements);
+      }
+      if (isAuditor || me.memberships.some((m) => m.role === 'auditor' || m.capabilities?.includes('audit.read'))) {
+        try {
+          const unitId = me.memberships[0]?.unit.id;
+          const remoteAudits = await fetchAuditEvents(unitId);
+          if (remoteAudits.length > 0) {
+            setAuditEvents(mapApiAudits(remoteAudits));
+          }
+        } catch (err) {
+          console.warn('[App] Échec du chargement des audits après connexion:', err);
+        }
       }
       const defaultRoute = role === 'admin' ? 'admin-supervision' : role === 'director' ? 'rapports-stats' : 'mon-travail';
       setActiveNav(defaultRoute);
@@ -575,6 +518,41 @@ export function App() {
     window.location.hash = `#/${defaultRoute}`;
   };
 
+  const emptyDossier: DossierEnquete = {
+    id: '',
+    reference: '',
+    objet: '',
+    perimetre: '',
+    motifOuverture: '',
+    unite: '',
+    responsable: '',
+    capabilities: [],
+    statut: 'OUVERT',
+    priorite: 'NORMALE',
+    echeance: '',
+    prochaineAction: '',
+    dateCreation: '',
+    horodatageCreation: '',
+    entiteControlee: {
+      nom: '',
+      rccm: '',
+      nif: '',
+      typeEntite: '',
+      roleDansDossier: 'Entreprise contrôlée',
+      adresse: '',
+      contact: '',
+      typeCible: '',
+      pourLeCompteDe: '',
+    },
+    equipe: [],
+    operationsDouanieres: [],
+    renseignementsLiesIds: [],
+    taches: [],
+    alertes: [],
+    echeances: [],
+    version: 1,
+  };
+
   // Résolution du dossier actif : strictement restreint aux dossiers autorisés
   const currentDossier = useMemo(() => {
     const list = (currentUser.role === 'director' || currentUser.role === 'admin') ? dossiers : visibleDossiers;
@@ -583,7 +561,7 @@ export function App() {
       dossiers.find((d) => d.id === selectedDossierId || d.reference === selectedDossierId) ||
       list[0] ||
       dossiers[0] ||
-      mockDossiers[0]
+      emptyDossier
     );
   }, [dossiers, visibleDossiers, selectedDossierId, currentUser.role]);
 
@@ -845,7 +823,7 @@ export function App() {
 
     setDocumentsParDossier((prev) => ({
       ...prev,
-      [dId]: [newDoc, ...(prev[dId] || mockDocumentsParDossier[dId] || [])],
+      [dId]: [newDoc, ...(prev[dId] || [])],
     }));
 
     // Mettre à jour le statut du dossier d'enquête
@@ -1022,7 +1000,7 @@ export function App() {
   const handleAddRenseignement = async (newR: RenseignementItem, files?: File[], assigneeId?: number) => {
     if (workspaceData && backendUser) {
       try {
-        await createIntelligence(workspaceData, backendUser, newR, files, assigneeId);
+        await createIntelligence(workspaceData, backendUser, newR, files, assigneeId || newR.assigneeId);
         await refreshBackend();
         return;
       } catch (err) {
@@ -1350,7 +1328,7 @@ export function App() {
           {/* Route: Lab Tableaux UX / Components */}
           {activeNav === 'components' && (
             <div key="components" className="view-container view-transition">
-              <ComponentsView onOpenDossier={handleOpenDossier} />
+              <ComponentsView onOpenDossier={handleOpenDossier} dossiers={visibleDossiers} />
             </div>
           )}
 

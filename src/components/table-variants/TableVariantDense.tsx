@@ -8,7 +8,7 @@ import {
   CheckCircle2,
   Scale
 } from 'lucide-react';
-import type { EnqueteDataRow } from './mockTableData';
+import type { EnqueteDataRow } from './types';
 import type { TableDensity, TableSortConfig } from '../table-system/types';
 import {
   TableContainer,

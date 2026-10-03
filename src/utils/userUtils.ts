@@ -11,7 +11,7 @@ export function isAssignedToUser(
   team: string[] | null | undefined,
   user: UserAccount
 ): boolean {
-  if (!user || user.role === 'director') return true;
+  if (!user || user.role === 'director' || user.role === 'admin') return true;
 
   const prenom = (user.prenom || '').toLowerCase().trim();
   const nom = (user.nom || '').toLowerCase().trim();
@@ -19,8 +19,12 @@ export function isAssignedToUser(
   const matches = (target?: string | null): boolean => {
     if (!target) return false;
     const t = target.toLowerCase();
-    // Doit contenir le prénom et le nom pour éviter les faux positifs (ex: Mireille Kabamba vs Marc Kabamba)
-    return t.includes(nom) && t.includes(prenom);
+    // Doit contenir le nom pour correspondance robuste (ex: "Marc Kabamba" ou "Inspecteur Kabamba")
+    if (nom && prenom) {
+      return t.includes(nom) && (t.includes(prenom) || t.includes(prenom.slice(0, 3)));
+    }
+    if (nom) return t.includes(nom);
+    return false;
   };
 
   if (matches(assignee)) return true;
@@ -28,3 +32,4 @@ export function isAssignedToUser(
 
   return false;
 }
+

@@ -6,8 +6,7 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
-  LogOut,
-  ShieldCheck
+  LogOut
 } from 'lucide-react';
 import type { UserAccount } from '../types';
 

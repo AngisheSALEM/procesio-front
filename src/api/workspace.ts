@@ -56,30 +56,30 @@ export async function fetchCaseDetailData(
   optional: <T>(label: string, read: () => Promise<T>, fallback: T, critical?: boolean) => Promise<T>,
 ): Promise<CaseDetailData> {
   const query = `?case=${encodeURIComponent(item.id)}&page_size=100`;
-  const requests = await optional(`${item.reference} · demandes`, () => apiAll<ApiRequest>(`/demandes/${query}`), []);
-  const sheets = await optional(`${item.reference} · feuilles`, () => apiAll<ApiSheet>(`/feuilles/${query}`), []);
-  const missions = await optional(`${item.reference} · missions`, () => apiAll<ApiMission>(`/missions/${query}`), []);
-  const documents = await optional(`${item.reference} · pièces`, () => apiAll<ApiDocument>(`/documents/${query}`), []);
-  const decisions = await optional(`${item.reference} · décisions`, () => apiAll<ApiDecision>(`/decisions/${query}`), []);
-  const transfers = await optional(`${item.reference} · transferts GELEC`, () => apiAll<ApiGelecTransfer>(`/transferts-gelec/${query}`), []);
+  const requests = await optional(`${item.reference} · demandes`, () => apiAll<ApiRequest>(`/demandes/${query}`), [], false);
+  const sheets = await optional(`${item.reference} · feuilles`, () => apiAll<ApiSheet>(`/feuilles/${query}`), [], false);
+  const missions = await optional(`${item.reference} · missions`, () => apiAll<ApiMission>(`/missions/${query}`), [], false);
+  const documents = await optional(`${item.reference} · pièces`, () => apiAll<ApiDocument>(`/documents/${query}`), [], false);
+  const decisions = await optional(`${item.reference} · décisions`, () => apiAll<ApiDecision>(`/decisions/${query}`), [], false);
+  const transfers = await optional(`${item.reference} · transferts GELEC`, () => apiAll<ApiGelecTransfer>(`/transferts-gelec/${query}`), [], false);
   const responses: ApiResponse[] = [];
   const assessmentRows: Array<{ id: string; rows: ApiAssessment[] }> = [];
   for (const request of requests) {
     responses.push(...await optional(`${item.reference} · réponses ${request.reference || request.id}`,
-      () => apiAll<ApiResponse>(`/demandes/${request.id}/reponses/?page_size=100`), []));
+      () => apiAll<ApiResponse>(`/demandes/${request.id}/reponses/?page_size=100`), [], false));
     for (const element of request.items) {
       assessmentRows.push({ id: element.id, rows: await optional(`${item.reference} · appréciations ${element.number}`,
-        () => apiAll<ApiAssessment>(`/demandes/${request.id}/elements/${element.id}/appreciations/?page_size=100`), []) });
+        () => apiAll<ApiAssessment>(`/demandes/${request.id}/elements/${element.id}/appreciations/?page_size=100`), [], false) });
     }
   }
   const defenses: ApiDefense[] = [];
   const observationAssessments: Record<string, ApiObservationAssessment[]> = {};
   for (const sheet of sheets) {
     defenses.push(...await optional(`${item.reference} · défenses`,
-      () => apiAll<ApiDefense>(`/feuilles/${sheet.id}/defenses/?page_size=100`), []));
+      () => apiAll<ApiDefense>(`/feuilles/${sheet.id}/defenses/?page_size=100`), [], false));
     for (const observation of sheet.observations) {
       observationAssessments[observation.id] = await optional(`${item.reference} · observation O${observation.number}`,
-        () => apiAll<ApiObservationAssessment>(`/feuilles/${sheet.id}/observations/${observation.id}/appreciations/?page_size=100`), []);
+        () => apiAll<ApiObservationAssessment>(`/feuilles/${sheet.id}/observations/${observation.id}/appreciations/?page_size=100`), [], false);
     }
   }
   return {
@@ -147,8 +147,8 @@ export function applyCaseDetails(
   };
 }
 
-export async function loadWorkspace(me: ApiUser, initialCaseId?: string, loadAll = false): Promise<WorkspaceData> {
-  const memberships = me.memberships.filter((membership) => membership.role === 'manager' || membership.role === 'investigator');
+export async function loadWorkspace(me: ApiUser, initialCaseId?: string, loadAll = true): Promise<WorkspaceData> {
+  const memberships = me.memberships.filter((membership) => membership.role === 'manager' || membership.role === 'investigator' || membership.role === 'auditor');
   const units = new Map(me.memberships.map((membership) => [membership.unit.id, membership.unit.name]));
   const unitIds = [...new Set(memberships.map((membership) => membership.unit.id))];
   const warnings: string[] = [];

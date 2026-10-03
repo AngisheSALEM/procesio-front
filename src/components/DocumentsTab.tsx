@@ -521,7 +521,7 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({
             statut: previewDoc.statutValidation,
             scanState: previewDoc.scanState || 'accepted',
           }}
-          mockContent={{
+          documentContent={{
             type: previewDoc.titre,
             objet: `Pièce d’instruction contradictoire enregistrée sous la référence ${previewDoc.reference}`,
             destinataire: 'Opérateur économique contrôlé',

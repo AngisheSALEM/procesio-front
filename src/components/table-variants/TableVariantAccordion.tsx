@@ -5,7 +5,7 @@ import {
   ArrowRight,
   ShieldAlert
 } from 'lucide-react';
-import type { EnqueteDataRow } from './mockTableData';
+import type { EnqueteDataRow } from './types';
 import {
   TableContainer,
   TableToolbar,

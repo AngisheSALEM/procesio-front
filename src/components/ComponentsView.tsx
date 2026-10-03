@@ -3,7 +3,8 @@ import {
   CheckCircle,
   Check
 } from 'lucide-react';
-import { mockEnquetesData } from './table-variants/mockTableData';
+import type { EnqueteDataRow } from './table-variants/types';
+import type { DossierEnquete } from '../types';
 import { TableVariantDense } from './table-variants/TableVariantDense';
 import { TableVariantAccordion } from './table-variants/TableVariantAccordion';
 import { TableVariantSplitView } from './table-variants/TableVariantSplitView';
@@ -12,6 +13,38 @@ import { TableVariantZen } from './table-variants/TableVariantZen';
 
 interface ComponentsViewProps {
   onOpenDossier?: (id: string) => void;
+  dossiers?: DossierEnquete[];
+}
+
+function mapDossiersToRows(dossiers?: DossierEnquete[]): EnqueteDataRow[] {
+  if (!dossiers || dossiers.length === 0) return [];
+  return dossiers.map((d) => {
+    const primaryOp = d.operationsDouanieres?.[0];
+    const echeanceDate = d.echeance ? new Date(d.echeance) : null;
+    const now = new Date();
+    const diffDays = echeanceDate ? Math.max(0, Math.ceil((echeanceDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))) : 0;
+    return {
+      id: d.id,
+      reference: d.reference,
+      operateur: d.entiteControlee.nom,
+      nif: d.entiteControlee.nif || 'N/A',
+      bureau: primaryOp?.bureau || d.unite || 'Bureau Central',
+      regime: primaryOp?.regime || 'Contrôle a posteriori',
+      marchandise: primaryOp?.marchandise || d.objet || 'Marchandises diverses',
+      valeurUSD: primaryOp?.valeurDeclareeUSD || 0,
+      statut: d.statut === 'CLOTURE' ? 'CONFORME' : d.statut === 'RELAIS_CONTENTIEUX' ? 'CONTENTIEUX' : 'EN_COURS',
+      priorite: d.priorite === 'URGENTE' ? 'URGENTE' : 'NORMALE',
+      echeance: d.echeance || d.dateCreation || new Date().toISOString().slice(0, 10),
+      joursRestants: diffDays,
+      inspecteur: d.responsable || 'Agent DGDA',
+      tauxRisque: d.priorite === 'URGENTE' ? 85 : 45,
+      anomalieDetectee: d.motifOuverture || d.prochaineAction || 'Contrôle douanier en cours',
+      piecesFournies: d.operationsDouanieres?.length || 1,
+      piecesTotal: (d.operationsDouanieres?.length || 1) + 2,
+      derniereAction: d.prochaineAction || 'Instruction du dossier',
+      tags: [d.unite || 'DGDA', primaryOp?.regime || 'Douane'].filter(Boolean),
+    };
+  });
 }
 
 type VariantId = 'dense' | 'accordion' | 'split' | 'grouped' | 'zen';
@@ -106,7 +139,8 @@ const VARIANTS: VariantMeta[] = [
   },
 ];
 
-export const ComponentsView: React.FC<ComponentsViewProps> = ({ onOpenDossier }) => {
+export const ComponentsView: React.FC<ComponentsViewProps> = ({ onOpenDossier, dossiers }) => {
+  const tableData = React.useMemo(() => mapDossiersToRows(dossiers), [dossiers]);
   const STORAGE_KEY = 'procezo_preferred_table_variant';
   const [selectedVariant, setSelectedVariant] = useState<VariantId>('zen');
   const [preferredVariant, setPreferredVariant] = useState<VariantId>(() => {
@@ -418,19 +452,19 @@ export const ComponentsView: React.FC<ComponentsViewProps> = ({ onOpenDossier })
           {/* Render Active Table Component */}
           <div>
             {selectedVariant === 'dense' && (
-              <TableVariantDense data={mockEnquetesData} onSelectDossier={onOpenDossier} />
+              <TableVariantDense data={tableData} onSelectDossier={onOpenDossier} />
             )}
             {selectedVariant === 'accordion' && (
-              <TableVariantAccordion data={mockEnquetesData} onOpenDossier={onOpenDossier} />
+              <TableVariantAccordion data={tableData} onOpenDossier={onOpenDossier} />
             )}
             {selectedVariant === 'split' && (
-              <TableVariantSplitView data={mockEnquetesData} onOpenDossier={onOpenDossier} />
+              <TableVariantSplitView data={tableData} onOpenDossier={onOpenDossier} />
             )}
             {selectedVariant === 'grouped' && (
-              <TableVariantGrouped data={mockEnquetesData} onOpenDossier={onOpenDossier} />
+              <TableVariantGrouped data={tableData} onOpenDossier={onOpenDossier} />
             )}
             {selectedVariant === 'zen' && (
-              <TableVariantZen data={mockEnquetesData} onOpenDossier={onOpenDossier} />
+              <TableVariantZen data={tableData} onOpenDossier={onOpenDossier} />
             )}
           </div>
         </>
@@ -500,11 +534,11 @@ export const ComponentsView: React.FC<ComponentsViewProps> = ({ onOpenDossier })
                 </div>
               </div>
 
-              {v.id === 'dense' && <TableVariantDense data={mockEnquetesData} onSelectDossier={onOpenDossier} />}
-              {v.id === 'accordion' && <TableVariantAccordion data={mockEnquetesData} onOpenDossier={onOpenDossier} />}
-              {v.id === 'split' && <TableVariantSplitView data={mockEnquetesData} onOpenDossier={onOpenDossier} />}
-              {v.id === 'grouped' && <TableVariantGrouped data={mockEnquetesData} onOpenDossier={onOpenDossier} />}
-              {v.id === 'zen' && <TableVariantZen data={mockEnquetesData} onOpenDossier={onOpenDossier} />}
+              {v.id === 'dense' && <TableVariantDense data={tableData} onSelectDossier={onOpenDossier} />}
+              {v.id === 'accordion' && <TableVariantAccordion data={tableData} onOpenDossier={onOpenDossier} />}
+              {v.id === 'split' && <TableVariantSplitView data={tableData} onOpenDossier={onOpenDossier} />}
+              {v.id === 'grouped' && <TableVariantGrouped data={tableData} onOpenDossier={onOpenDossier} />}
+              {v.id === 'zen' && <TableVariantZen data={tableData} onOpenDossier={onOpenDossier} />}
             </div>
           ))}
         </div>

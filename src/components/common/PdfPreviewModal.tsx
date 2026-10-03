@@ -22,6 +22,16 @@ export interface PdfPreviewMetadata {
   entite?: string;
 }
 
+export interface DocumentPreviewContent {
+  type?: string;
+  destinataire?: string;
+  objet?: string;
+  articles?: string[];
+  constats?: string[];
+  observations?: string[];
+  conclusions?: string;
+}
+
 export interface PdfPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -29,15 +39,8 @@ export interface PdfPreviewModalProps {
   fileUrl?: string | null;
   file?: File | null;
   metadata?: PdfPreviewMetadata;
-  mockContent?: {
-    type?: string;
-    destinataire?: string;
-    objet?: string;
-    articles?: string[];
-    constats?: string[];
-    observations?: string[];
-    conclusions?: string;
-  };
+  documentContent?: DocumentPreviewContent;
+  mockContent?: DocumentPreviewContent;
 }
 
 export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
@@ -47,8 +50,10 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
   fileUrl,
   file,
   metadata,
+  documentContent,
   mockContent,
 }) => {
+  const content = documentContent || mockContent;
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
@@ -449,7 +454,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
                       textDecoration: 'underline',
                     }}
                   >
-                    {mockContent?.type || title.replace(/\.pdf$/i, '').replace(/_/g, ' ')}
+                    {content?.type || title.replace(/\.pdf$/i, '').replace(/_/g, ' ')}
                   </div>
                   {metadata?.entite && (
                     <div style={{ fontSize: '12px', marginTop: '6px', fontWeight: 600 }}>
@@ -460,17 +465,17 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
 
                 {/* Corps de document */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {mockContent?.objet && (
+                  {content?.objet && (
                     <div>
                       <strong>OBJET : </strong>
-                      <span>{mockContent.objet}</span>
+                      <span>{content.objet}</span>
                     </div>
                   )}
 
-                  {mockContent?.destinataire && (
+                  {content?.destinataire && (
                     <div>
                       <strong>DESTINATAIRE : </strong>
-                      <span>{mockContent.destinataire}</span>
+                      <span>{content.destinataire}</span>
                     </div>
                   )}
 
@@ -483,11 +488,11 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
                     </p>
                   </div>
 
-                  {mockContent?.constats && mockContent.constats.length > 0 && (
+                  {content?.constats && content.constats.length > 0 && (
                     <div>
                       <strong>CONSTATATIONS MATÉRIELLES DES ENQUÊTEURS :</strong>
                       <ul style={{ margin: '6px 0 0 18px', padding: 0 }}>
-                        {mockContent.constats.map((c, idx) => (
+                        {content.constats.map((c, idx) => (
                           <li key={idx} style={{ marginBottom: '4px', textAlign: 'justify' }}>
                             {c}
                           </li>
@@ -496,11 +501,11 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
                     </div>
                   )}
 
-                  {mockContent?.observations && mockContent.observations.length > 0 && (
+                  {content?.observations && content.observations.length > 0 && (
                     <div>
                       <strong>OBSERVATIONS ET ÉLÉMENTS DE RÉPONSE RECUEILLIS :</strong>
                       <ul style={{ margin: '6px 0 0 18px', padding: 0 }}>
-                        {mockContent.observations.map((obs, idx) => (
+                        {content.observations.map((obs, idx) => (
                           <li key={idx} style={{ marginBottom: '4px', textAlign: 'justify' }}>
                             {obs}
                           </li>
@@ -512,7 +517,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
                   <div>
                     <strong>CONCLUSION OPÉRATIONNELLE :</strong>
                     <p style={{ margin: '4px 0 0 0', textAlign: 'justify' }}>
-                      {mockContent?.conclusions ||
+                      {content?.conclusions ||
                         "Le présent document fait foi des constatations opérées dans le cadre strict de la mission d'enquête douanière. Toute omission ou fausse déclaration expose le contrevenant aux peines prévues par la législation douanière en vigueur."}
                     </p>
                   </div>

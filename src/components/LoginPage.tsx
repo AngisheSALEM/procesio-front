@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, Briefcase, ShieldCheck, Lock, Mail, ArrowRight, UserCheck } from 'lucide-react';
+import { Shield, Briefcase, ShieldCheck, Lock, Mail, ArrowRight } from 'lucide-react';
 import type { UserRole } from '../types';
 
 interface LoginPageProps {
@@ -20,7 +20,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [password, setPassword] = useState('dgda-procezo-2026');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
 
   const handleSelectRole = (role: UserRole) => {
     setSelectedRole(role);
@@ -50,33 +49,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       setSubmitting(false);
     }
   };
-
-  const activeUser = selectedRole === 'director'
-    ? {
-        prenom: 'Salem',
-        nom: 'Mukendi',
-        grade: 'Inspecteur Principal / Chef de Division',
-        unite: 'Direction des Recherches et Enquêtes (DRK)',
-        avatarInitials: 'SM',
-        matricule: 'DGDA-DIR-089',
-      }
-    : selectedRole === 'admin'
-    ? {
-        prenom: 'Alain',
-        nom: 'Mbombo',
-        grade: 'Administrateur Système & Contrôleur d’Audit',
-        unite: 'Cellule Nationale d’Audit & Supervision (DGA)',
-        avatarInitials: 'AM',
-        matricule: 'DGDA-SYS-001',
-      }
-    : {
-        prenom: 'Marc',
-        nom: 'Kabamba',
-        grade: 'Inspecteur Vérificateur de 1ère classe',
-        unite: 'Direction des Recherches et Enquêtes (DRK)',
-        avatarInitials: 'MK',
-        matricule: 'DGDA-INSP-2041',
-      };
 
   return (
     <div
@@ -141,36 +113,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           >
             PROCEZO
           </h1>
-          <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-            Direction Générale des Douanes et Accises — RDC
-          </p>
-          <div
-            style={{
-              fontSize: '11px',
-              color: 'var(--color-text-secondary)',
-              marginTop: '6px',
-              fontWeight: 500,
-            }}
-          >
-            Portail de gestion des enquêtes et du renseignement
-          </div>
+         
+          
         </div>
 
         {/* Persona / Role Selector Buttons */}
         <div>
-          <label
-            style={{
-              display: 'block',
-              fontSize: '11px',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.8px',
-              color: 'var(--color-text-muted)',
-              marginBottom: '10px',
-            }}
-          >
-            Sélectionnez votre profil de connexion :
-          </label>
+         
           <div className="form-grid-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
             <button
               type="button"
@@ -276,45 +225,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           </div>
         </div>
 
-        {/* Selected Account Info Card */}
-        <div
-          style={{
-            backgroundColor: 'var(--glass-surface)',
-            border: '1px solid var(--glass-border)',
-            borderRadius: '14px',
-            padding: '12px 14px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-          }}
-        >
-          <div
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '9999px',
-              backgroundColor: 'var(--color-surface-elevated)',
-              border: '1px solid var(--color-border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              fontSize: '13px',
-              color: 'var(--color-accent)',
-            }}
-          >
-            {activeUser.avatarInitials}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-              {activeUser.prenom} {activeUser.nom}
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-              {activeUser.grade} • {activeUser.unite}
-            </div>
-          </div>
-          <UserCheck size={16} color="var(--color-accent)" />
-        </div>
+
 
         {/* Login Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -427,19 +338,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </div>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input
-              type="checkbox"
-              id="remember"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              style={{ cursor: 'pointer' }}
-            />
-            <label htmlFor="remember" style={{ fontSize: '12px', color: 'var(--color-text-muted)', cursor: 'pointer' }}>
-              Rester connecté sur ce poste
-            </label>
-          </div>
-
+          
           <button
             type="submit"
             disabled={submitting || externalLoading}
@@ -487,9 +386,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           )}
         </form>
 
-        <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--color-text-muted)' }}>
-          Système officiel sécurisé — Accès réservé aux agents habilités DGDA
-        </div>
+
       </div>
     </div>
   );

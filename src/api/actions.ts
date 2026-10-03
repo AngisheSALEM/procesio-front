@@ -33,7 +33,14 @@ function resolveAssignee(workspace: WorkspaceData, label: string | undefined, ex
   const eligibleIds = unit ? workspace.agentScopes[unit]?.[classification === 1 ? 'restricted' : 'ordinary'] || [] : workspace.assignableAgentIds;
   if (explicit && (eligibleIds.length === 0 || eligibleIds.includes(explicit))) return explicit;
 
-  const candidateUsers = workspace.users.filter((user) => eligibleIds.length === 0 || eligibleIds.includes(user.id));
+  // Priorité absolue aux comptes réels (kabamba, tshilumba, mukendi) sur les alias de démo
+  const candidateUsers = workspace.users
+    .filter((user) => eligibleIds.length === 0 || eligibleIds.includes(user.id))
+    .sort((a, b) => {
+      const aDemo = a.username.startsWith('demo_') ? 1 : 0;
+      const bDemo = b.username.startsWith('demo_') ? 1 : 0;
+      return aDemo - bDemo;
+    });
 
   if (label) {
     const cleanLabel = label.toLowerCase()

@@ -490,6 +490,7 @@ export interface ApiAuditEvent {
   actor: number;
   actor_name?: string;
   unit: string;
+  unit_code?: string;
   unit_name?: string;
   classification: number;
   action: string;
@@ -499,8 +500,10 @@ export interface ApiAuditEvent {
   details: Record<string, unknown>;
 }
 
-export async function fetchAuditEvents(unitId?: string): Promise<ApiAuditEvent[]> {
-  const query = unitId ? `?unit=${encodeURIComponent(unitId)}&page_size=100` : '?page_size=100';
-  return apiAll<ApiAuditEvent>(`/audit/${query}`);
+export async function fetchAuditEvents(unitId?: string, pageSize = 100): Promise<ApiAuditEvent[]> {
+  const query = new URLSearchParams({ page_size: String(pageSize) });
+  if (unitId) query.set('unit', unitId);
+  const page = await apiGet<Page<ApiAuditEvent>>(`/audit/?${query.toString()}`);
+  return Array.isArray(page?.results) ? page.results : [];
 }
 

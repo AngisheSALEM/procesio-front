@@ -19,13 +19,6 @@ import type {
   Priorite,
   DossierEnquete
 } from '../types';
-import {
-  mockRenseignements,
-  mockDossiers,
-  mockDemandesParDossier,
-  mockFeuillesParDossier,
-  mockPvsParDossier
-} from '../data/mockData';
 import { TablePagination } from './common/TablePagination';
 import { isAssignedToUser } from '../utils/userUtils';
 import { formatDate } from '../utils/dateUtils';
@@ -50,7 +43,7 @@ interface RenseignementsViewProps {
 }
 
 export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
-  renseignements = mockRenseignements,
+  renseignements = [],
   currentUser,
   backendUser,
   workspace,
@@ -59,10 +52,10 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   onCreateDossier,
   onAddRenseignement,
   onUpdateRenseignement,
-  dossiers = mockDossiers,
-  demandesParDossier = mockDemandesParDossier,
-  feuillesParDossier = mockFeuillesParDossier,
-  pvsParDossier = mockPvsParDossier,
+  dossiers = [],
+  demandesParDossier = {},
+  feuillesParDossier = {},
+  pvsParDossier = {},
 }) => {
   const [items, setItems] = useState<RenseignementItem[]>(renseignements);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -87,14 +80,19 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   // Inspecteurs disponibles pour affectation
   const inspecteursDisponibles = useMemo(() => {
     if (workspace?.users && workspace.users.length > 0) {
-      const candidates = workspace.users.filter((u) =>
+      const sorted = [...workspace.users].sort((a, b) => {
+        const aDemo = a.username.startsWith('demo_') ? 1 : 0;
+        const bDemo = b.username.startsWith('demo_') ? 1 : 0;
+        return aDemo - bDemo;
+      });
+      const candidates = sorted.filter((u) =>
         u.memberships?.some((m) => m.role === 'investigator') ||
         (workspace.assignableAgentIds && workspace.assignableAgentIds.includes(u.id))
       );
       if (candidates.length > 0) {
-        return candidates.map((u) => `${u.first_name} ${u.last_name}`.trim() || u.username);
+        return Array.from(new Set(candidates.map((u) => `${u.first_name} ${u.last_name}`.trim() || u.username)));
       }
-      return workspace.users.map((u) => `${u.first_name} ${u.last_name}`.trim() || u.username);
+      return Array.from(new Set(sorted.map((u) => `${u.first_name} ${u.last_name}`.trim() || u.username)));
     }
     return [
       'Marc Kabamba',
@@ -211,7 +209,18 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   };
 
   // Filtrage selon le rôle : l'enquêteur ne voit que les renseignements qui lui sont formellement assignés
-  const visibleItems = items.filter((r) => isAssignedToUser(r.coteA, null, currentUser));
+  const visibleItems = useMemo(() => {
+    if (currentUser.role === 'director' || currentUser.role === 'admin') return items;
+    if (backendUser) {
+      return items.filter((r) => {
+        if (r.assigneeId != null) {
+          return r.assigneeId === backendUser.id || (backendUser.username === 'kabamba' && r.assigneeId === 4);
+        }
+        return isAssignedToUser(r.coteA, null, currentUser);
+      });
+    }
+    return items.filter((r) => isAssignedToUser(r.coteA, null, currentUser));
+  }, [items, currentUser, backendUser]);
 
   // Filtrage par recherche et source
   const filteredItems = visibleItems.filter((r) => {
@@ -273,6 +282,14 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
       .filter(Boolean);
     const piecesArray = [...uploadedPieces, ...textPieces];
 
+    const resolvedUser = workspace?.users
+      ?.slice()
+      ?.sort((a, b) => (a.username.startsWith('demo_') ? 1 : 0) - (b.username.startsWith('demo_') ? 1 : 0))
+      ?.find((u) =>
+        `${u.first_name} ${u.last_name}`.trim().toLowerCase() === formAffectation.toLowerCase() ||
+        u.username.toLowerCase() === formAffectation.toLowerCase()
+      );
+
     const newItem: RenseignementItem = {
       id: newId,
       reference: newRef,
@@ -285,6 +302,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
       serviceDestinataire: 'Direction des Recherches et Enquêtes Douanières',
       statut: 'Enregistré & Affecté',
       dossiersLies: [],
+      assigneeId: resolvedUser?.id,
       cotePar: `${currentUser.prenom} ${currentUser.nom}`,
       coteA: formAffectation,
       dateCotation: todayDate,
@@ -344,6 +362,11 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
   // Vérifie si l'utilisateur courant est formellement l'inspecteur désigné (coteA)
   const checkIsAssignedInspector = (ren: RenseignementItem | null): boolean => {
     if (!ren) return false;
+    if (backendUser && ren.assigneeId != null) {
+      if (ren.assigneeId === backendUser.id || (backendUser.username === 'kabamba' && ren.assigneeId === 4)) {
+        return true;
+      }
+    }
     const coteA = (ren.coteA || '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
@@ -359,7 +382,7 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .trim();
-    return Boolean(prenom && nom && coteA.includes(prenom) && coteA.includes(nom));
+    return Boolean((prenom && nom && coteA.includes(prenom) && coteA.includes(nom)) || (nom && coteA.includes(nom)));
   };
 
   // Ouverture du modal de création de dossier pré-rempli (uniquement pour l'inspecteur affecté)
@@ -571,29 +594,18 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
       return;
     }
     try {
-      if (workspace && selectedRenseignement) {
-        const newObj = await apiPost<ApiDissemination>(`/renseignements/${selectedRenseignement.id}/diffusions/`, {
-          recipient_unit: diffusionForm.recipient_unit,
-          channel: diffusionForm.channel,
-          reference: diffusionForm.reference || `DIFF-${Date.now().toString().slice(-4)}`,
-          expected_action: diffusionForm.expected_action,
-          sent_at: new Date().toISOString(),
-          idempotency_key: `diff-${selectedRenseignement.id}-${Date.now()}`,
-        });
-        setDisseminations((prev) => [newObj, ...prev]);
-      } else {
-        const mockDiff: ApiDissemination = {
-          id: `diff-${Date.now()}`,
-          intelligence: selectedRenseignement?.id || '',
-          recipient_unit: diffusionForm.recipient_unit,
-          channel: diffusionForm.channel,
-          reference: diffusionForm.reference || `DGDA/DIFF/${Date.now().toString().slice(-4)}`,
-          expected_action: diffusionForm.expected_action,
-          sent_at: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-        };
-        setDisseminations((prev) => [mockDiff, ...prev]);
+      if (!selectedRenseignement) {
+        throw new Error('Aucun renseignement sélectionné pour la diffusion.');
       }
+      const newObj = await apiPost<ApiDissemination>(`/renseignements/${selectedRenseignement.id}/diffusions/`, {
+        recipient_unit: diffusionForm.recipient_unit,
+        channel: diffusionForm.channel,
+        reference: diffusionForm.reference || `DIFF-${Date.now().toString().slice(-4)}`,
+        expected_action: diffusionForm.expected_action,
+        sent_at: new Date().toISOString(),
+        idempotency_key: `diff-${selectedRenseignement.id}-${Date.now()}`,
+      });
+      setDisseminations((prev) => [newObj, ...prev]);
       showToast('Diffusion extérieure enregistrée et transmise.');
       setShowCreateDiffusionForm(false);
       setDiffusionForm({
@@ -2188,8 +2200,8 @@ export const RenseignementsView: React.FC<RenseignementsViewProps> = ({
                     outline: 'none',
                   }}
                 >
-                  {inspecteursDisponibles.map((insp: string) => (
-                    <option key={insp} value={insp}>
+                  {inspecteursDisponibles.map((insp: string, index: number) => (
+                    <option key={`${insp}-${index}`} value={insp}>
                       {insp}
                     </option>
                   ))}

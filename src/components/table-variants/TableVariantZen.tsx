@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   SlidersHorizontal
 } from 'lucide-react';
-import type { EnqueteDataRow } from './mockTableData';
+import type { EnqueteDataRow } from './types';
 import {
   TableContainer,
   TableToolbar,

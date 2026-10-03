@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sun, Moon, User, Bell, Check, Shield, Briefcase, Activity, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Sun, Moon, User, Bell, Check, Shield, Briefcase } from 'lucide-react';
 import type { UserAccount } from '../types';
 import type { useTechnicalDebt } from '../hooks/useTechnicalDebt';
 

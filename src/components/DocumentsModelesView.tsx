@@ -203,7 +203,7 @@ export const DocumentsModelesView: React.FC = () => {
             date: selectedPreview.dateApplication,
             taille: 'Modèle officiel Procezo',
           }}
-          mockContent={{
+          documentContent={{
             type: selectedPreview.titre,
             objet: selectedPreview.description,
             constats: [

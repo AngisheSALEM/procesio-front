@@ -83,7 +83,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
   const [previewPdfData, setPreviewPdfData] = useState<{
     title: string;
     metadata?: any;
-    mockContent?: any;
+    documentContent?: any;
     file?: File;
     fileUrl?: string;
   } | null>(null);
@@ -1474,7 +1474,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                             date: proj.prepared_at,
                             entite: feuille.destinataire,
                           },
-                          mockContent: {
+                          documentContent: {
                             type: 'PROJET DE FEUILLE D’OBSERVATION (NON NOTIFIÉ)',
                             destinataire: feuille.destinataire,
                             objet: feuille.objetControle,
@@ -1528,7 +1528,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                           date: feuille.dateRedaction,
                           entite: feuille.destinataire,
                         },
-                        mockContent: {
+                        documentContent: {
                           type: 'FEUILLE D’OBSERVATIONS CONTRADICTOIRES NOTIFIÉE',
                           destinataire: feuille.destinataire,
                           objet: feuille.objetControle,
@@ -1865,7 +1865,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
                         date: feuille.dateRedaction,
                         entite: feuille.destinataire,
                       },
-                      mockContent: {
+                      documentContent: {
                         type: 'FEUILLE D’OBSERVATIONS CONTRADICTOIRES NOTIFIÉE',
                         destinataire: feuille.destinataire,
                         objet: feuille.objetControle,
@@ -2917,7 +2917,7 @@ export const FeuilleObservationView: React.FC<FeuilleObservationViewProps> = ({
           fileUrl={previewPdfData.fileUrl}
           file={previewPdfData.file}
           metadata={previewPdfData.metadata}
-          mockContent={previewPdfData.mockContent}
+          documentContent={previewPdfData.documentContent}
         />
       )}
     </div>

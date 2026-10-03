@@ -276,7 +276,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
   const [previewPdfData, setPreviewPdfData] = useState<{
     title: string;
     metadata?: any;
-    mockContent?: any;
+    documentContent?: any;
     file?: File;
     fileUrl?: string;
   } | null>(null);
@@ -1611,7 +1611,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             fileUrl={previewPdfData.fileUrl}
             file={previewPdfData.file}
             metadata={previewPdfData.metadata}
-            mockContent={previewPdfData.mockContent}
+            documentContent={previewPdfData.documentContent}
           />
         )}
       </>
@@ -1630,7 +1630,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
             fileUrl={previewPdfData.fileUrl}
             file={previewPdfData.file}
             metadata={previewPdfData.metadata}
-            mockContent={previewPdfData.mockContent}
+            documentContent={previewPdfData.documentContent}
           />
         )}
       </>
@@ -1984,7 +1984,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                         taille: demande.pdfSourceTaille || '940 Ko',
                         entite: demande.destinataire.nom,
                       },
-                      mockContent: {
+                      documentContent: {
                         type: 'DEMANDE DE COMMUNICATION DE DOCUMENTS (ART. 46)',
                         destinataire: `${demande.destinataire.nom} — ${demande.destinataire.adresse}`,
                         objet: demande.objet,
@@ -2056,7 +2056,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
                           taille: demande.reponsePdfTaille || '1.8 Mo',
                           entite: demande.destinataire.nom,
                         },
-                        mockContent: {
+                        documentContent: {
                           type: 'TRANSMISSION DES DOCUMENTS COMPTABLES & JUSTIFICATIFS',
                           destinataire: 'Direction Générale des Douanes et Accises (DGDA) - Brigade d’Enquêtes',
                           objet: `Réponse à la réquisition officielle ${demande.reference}`,
@@ -3511,7 +3511,7 @@ export const DemandeCommunicationView: React.FC<DemandeCommunicationViewProps> =
           fileUrl={previewPdfData.fileUrl}
           file={previewPdfData.file}
           metadata={previewPdfData.metadata}
-          mockContent={previewPdfData.mockContent}
+          documentContent={previewPdfData.documentContent}
         />
       )}
     </div>
